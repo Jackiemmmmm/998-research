@@ -1,40 +1,48 @@
-"""LangGraph single-node graph template.
+from typing import Annotated
 
-Returns a predefined response. Replace logic and configuration as needed.
-"""
+from typing_extensions import TypedDict
 
-from __future__ import annotations
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
 
-from typing import Any, Dict, TypedDict
+from langchain.chat_models import init_chat_model
 
-from langgraph.graph import StateGraph
-from langgraph.runtime import Runtime
-from langgraph.prebuilt import create_react_agent
+from langgraph.prebuilt import ToolNode, tools_condition
+from dotenv import load_dotenv
 
-
-class CalcState(TypedDict):
-    x: int
+from src.tool import tools
 
 
-def addition(state: CalcState) -> CalcState:
-    print(f"[addition]: {state}")
-    return CalcState(x=state["x"] + 1)
+load_dotenv()
 
 
-def subtraction(state: CalcState) -> CalcState:
-    print(f"[subtraction]: {state}")
-    return CalcState(x=state["x"] - 1)
+class State(TypedDict):
+    messages: Annotated[list, add_messages]
 
 
-# Define the graph
-graph = (
-    StateGraph(
-        CalcState,
-    )
-    .add_node("addition", addition)
-    .add_node("subtraction", subtraction)
-    .add_edge("__start__", "addition")
-    .add_edge("addition", "subtraction")
-    .add_edge("subtraction", "__end__")
-    .compile(name="New Graph")
+llm = init_chat_model("google_genai:gemini-2.0-flash")
+
+llm_with_tools = llm.bind_tools(tools)
+
+graph_builder = StateGraph(State)
+
+
+def chatbot(state: State):
+    response = llm_with_tools.invoke(state["messages"])
+    print(f"LLM response type: {type(response)}")
+    print(f"Has tool_calls: {hasattr(response, 'tool_calls') and response.tool_calls}")
+    return {"messages": [response]}
+
+
+graph_builder.add_node("chatbot", chatbot)
+tool_node = ToolNode(tools=tools)
+graph_builder.add_node("tools", tool_node)
+
+graph_builder.add_conditional_edges(
+    "chatbot",
+    tools_condition,
 )
+
+graph_builder.add_edge("tools", "chatbot")
+graph_builder.add_edge(START, "chatbot")
+graph = graph_builder.compile()
