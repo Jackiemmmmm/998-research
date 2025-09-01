@@ -7,5 +7,5 @@ load_dotenv()
 
 # {"messages": [{"role": "user", "content": "What date today? and What's weather in Wollongong today?"}]}
 
-graph = graph_manual
-# graph = graph_simple
+# graph = graph_manual
+graph = graph_simple
