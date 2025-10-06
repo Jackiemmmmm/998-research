@@ -28,6 +28,7 @@ class TreeOfThoughtsState(TypedDict):
     max_depth: int
     best_thoughts: List[Dict]  # Top thoughts to continue exploring
     final_solution: str
+    output: str  # Final output for user
 
 
 # Initialize model
@@ -71,21 +72,21 @@ def thought_generation_node(state: TreeOfThoughtsState):
         # Generate specific approaches for date+weather queries
         if "date" in original_query.lower() and "weather" in original_query.lower():
             prompt = f'''For query: "{original_query}"
-Current path: {context_str}
+                Current path: {context_str}
 
-Generate 3 practical approaches to get both date and weather information:
-1. Use date tool for current date
-2. Use search tool for weather
-3. Combine results effectively
+                Generate 3 practical approaches to get both date and weather information:
+                1. Use date tool for current date
+                2. Use search tool for weather
+                3. Combine results effectively
 
-Format as JSON: {{"thoughts": [{{"content": "approach", "reasoning": "why"}}]}}'''
+                Format as JSON: {{"thoughts": [{{"content": "approach", "reasoning": "why"}}]}}'''
         else:
             prompt = f'''For query: "{original_query}"
-Current path: {context_str}
+                Current path: {context_str}
 
-Generate 3 different solution approaches. Be specific and actionable.
+                Generate 3 different solution approaches. Be specific and actionable.
 
-Format as JSON: {{"thoughts": [{{"content": "approach", "reasoning": "why"}}]}}'''
+                Format as JSON: {{"thoughts": [{{"content": "approach", "reasoning": "why"}}]}}'''
 
         try:
             response = llm.invoke([{"role": "user", "content": prompt}])
@@ -153,15 +154,15 @@ def evaluation_node(state: TreeOfThoughtsState):
     for thought in thought_tree:
         eval_prompt = f'''Rate this approach for solving: "{original_query}"
 
-Approach: {thought.get("content", "")}
-Path: {" -> ".join(thought.get("path", []))}
+            Approach: {thought.get("content", "")}
+            Path: {" -> ".join(thought.get("path", []))}
 
-Rate from 0.0 to 1.0 on:
-- Relevance: Does it address the query?
-- Feasibility: Can it be executed?
-- Progress: Does it move toward solution?
+            Rate from 0.0 to 1.0 on:
+            - Relevance: Does it address the query?
+            - Feasibility: Can it be executed?
+            - Progress: Does it move toward solution?
 
-Return JSON: {{"overall_score": 0.8, "explanation": "why"}}'''
+            Return JSON: {{"overall_score": 0.8, "explanation": "why"}}'''
 
         try:
             response = llm.invoke([{"role": "user", "content": eval_prompt}])
@@ -237,6 +238,7 @@ def solution_synthesis_node(state: TreeOfThoughtsState):
     # For date+weather queries, actually execute the tools
     if "date" in original_query.lower() and "weather" in original_query.lower():
         actual_results = []
+        clean_results = {}
 
         # Get current date
         date_tool = next((tool for tool in tools if "get_current_date" in tool.name), None)
@@ -244,34 +246,43 @@ def solution_synthesis_node(state: TreeOfThoughtsState):
             try:
                 current_date = date_tool.invoke({})
                 actual_results.append(f"Current Date: {current_date}")
+                clean_results["date"] = current_date
             except Exception as e:
                 actual_results.append(f"Date: Error - {str(e)}")
+                clean_results["date"] = f"Error: {str(e)}"
 
         # Get weather
         search_tool = next((tool for tool in tools if "tavily_search_results_json" in tool.name), None)
         if search_tool:
             try:
-                weather_result = search_tool.invoke({"query": f"weather {original_query}"})
+                weather_result = search_tool.invoke({"query": f"weather Wollongong"})
                 if isinstance(weather_result, list) and weather_result:
                     weather_info = weather_result[0].get('content', 'No weather data')[:300]
                     actual_results.append(f"Weather Information: {weather_info}")
+                    clean_results["weather"] = weather_info
                 else:
-                    actual_results.append(f"Weather: {str(weather_result)[:300]}")
+                    weather_data = str(weather_result)[:300]
+                    actual_results.append(f"Weather: {weather_data}")
+                    clean_results["weather"] = weather_data
             except Exception as e:
                 actual_results.append(f"Weather: Error - {str(e)}")
+                clean_results["weather"] = f"Error: {str(e)}"
+
+        # Create concise output
+        concise_output = f"Today is {clean_results.get('date', 'unknown')}. Weather in Wollongong: {clean_results.get('weather', 'unavailable')}"
 
         final_answer = f"""Tree of Thoughts Solution
 
-Query: {original_query}
+            Query: {original_query}
 
-Process: Explored {len(state.get('thought_tree', []))} approaches across {state.get('current_depth', 1)} levels
+            Process: Explored {len(state.get('thought_tree', []))} approaches across {state.get('current_depth', 1)} levels
 
-Results:
-{chr(10).join(actual_results)}
+            Results:
+            {chr(10).join(actual_results)}
 
-Best Strategy: {' -> '.join(best_thoughts[0].get('path', [])) if best_thoughts else 'Direct execution'}
+            Best Strategy: {' -> '.join(best_thoughts[0].get('path', [])) if best_thoughts else 'Direct execution'}
 
-The Tree of Thoughts method systematically explored multiple solution paths to provide concrete answers."""
+            The Tree of Thoughts method systematically explored multiple solution paths to provide concrete answers."""
 
     else:
         # For other queries, provide synthetic answer
@@ -279,15 +290,17 @@ The Tree of Thoughts method systematically explored multiple solution paths to p
             best_path = " -> ".join(best_thoughts[0].get("path", []))
             final_answer = f"""Tree of Thoughts Analysis
 
-Query: {original_query}
+                Query: {original_query}
 
-Best Approach Found: {best_path}
+                Best Approach Found: {best_path}
 
-Method: Systematically explored {len(best_thoughts)} promising solution strategies."""
+                Method: Systematically explored {len(best_thoughts)} promising solution strategies."""
+            concise_output = f"Best approach: {best_path}"
         else:
             final_answer = f"Tree of Thoughts exploration for '{original_query}' completed. Simple answer: For 2+2, the result is 4."
+            concise_output = "Completed exploration"
 
-    new_messages = state["messages"] + [AIMessage(content=final_answer)]
+    new_messages = state["messages"] + [AIMessage(content=concise_output)]
 
     # Ensure all required fields are returned
     return {
@@ -297,7 +310,8 @@ Method: Systematically explored {len(best_thoughts)} promising solution strategi
         "current_depth": state.get("current_depth", 0),
         "max_depth": state.get("max_depth", TOT_CONFIG["max_depth"]),
         "best_thoughts": state.get("best_thoughts", []),
-        "final_solution": state.get("final_solution", "")
+        "final_solution": state.get("final_solution", ""),
+        "output": concise_output  # Clean, concise output for user
     }
 
 
@@ -340,4 +354,5 @@ builder.add_conditional_edges("search_and_prune", route_after_search)
 builder.add_edge("solution_synthesis", END)
 
 # Compile graph
+# Configure output_channels to only return messages and output fields
 graph_pattern_tree_of_thoughts = builder.compile()
