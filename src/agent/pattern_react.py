@@ -14,6 +14,7 @@ from langgraph.prebuilt import create_react_agent
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import SystemMessage, BaseMessage
 from src.tool import tools
+from src.llm_config import get_llm
 from langgraph.graph import StateGraph
 from typing import TypedDict, Annotated
 from langgraph.graph.message import add_messages
@@ -98,14 +99,15 @@ def create_enhanced_react_agent_with_prompt(model, tools, system_prompt=None):
         return base_agent
 
 # Create the basic ReAct agent (maintains compatibility)
+# 使用配置的 LLM
 graph_pattern_react = create_react_agent(
-    model="google_genai:gemini-2.0-flash",
+    model=get_llm(),
     tools=tools
 )
 
 # Create the enhanced ReAct agent with system prompt
 enhanced_graph_pattern_react = create_enhanced_react_agent_with_prompt(
-    model="google_genai:gemini-2.0-flash",
+    model=get_llm(),
     tools=tools,
     system_prompt=REACT_SYSTEM_PROMPT.format(
         tool_names=", ".join([tool.name for tool in tools])

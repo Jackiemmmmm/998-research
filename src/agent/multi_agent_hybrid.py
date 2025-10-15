@@ -5,6 +5,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import create_react_agent
 from dotenv import load_dotenv
 from src.tool import tools
+from src.llm_config import get_llm
 
 load_dotenv()
 
@@ -15,13 +16,13 @@ class HybridState(TypedDict):
 
 # 创建专门的agent
 research_agent = create_react_agent(
-    model="google_genai:gemini-2.0-flash",
+    model=get_llm(),
     tools=tools,
     system_message="You are a research specialist. Gather comprehensive information."
 )
 
 analysis_agent = create_react_agent(
-    model="google_genai:gemini-2.0-flash", 
+    model=get_llm(), 
     tools=[],  # 分析agent不需要工具，只分析已有信息
     system_message="You are an analysis specialist. Analyze and synthesize information."
 )

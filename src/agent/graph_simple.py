@@ -1,4 +1,5 @@
 from langgraph.prebuilt import create_react_agent
 from src.tool import tools
+from src.llm_config import get_llm
 
-graph_simple = create_react_agent(model="google_genai:gemini-2.0-flash", tools=tools)
+graph_simple = create_react_agent(model=get_llm(), tools=tools)

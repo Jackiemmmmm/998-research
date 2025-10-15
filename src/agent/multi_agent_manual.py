@@ -6,6 +6,7 @@ from langchain.chat_models import init_chat_model
 from langgraph.prebuilt import ToolNode
 from dotenv import load_dotenv
 from src.tool import tools
+from src.llm_config import get_llm
 
 load_dotenv()
 
@@ -17,7 +18,7 @@ class MultiAgentState(TypedDict):
     analysis_complete: bool
 
 # 初始化模型
-llm = init_chat_model("google_genai:gemini-2.0-flash")
+llm = get_llm()
 llm_with_tools = llm.bind_tools(tools)
 
 # 研究agent节点

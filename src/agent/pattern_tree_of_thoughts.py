@@ -14,9 +14,9 @@ from typing import Annotated, List, Dict, Literal
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage
 from src.tool import tools
+from src.llm_config import get_llm
 import json
 
 
@@ -31,8 +31,8 @@ class TreeOfThoughtsState(TypedDict):
     output: str  # Final output for user
 
 
-# Initialize model
-llm = init_chat_model("google_genai:gemini-2.0-flash")
+# Initialize model - 使用配置的 LLM
+llm = get_llm()
 
 # Configuration
 TOT_CONFIG = {

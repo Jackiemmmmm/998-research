@@ -8,10 +8,10 @@ from typing import Annotated
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage
 from langgraph.prebuilt import ToolNode, tools_condition
 from src.tool import tools
+from src.llm_config import get_llm
 
 
 class SequentialState(TypedDict):
@@ -21,8 +21,8 @@ class SequentialState(TypedDict):
     execution_result: str
 
 
-# 初始化模型
-llm = init_chat_model("google_genai:gemini-2.0-flash")
+# 初始化模型 - 使用配置的 LLM
+llm = get_llm()
 
 
 # 规划节点

@@ -3,7 +3,10 @@
     "allow": [
       "Bash(python -m pip install:*)",
       "Bash(python:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(chmod:*)",
+      "Bash(pip install:*)",
+      "Bash(timeout 60 python:*)"
     ],
     "deny": [],
     "ask": []

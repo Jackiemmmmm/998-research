@@ -13,10 +13,10 @@ from typing import Annotated, Literal
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage
 # 不需要 ToolNode 和 tools_condition - Reflex Agent 直接调用工具
 from src.tool import tools
+from src.llm_config import get_llm
 import re
 
 
@@ -26,8 +26,8 @@ class ReflexState(TypedDict):
     action_taken: str
 
 
-# 初始化模型
-llm = init_chat_model("google_genai:gemini-2.0-flash")
+# 初始化模型 - 使用配置的 LLM
+llm = get_llm()
 
 # 定义反射规则集 - 简单的if-then规则
 REFLEX_RULES = [
