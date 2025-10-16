@@ -24,6 +24,7 @@ class ReflexState(TypedDict):
     messages: Annotated[list, add_messages]
     matched_rule: str
     action_taken: str
+    evaluation_mode: bool  # If True, output clean results without decorative formatting
 
 
 # 初始化模型 - 使用配置的 LLM
@@ -195,9 +196,16 @@ def rule_matcher_node(state: ReflexState):
                 response_parts.append(f"🔧 I'll try to help: {rule.get('response', 'How can I assist you?')}")
                 tools_used.append("tavily_search_results_json (failed)")
 
-    # 构建最终响应
-    tool_info = f"🔧 Tools used: {', '.join(set(tools_used))}\n\n"
-    final_response = tool_info + "\n\n".join(response_parts)
+    # 构建最终响应 - 根据 evaluation_mode 决定是否添加格式化前缀
+    evaluation_mode = state.get("evaluation_mode", False)
+
+    if evaluation_mode:
+        # Evaluation mode: clean output without decorative formatting
+        final_response = "\n\n".join(response_parts)
+    else:
+        # Demo mode: add tool usage info for readability
+        tool_info = f"🔧 Tools used: {', '.join(set(tools_used))}\n\n"
+        final_response = tool_info + "\n\n".join(response_parts)
 
     return {
         "messages": messages + [AIMessage(content=final_response)],

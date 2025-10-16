@@ -290,7 +290,7 @@ TEST_SUITE: List[TestTask] = [
         complexity="complex",
         prompt="Plan a 2-day Rome itinerary including at least three attractions: Colosseum, Trevi Fountain, Vatican Museums. Return JSON {day1:[...], day2:[...]}.",
         ground_truth=None,
-        judge={"mode": "regex", "pattern": r"(?s).*Colosseum.*(?s).*Trevi Fountain.*(?s).*Vatican Museums.*"},
+        judge={"mode": "regex", "pattern": r"(?s).*Colosseum.*Trevi Fountain.*Vatican Museums.*"},
         schema={
             "type": "object",
             "properties": {

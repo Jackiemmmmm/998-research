@@ -17,7 +17,8 @@ class Judge:
         output: str,
         ground_truth: Any,
         judge_config: Dict[str, Any],
-        schema: Optional[Dict[str, Any]] = None
+        schema: Optional[Dict[str, Any]] = None,
+        lenient: bool = False
     ) -> Tuple[bool, str]:
         """
         Evaluate output against ground truth
@@ -27,10 +28,15 @@ class Judge:
             ground_truth: Expected answer
             judge_config: Judge configuration with 'mode' field
             schema: Optional JSON schema for validation
+            lenient: If True, extract answer from output before judging
 
         Returns:
             Tuple of (success: bool, explanation: str)
         """
+        # Apply lenient extraction if requested
+        if lenient:
+            output = Judge._extract_answer(output, ground_truth, judge_config)
+
         mode = judge_config.get("mode", "exact")
 
         if mode == "exact":
@@ -41,6 +47,81 @@ class Judge:
             return Judge._judge_regex(output, judge_config)
         else:
             return False, f"Unknown judge mode: {mode}"
+
+    @staticmethod
+    def _extract_answer(
+        output: str,
+        ground_truth: Any,
+        judge_config: Dict[str, Any]
+    ) -> str:
+        """
+        Intelligently extract the actual answer from verbose model output
+
+        Examples:
+            "The cost of 12 apples is $20." -> "20"
+            "Anna is the shortest." -> "Anna"
+            "The date '12 October 2025' normalized to ISO 2025-10-12" -> "2025-10-12"
+
+        Args:
+            output: Raw model output
+            ground_truth: Expected answer (used to infer extraction type)
+            judge_config: Judge configuration
+
+        Returns:
+            Extracted answer string
+        """
+        mode = judge_config.get("mode", "exact")
+
+        # Ensure output is a string
+        if not isinstance(output, str):
+            output = str(output)
+
+        output = output.strip()
+
+        # For JSON mode, don't extract here - _judge_json handles JSON extraction
+        # Extraction here would return a dict, causing .strip() errors later
+        if mode == "json":
+            return output
+
+        # For regex mode, don't extract (regex is already lenient)
+        if mode == "regex":
+            return output
+
+        # For exact mode, infer type from ground_truth
+        if ground_truth is not None:
+            ground_truth_str = str(ground_truth).strip()
+
+            # Check if ground_truth is a number
+            if re.match(r'^\d+(\.\d+)?$', ground_truth_str):
+                # Extract first number from output
+                match = re.search(r'\b(\d+(?:\.\d+)?)\b', output)
+                if match:
+                    return match.group(1)
+
+            # Check if ground_truth is a date (YYYY-MM-DD)
+            elif re.match(r'^\d{4}-\d{2}-\d{2}$', ground_truth_str):
+                # Extract ISO date
+                match = re.search(r'\b(\d{4}-\d{2}-\d{2})\b', output)
+                if match:
+                    return match.group(1)
+
+            # Check if ground_truth is a single word
+            elif ' ' not in ground_truth_str and len(ground_truth_str) < 30:
+                # Extract first meaningful word
+                # Remove common prefix phrases
+                cleaned = output
+                for prefix in ["The answer is", "It is", "The result is", "This is"]:
+                    if cleaned.lower().startswith(prefix.lower()):
+                        cleaned = cleaned[len(prefix):].strip()
+
+                # Get first word, removing punctuation
+                words = cleaned.split()
+                if words:
+                    first_word = words[0].rstrip('.,!?:;')
+                    return first_word
+
+        # If no extraction applied, return original
+        return output
 
     @staticmethod
     def _judge_exact(output: str, ground_truth: Any) -> Tuple[bool, str]:

@@ -245,22 +245,29 @@ class ReportGenerator:
         print(" " * 20 + "EVALUATION REPORT")
         print("="*70)
 
-        # Summary table
+        # Summary table with both success rates
         print("\n📊 SUMMARY COMPARISON")
-        print("-"*70)
-        print(f"{'Pattern':<15} {'Success':<10} {'Latency':<10} {'Tokens':<10} {'Robust':<10}")
-        print("-"*70)
+        print("-"*80)
+        print(f"{'Pattern':<12} {'Strict':<9} {'Lenient':<9} {'Gap':<7} {'Latency':<10} {'Tokens':<8} {'Robust':<8}")
+        print("-"*80)
 
         for row in comparison["summary_table"]:
             print(
-                f"{row['pattern']:<15} "
-                f"{row['success_rate']:>8.1%}  "
+                f"{row['pattern']:<12} "
+                f"{row['success_rate_strict']:>7.1%}  "
+                f"{row['success_rate_lenient']:>7.1%}  "
+                f"{row['controllability_gap']:>5.1%}  "
                 f"{row['avg_latency_sec']:>8.2f}s  "
-                f"{row['avg_tokens']:>8.0f}  "
-                f"{row['degradation_pct']:>7.1f}%"
+                f"{row['avg_tokens']:>6.0f}  "
+                f"{row['degradation_pct']:>6.1f}%"
             )
 
-        print("-"*70)
+        print("-"*80)
+        print("\nLegend:")
+        print("  Strict:  Exact match evaluation")
+        print("  Lenient: With intelligent answer extraction")
+        print("  Gap:     Controllability gap (lenient - strict)")
+        print("-"*80)
 
         # Winners
         print("\n🏆 DIMENSION WINNERS")

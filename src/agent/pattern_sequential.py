@@ -19,6 +19,7 @@ class SequentialState(TypedDict):
     stage: str
     plan: str
     execution_result: str
+    evaluation_mode: bool  # If True, output clean results without verbose formatting
 
 
 # 初始化模型 - 使用配置的 LLM
@@ -63,6 +64,7 @@ Format: "PLAN: [your detailed plan here]"
         "stage": "execution",
         "plan": plan,
         "execution_result": "",
+        "evaluation_mode": state.get("evaluation_mode", False),
     }
 
 
@@ -104,6 +106,7 @@ Your goal is to provide a final, complete answer to the user's question.""",
             "stage": "review",
             "plan": state.get("plan", ""),
             "execution_result": execution_content,
+            "evaluation_mode": state.get("evaluation_mode", False),
         }
     except Exception as e:
         error_message = f"Execution failed with error: {str(e)}"
@@ -113,6 +116,7 @@ Your goal is to provide a final, complete answer to the user's question.""",
             "stage": "review",
             "plan": state.get("plan", ""),
             "execution_result": error_message,
+            "evaluation_mode": state.get("evaluation_mode", False),
         }
 
 
@@ -126,11 +130,32 @@ def review_node(state: SequentialState):
         state["messages"][0].content if state["messages"] else "No original query"
     )
 
-    # 构建正确的消息格式
-    review_messages = [
-        {
-            "role": "user",
-            "content": f"""You are in the REVIEW stage of a sequential processing pattern.
+    # Check if in evaluation mode
+    evaluation_mode = state.get("evaluation_mode", False)
+
+    # Adjust prompt based on evaluation mode
+    if evaluation_mode:
+        # Evaluation mode: output only the concise answer
+        review_prompt = f"""You are in the REVIEW stage of a sequential processing pattern.
+
+Original User Query: {original_query}
+Plan Created: {state.get('plan', 'No plan')}
+Execution Result: {state.get('execution_result', 'No execution result')}
+
+Your task: Provide ONLY the direct answer to the user's query. Be extremely concise.
+
+IMPORTANT:
+- Output ONLY the answer itself, nothing more
+- For calculations: output only the number (e.g., "408", not "The result is 408")
+- For facts: output only the fact (e.g., "Paris", not "The capital is Paris")
+- For dates: output only the date in requested format
+- For JSON: output only the JSON object
+- NO explanations, NO prefixes, NO formatting
+
+Provide only the answer:"""
+    else:
+        # Demo mode: comprehensive user-friendly response
+        review_prompt = f"""You are in the REVIEW stage of a sequential processing pattern.
 
 Original User Query: {original_query}
 Plan Created: {state.get('plan', 'No plan')}
@@ -145,10 +170,10 @@ Guidelines:
 - Present the information in a clear, user-friendly format
 - Don't mention internal stages - just provide the final answer
 
-Please provide the final answer that directly addresses the user's query.
-""",
-        }
-    ]
+Please provide the final answer that directly addresses the user's query."""
+
+    # 构建正确的消息格式
+    review_messages = [{"role": "user", "content": review_prompt}]
 
     response = review_llm.invoke(review_messages)
 
@@ -160,6 +185,7 @@ Please provide the final answer that directly addresses the user's query.
         "stage": "completed",
         "plan": state.get("plan", ""),
         "execution_result": state.get("execution_result", ""),
+        "evaluation_mode": state.get("evaluation_mode", False),
     }
 
 

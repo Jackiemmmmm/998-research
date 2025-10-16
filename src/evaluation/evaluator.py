@@ -47,8 +47,10 @@ class TaskResult:
     tool_call_count: int = 0
 
     # Validation
-    judge_success: bool = False
+    judge_success: bool = False  # Strict evaluation
     judge_message: str = ""
+    lenient_judge_success: bool = False  # Lenient evaluation (with answer extraction)
+    lenient_judge_message: str = ""
     schema_compliant: bool = True
     tool_policy_compliant: bool = True
 
@@ -145,7 +147,9 @@ class PatternEvaluator:
         print(f"\n{'='*60}")
         print(f"Evaluation Complete: {pattern_name}")
         print(f"{'='*60}")
-        print(f"Success Rate: {metrics.success.success_rate():.1%}")
+        print(f"Success Rate (Strict): {metrics.success.success_rate():.1%}")
+        print(f"Success Rate (Lenient): {metrics.success.lenient_success_rate():.1%}")
+        print(f"Controllability Gap: {metrics.success.controllability_gap():.1%}")
         print(f"Avg Latency: {metrics.efficiency.avg_latency():.2f}s")
         print(f"Avg Tokens: {metrics.efficiency.avg_total_tokens():.0f}")
         print(f"Controllability: {metrics.controllability.overall_controllability():.1%}")
@@ -173,8 +177,14 @@ class PatternEvaluator:
             result = await self._run_single_task(pattern_name, graph, task, prompt)
             results.append(result)
 
-            status = "✓" if result.judge_success else "✗"
-            print(f"           {status} {result.judge_message[:60]}")
+            # Display strict evaluation result
+            strict_status = "✓" if result.judge_success else "✗"
+            print(f"           Strict:  {strict_status} {result.judge_message[:50]}")
+
+            # If lenient result differs, show it as well
+            if result.lenient_judge_success != result.judge_success:
+                lenient_status = "✓" if result.lenient_judge_success else "✗"
+                print(f"           Lenient: {lenient_status} {result.lenient_judge_message[:50]}")
 
             # Add delay between tasks to avoid rate limits
             if i < len(tasks) and self.delay_between_tasks > 0:
@@ -201,10 +211,14 @@ class PatternEvaluator:
             # Execute task
             start_time = time.time()
 
-            # Invoke graph
+            # Invoke graph with evaluation_mode enabled
+            # This tells patterns (Reflex, ToT) to output clean results without decorative formatting
             response = await asyncio.to_thread(
                 graph.invoke,
-                {"messages": [{"role": "user", "content": prompt}]}
+                {
+                    "messages": [{"role": "user", "content": prompt}],
+                    "evaluation_mode": True  # Clean output for evaluation
+                }
             )
 
             end_time = time.time()
@@ -240,16 +254,29 @@ class PatternEvaluator:
             result.output_tokens = len(result.output) // 4
             result.total_tokens = result.input_tokens + result.output_tokens
 
-            # Judge output
+            # Judge output - Strict evaluation (exact match)
             judge_success, judge_msg = Judge.evaluate(
                 result.output,
                 task.ground_truth,
                 task.judge,
                 task.schema,
+                lenient=False  # Strict mode
             )
 
             result.judge_success = judge_success
             result.judge_message = judge_msg
+
+            # Judge output - Lenient evaluation (with answer extraction)
+            lenient_judge_success, lenient_judge_msg = Judge.evaluate(
+                result.output,
+                task.ground_truth,
+                task.judge,
+                task.schema,
+                lenient=True  # Lenient mode with answer extraction
+            )
+
+            result.lenient_judge_success = lenient_judge_success
+            result.lenient_judge_message = lenient_judge_msg
 
             # Check schema compliance
             if task.schema:
@@ -290,9 +317,10 @@ class PatternEvaluator:
         results: List[TaskResult],
         tasks: List[TestTask],
     ):
-        """Collect success dimension metrics"""
+        """Collect success dimension metrics (both strict and lenient)"""
         success_metrics.total_tasks = len(results)
         success_metrics.successful_tasks = sum(1 for r in results if r.judge_success)
+        success_metrics.lenient_successful_tasks = sum(1 for r in results if r.lenient_judge_success)
         success_metrics.failed_tasks = sum(1 for r in results if not r.judge_success)
 
         # By category

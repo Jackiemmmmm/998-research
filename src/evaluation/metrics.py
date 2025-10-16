@@ -16,19 +16,32 @@ class SuccessMetrics:
     """Success dimension metrics"""
 
     total_tasks: int = 0
-    successful_tasks: int = 0
+    successful_tasks: int = 0  # Strict: exact match
     failed_tasks: int = 0
     partial_success_tasks: int = 0
+
+    # Lenient evaluation (with answer extraction)
+    lenient_successful_tasks: int = 0  # Lenient: after extracting answer
 
     # Per-category breakdown
     success_by_category: Dict[str, float] = field(default_factory=dict)
     success_by_complexity: Dict[str, float] = field(default_factory=dict)
 
     def success_rate(self) -> float:
-        """Overall success rate"""
+        """Overall success rate (strict)"""
         if self.total_tasks == 0:
             return 0.0
         return self.successful_tasks / self.total_tasks
+
+    def lenient_success_rate(self) -> float:
+        """Overall success rate (lenient with answer extraction)"""
+        if self.total_tasks == 0:
+            return 0.0
+        return self.lenient_successful_tasks / self.total_tasks
+
+    def controllability_gap(self) -> float:
+        """Gap between lenient and strict success (indicates output format control)"""
+        return self.lenient_success_rate() - self.success_rate()
 
     def failure_rate(self) -> float:
         """Overall failure rate"""
@@ -40,10 +53,13 @@ class SuccessMetrics:
         """Convert to dictionary"""
         return {
             "total_tasks": self.total_tasks,
-            "successful_tasks": self.successful_tasks,
+            "successful_tasks_strict": self.successful_tasks,
+            "successful_tasks_lenient": self.lenient_successful_tasks,
             "failed_tasks": self.failed_tasks,
             "partial_success_tasks": self.partial_success_tasks,
-            "success_rate": round(self.success_rate(), 3),
+            "success_rate_strict": round(self.success_rate(), 3),
+            "success_rate_lenient": round(self.lenient_success_rate(), 3),
+            "controllability_gap": round(self.controllability_gap(), 3),
             "failure_rate": round(self.failure_rate(), 3),
             "success_by_category": {k: round(v, 3) for k, v in self.success_by_category.items()},
             "success_by_complexity": {k: round(v, 3) for k, v in self.success_by_complexity.items()},
@@ -239,7 +255,9 @@ class PatternMetrics:
         """Get summary metrics"""
         return {
             "pattern": self.pattern_name,
-            "success_rate": round(self.success.success_rate(), 3),
+            "success_rate_strict": round(self.success.success_rate(), 3),
+            "success_rate_lenient": round(self.success.lenient_success_rate(), 3),
+            "controllability_gap": round(self.success.controllability_gap(), 3),
             "avg_latency_sec": round(self.efficiency.avg_latency(), 2),
             "avg_tokens": round(self.efficiency.avg_total_tokens(), 1),
             "degradation_pct": round(self.robustness.degradation_percentage, 2),

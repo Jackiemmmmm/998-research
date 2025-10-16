@@ -29,6 +29,7 @@ class TreeOfThoughtsState(TypedDict):
     best_thoughts: List[Dict]  # Top thoughts to continue exploring
     final_solution: str
     output: str  # Final output for user
+    evaluation_mode: bool  # If True, output clean results without decorative formatting
 
 
 # Initialize model - 使用配置的 LLM
@@ -209,7 +210,13 @@ def search_and_prune_node(state: TreeOfThoughtsState):
     if current_depth >= max_depth or any(t.get("score", 0) >= TOT_CONFIG["evaluation_threshold"] for t in sorted_thoughts):
         best_solution = sorted_thoughts[0]
         solution_path = " -> ".join(best_solution.get("path", []))
-        final_solution = f"Best approach: {solution_path}"
+
+        # Format based on evaluation_mode
+        evaluation_mode = state.get("evaluation_mode", False)
+        if evaluation_mode:
+            final_solution = solution_path  # Clean output for evaluation
+        else:
+            final_solution = f"Best approach: {solution_path}"  # Formatted for demo
 
         return {
             **state,
@@ -286,6 +293,8 @@ def solution_synthesis_node(state: TreeOfThoughtsState):
 
     else:
         # For other queries, provide synthetic answer
+        evaluation_mode = state.get("evaluation_mode", False)
+
         if best_thoughts:
             best_path = " -> ".join(best_thoughts[0].get("path", []))
             final_answer = f"""Tree of Thoughts Analysis
@@ -295,7 +304,12 @@ def solution_synthesis_node(state: TreeOfThoughtsState):
                 Best Approach Found: {best_path}
 
                 Method: Systematically explored {len(best_thoughts)} promising solution strategies."""
-            concise_output = f"Best approach: {best_path}"
+
+            # Format based on evaluation_mode
+            if evaluation_mode:
+                concise_output = best_path  # Clean output for evaluation
+            else:
+                concise_output = f"Best approach: {best_path}"  # Formatted for demo
         else:
             final_answer = f"Tree of Thoughts exploration for '{original_query}' completed. Simple answer: For 2+2, the result is 4."
             concise_output = "Completed exploration"
