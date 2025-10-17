@@ -11,13 +11,9 @@ Based on IBM's ReAct agent best practices:
 - Includes termination conditions and iteration limits
 """
 from langgraph.prebuilt import create_react_agent
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import SystemMessage, BaseMessage
+from langchain_core.messages import SystemMessage
 from src.tool import tools
 from src.llm_config import get_llm
-from langgraph.graph import StateGraph
-from typing import TypedDict, Annotated
-from langgraph.graph.message import add_messages
 
 # Enhanced ReAct agent with improved reasoning-action-observation loop
 # System message that guides the agent's behavior according to ReAct principles
@@ -31,11 +27,13 @@ For each task, follow this iterative process:
    - Break down complex tasks into smaller subtasks
    - Consider which tools or actions would be most helpful
    - Reason about the current state and next steps
+   - IMPORTANT: For simple reasoning tasks (math, logic, comparisons), you can solve them directly without tools
 
-2. **ACTION**: Take a specific action using available tools
+2. **ACTION**: Take a specific action using available tools (only when needed)
    - Choose the most appropriate tool for your current need
    - Provide clear, specific parameters for tool calls
    - Only take one action at a time
+   - Skip this step if you can answer using reasoning alone
 
 3. **OBSERVATION**: Analyze the results of your action
    - Interpret the information you received
@@ -45,17 +43,27 @@ For each task, follow this iterative process:
 
 4. **REPEAT**: Continue the Thought-Action-Observation cycle until you have enough information to provide a final answer
 
-IMPORTANT GUIDELINES:
-- Always explain your reasoning before taking actions
-- Use the scratchpad to keep track of your progress and findings
-- Be systematic and methodical in your approach
-- If you encounter errors, adapt your strategy accordingly
-- Provide clear explanations of your reasoning process
-- Terminate when you have sufficient information to answer the question completely
+CRITICAL OUTPUT FORMATTING RULES (MUST FOLLOW EXACTLY):
+- When the user asks for "Output the number only", output JUST the number, nothing else
+- When the user asks for "Output X only" or "Return X only", output ONLY that exact value with ZERO additional text
+- For JSON requests: Return ONLY valid JSON, no explanations, no markdown code blocks
+- For number-only requests: Return ONLY the number (e.g., "408" NOT "17 * 24 = 408")
+- For single-word requests: Return ONLY that word (e.g., "Paris" NOT "The capital is Paris")
+- DO NOT include calculations, explanations, or reasoning in your final output
+- DO NOT add phrases like "Based on...", "The answer is...", "According to...", "Here is..."
+- DO NOT use markdown formatting (```), bullet points, or any decorations
+- Your FINAL MESSAGE must contain ONLY the requested output, nothing more
+- Read the task instructions carefully and follow output format requirements EXACTLY
+
+REASONING GUIDELINES:
+- For simple arithmetic (like 17 × 24): Calculate directly, don't use tools
+- For logic puzzles (if A>B and B>C, then A>C): Reason through them directly
+- For reading comprehension: Extract answer from given text directly
+- Only use tools when you need external information (weather, prices, search, etc.)
 
 Available tools: {tool_names}
 
-Remember: Quality reasoning leads to better actions, which produce more useful observations.
+Remember: Quality reasoning leads to better actions, and clean outputs that follow instructions exactly.
 """
 
 # Configuration for the enhanced ReAct agent
@@ -67,36 +75,21 @@ REACT_CONFIG = {
 
 # Create a wrapper function to add system prompt to the ReAct agent
 def create_enhanced_react_agent_with_prompt(model, tools, system_prompt=None):
-    """Create a ReAct agent with enhanced system prompt"""
+    """
+    Create a ReAct agent with enhanced system prompt
 
-    # Use the basic ReAct agent
-    base_agent = create_react_agent(model=model, tools=tools)
-
+    Uses the `prompt` parameter of create_react_agent to inject system message.
+    This is the correct way per LangGraph API.
+    """
     if system_prompt:
-        # Create a wrapper that injects system message
-        class AgentState(TypedDict):
-            messages: Annotated[list[BaseMessage], add_messages]
-
-        def add_system_message(state):
-            messages = state["messages"]
-            # Check if system message already exists
-            if not messages or not isinstance(messages[0], SystemMessage):
-                # Add system message at the beginning
-                system_msg = SystemMessage(content=system_prompt)
-                messages = [system_msg] + messages
-            return {"messages": messages}
-
-        # Create enhanced graph that adds system message before processing
-        workflow = StateGraph(AgentState)
-        workflow.add_node("add_system", add_system_message)
-        workflow.add_node("react_agent", base_agent)
-        workflow.add_edge("add_system", "react_agent")
-        workflow.set_entry_point("add_system")
-        workflow.set_finish_point("react_agent")
-
-        return workflow.compile()
+        # Use the prompt parameter to inject system message
+        return create_react_agent(
+            model=model,
+            tools=tools,
+            prompt=system_prompt  # Can be SystemMessage or string
+        )
     else:
-        return base_agent
+        return create_react_agent(model=model, tools=tools)
 
 # Create the basic ReAct agent (maintains compatibility)
 # 使用配置的 LLM

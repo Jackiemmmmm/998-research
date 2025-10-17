@@ -30,22 +30,23 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src" / "agent"))
 
-from pattern_react import graph_pattern_react
+from pattern_react import graph_pattern_react, enhanced_graph_pattern_react
 from pattern_sequential import graph_pattern_sequential
 from pattern_reflex import graph_pattern_reflex
 from pattern_tree_of_thoughts import graph_pattern_tree_of_thoughts
 
 
 async def run_full_evaluation(delay: float = 3.0):
-    """Run complete evaluation on all 4 patterns"""
+    """Run complete evaluation on all 5 patterns"""
     print("=" * 70)
     print(" " * 15 + "AGENTIC PATTERN EVALUATION")
     print("=" * 70)
-    print("\nEvaluating 4 design patterns:")
-    print("  1. ReAct - Reasoning + Acting")
-    print("  2. Chain of Thought (Sequential) - Step-by-step reasoning")
-    print("  3. Reflex - Rule-based fast response")
-    print("  4. Tree of Thoughts - Parallel exploration")
+    print("\nEvaluating 5 design patterns:")
+    print("  1. ReAct - Reasoning + Acting (basic)")
+    print("  2. ReAct Enhanced - With output formatting & reasoning guidance")
+    print("  3. Chain of Thought (Sequential) - Step-by-step reasoning")
+    print("  4. Reflex - Rule-based fast response")
+    print("  5. Tree of Thoughts - Parallel exploration")
     print("\nTest Suite: 16 tasks across 4 categories")
     print("Dimensions: Success, Efficiency, Robustness, Controllability")
     print(f"\n⏱️  Delay between tasks: {delay}s (to avoid rate limits)")
@@ -54,6 +55,7 @@ async def run_full_evaluation(delay: float = 3.0):
     # Define patterns to evaluate
     patterns = {
         "ReAct": graph_pattern_react,
+        "ReAct_Enhanced": enhanced_graph_pattern_react,
         "CoT": graph_pattern_sequential,
         "Reflex": graph_pattern_reflex,
         "ToT": graph_pattern_tree_of_thoughts,
@@ -115,13 +117,14 @@ async def run_quick_test(delay: float = 3.0):
 
     patterns = {
         "ReAct": graph_pattern_react,
-        "CoT": graph_pattern_sequential,
+        "ReAct_Enhanced": enhanced_graph_pattern_react,
+        # "CoT": graph_pattern_sequential,
     }
 
     # Use only baseline tasks
     test_tasks = load_test_suite(category="baseline")
 
-    print(f"Running {len(test_tasks)} baseline tasks on 2 patterns...\n")
+    print(f"Running {len(test_tasks)} baseline tasks on 3 patterns...\n")
 
     pattern_metrics = await evaluate_multiple_patterns(
         patterns=patterns,
@@ -140,6 +143,7 @@ async def run_category_test(category: str, delay: float = 3.0):
 
     patterns = {
         "ReAct": graph_pattern_react,
+        "ReAct_Enhanced": enhanced_graph_pattern_react,
         "CoT": graph_pattern_sequential,
         "Reflex": graph_pattern_reflex,
         "ToT": graph_pattern_tree_of_thoughts,
