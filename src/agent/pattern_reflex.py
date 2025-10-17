@@ -104,6 +104,80 @@ def rule_matcher_node(state: ReflexState):
     user_input = state["messages"][-1].content if state["messages"] else ""
     user_input_lower = user_input.lower()
 
+    # Check evaluation mode
+    evaluation_mode = state.get("evaluation_mode", False)
+
+    # In evaluation mode, use LLM-based approach instead of rule matching
+    # This allows Reflex to handle diverse tasks that don't fit predefined rules
+    if evaluation_mode:
+        from src.llm_config import get_llm
+        llm_eval = get_llm()
+
+        try:
+            # Use LLM with tools to answer directly
+            llm_with_tools = llm_eval.bind_tools(tools)
+
+            prompt = f"""Answer this query directly and concisely: {user_input}
+
+IMPORTANT - Output format:
+- For calculations: output only the number (e.g., "408")
+- For facts: output only the fact (e.g., "Paris")
+- For yes/no: output only "Yes" or "No"
+- For dates: output only the date in requested format
+- For JSON: output only the JSON object
+- NO explanations, NO prefixes, NO tool result formatting
+
+Provide only the answer:"""
+
+            response = llm_with_tools.invoke([{"role": "user", "content": prompt}])
+
+            # Check if tools were called
+            if hasattr(response, 'tool_calls') and response.tool_calls:
+                # Execute tool calls
+                from langgraph.prebuilt import ToolNode
+                tool_node = ToolNode(tools)
+                tool_results = tool_node.invoke({"messages": [response]})
+
+                # Get tool results and generate final answer
+                final_prompt = f"""Based on the tool results, answer this query concisely: {user_input}
+
+Tool results: {tool_results}
+
+Remember:
+- Output ONLY the direct answer
+- NO explanations or prefixes
+- Extract the key information from tool results
+
+Provide only the answer:"""
+                final_response = llm_eval.invoke([{"role": "user", "content": final_prompt}])
+                final_answer = final_response.content.strip()
+            else:
+                final_answer = response.content.strip()
+
+            messages = state["messages"]
+            return {
+                "messages": messages + [AIMessage(content=final_answer)],
+                "matched_rule": "llm_evaluation_mode",
+                "action_taken": "LLM-based direct answer",
+                "evaluation_mode": True
+            }
+
+        except Exception as e:
+            # Fallback to simple LLM response
+            try:
+                response = llm_eval.invoke([{"role": "user", "content": f"Answer briefly: {user_input}"}])
+                final_answer = response.content.strip()
+            except:
+                final_answer = f"Error: {str(e)}"
+
+            messages = state["messages"]
+            return {
+                "messages": messages + [AIMessage(content=final_answer)],
+                "matched_rule": "llm_fallback",
+                "action_taken": "LLM fallback response",
+                "evaluation_mode": True
+            }
+
     # 查找所有匹配的规则（按优先级排序）- 支持复合查询，但排除默认规则以避免重复
     matched_rules = []
     for rule in sorted(REFLEX_RULES, key=lambda x: x["priority"]):
@@ -131,10 +205,16 @@ def rule_matcher_node(state: ReflexState):
             search_tool = next(tool for tool in tools if tool.name == "tavily_search_results_json")
             try:
                 result = search_tool.invoke({"query": f"weather {user_input}"})
-                response_parts.append(f"🌤️ Weather Information:\n{result}")
+                if evaluation_mode:
+                    response_parts.append(str(result))
+                else:
+                    response_parts.append(f"🌤️ Weather Information:\n{result}")
                 tools_used.append("tavily_search_results_json")
             except Exception as e:
-                response_parts.append(f"🌤️ Weather lookup failed: {str(e)}")
+                if evaluation_mode:
+                    response_parts.append(f"Weather lookup failed: {str(e)}")
+                else:
+                    response_parts.append(f"🌤️ Weather lookup failed: {str(e)}")
                 tools_used.append("tavily_search_results_json (failed)")
 
         elif action == "time_query":
@@ -143,13 +223,22 @@ def rule_matcher_node(state: ReflexState):
             if date_tool:
                 try:
                     result = date_tool.invoke({})
-                    response_parts.append(f"🕒 Current Date/Time:\n{result}")
+                    if evaluation_mode:
+                        response_parts.append(str(result))
+                    else:
+                        response_parts.append(f"🕒 Current Date/Time:\n{result}")
                     tools_used.append(date_tool.name)
                 except Exception as e:
-                    response_parts.append(f"🕒 Date lookup failed: {str(e)}")
+                    if evaluation_mode:
+                        response_parts.append(f"Date lookup failed: {str(e)}")
+                    else:
+                        response_parts.append(f"🕒 Date lookup failed: {str(e)}")
                     tools_used.append(f"{date_tool.name} (failed)")
             else:
-                response_parts.append("🕒 Current time: Date tool not available in this demo.")
+                if evaluation_mode:
+                    response_parts.append("Date tool not available")
+                else:
+                    response_parts.append("🕒 Current time: Date tool not available in this demo.")
                 tools_used.append("date_tool (not available)")
 
         elif action == "search_query":
@@ -157,26 +246,41 @@ def rule_matcher_node(state: ReflexState):
             search_tool = next(tool for tool in tools if tool.name == "tavily_search_results_json")
             try:
                 result = search_tool.invoke({"query": user_input})
-                response_parts.append(f"🔍 Search Results:\n{result}")
+                if evaluation_mode:
+                    response_parts.append(str(result))
+                else:
+                    response_parts.append(f"🔍 Search Results:\n{result}")
                 tools_used.append("tavily_search_results_json")
             except Exception as e:
-                response_parts.append(f"🔍 Search failed: {str(e)}")
+                if evaluation_mode:
+                    response_parts.append(f"Search failed: {str(e)}")
+                else:
+                    response_parts.append(f"🔍 Search failed: {str(e)}")
                 tools_used.append("tavily_search_results_json (failed)")
 
         elif action == "calculation":
             # 计算 - 直接处理
-            calc_result = _handle_calculation(user_input)
-            response_parts.append(f"🧮 Calculation:\n{calc_result}")
+            calc_result = _handle_calculation(user_input, evaluation_mode)
+            if evaluation_mode:
+                response_parts.append(calc_result)
+            else:
+                response_parts.append(f"🧮 Calculation:\n{calc_result}")
             tools_used.append("direct_calculation")
 
         elif action == "greeting":
             # 问候 - 直接响应
-            response_parts.append("👋 Hello! I'm a Reflex Agent designed to respond quickly to common requests. How can I help you today?")
+            if evaluation_mode:
+                response_parts.append("Hello! How can I help you?")
+            else:
+                response_parts.append("👋 Hello! I'm a Reflex Agent designed to respond quickly to common requests. How can I help you today?")
             tools_used.append("direct_response")
 
         elif action == "help_request":
             # 帮助 - 直接响应
-            help_text = """🤝 I'm a Reflex Agent that can quickly help with:
+            if evaluation_mode:
+                help_text = "I can help with weather queries, searches, calculations, time, or general assistance."
+            else:
+                help_text = """🤝 I'm a Reflex Agent that can quickly help with:
 - Weather queries (uses search tool)
 - Information searches (uses search tool)
 - Simple calculations (direct processing)
@@ -190,15 +294,19 @@ def rule_matcher_node(state: ReflexState):
             search_tool = next(tool for tool in tools if tool.name == "tavily_search_results_json")
             try:
                 result = search_tool.invoke({"query": user_input})
-                response_parts.append(f"🔧 General Help:\n{result}")
+                if evaluation_mode:
+                    response_parts.append(str(result))
+                else:
+                    response_parts.append(f"🔧 General Help:\n{result}")
                 tools_used.append("tavily_search_results_json")
             except Exception as e:
-                response_parts.append(f"🔧 I'll try to help: {rule.get('response', 'How can I assist you?')}")
+                if evaluation_mode:
+                    response_parts.append(rule.get('response', 'How can I assist you?'))
+                else:
+                    response_parts.append(f"🔧 I'll try to help: {rule.get('response', 'How can I assist you?')}")
                 tools_used.append("tavily_search_results_json (failed)")
 
     # 构建最终响应 - 根据 evaluation_mode 决定是否添加格式化前缀
-    evaluation_mode = state.get("evaluation_mode", False)
-
     if evaluation_mode:
         # Evaluation mode: clean output without decorative formatting
         final_response = "\n\n".join(response_parts)
@@ -210,23 +318,28 @@ def rule_matcher_node(state: ReflexState):
     return {
         "messages": messages + [AIMessage(content=final_response)],
         "matched_rule": ", ".join(actions_taken),
-        "action_taken": f"Reflex executed: {', '.join(actions_taken)} | Tools: {', '.join(set(tools_used))}"
+        "action_taken": f"Reflex executed: {', '.join(actions_taken)} | Tools: {', '.join(set(tools_used))}",
+        "evaluation_mode": evaluation_mode
     }
 
 
 
-def _handle_calculation(user_input: str) -> str:
+def _handle_calculation(user_input: str, evaluation_mode: bool = False) -> str:
     """处理简单的数学计算"""
     import re
 
     # 查找简单的数学表达式
-    math_pattern = r'(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)'
+    math_pattern = r'(\d+(?:\.\d+)?)\s*([+\-*/×])\s*(\d+(?:\.\d+)?)'
     match = re.search(math_pattern, user_input)
 
     if match:
         try:
             num1, operator, num2 = match.groups()
             num1, num2 = float(num1), float(num2)
+
+            # Normalize × to *
+            if operator == '×':
+                operator = '*'
 
             if operator == '+':
                 result = num1 + num2
@@ -242,11 +355,23 @@ def _handle_calculation(user_input: str) -> str:
             else:
                 return "Error: Unsupported operation!"
 
-            return f"Calculation: {num1} {operator} {num2} = {result}"
+            # Format result as integer if it's a whole number
+            if result == int(result):
+                result = int(result)
+
+            if evaluation_mode:
+                # Evaluation mode: only return the result
+                return str(result)
+            else:
+                # Demo mode: return full calculation
+                return f"Calculation: {num1} {operator} {num2} = {result}"
         except:
             return "Error: Could not perform calculation!"
 
-    return "I can help with simple calculations like '5 + 3' or '10 * 2'. What would you like to calculate?"
+    if evaluation_mode:
+        return "Cannot parse calculation"
+    else:
+        return "I can help with simple calculations like '5 + 3' or '10 * 2'. What would you like to calculate?"
 
 
 

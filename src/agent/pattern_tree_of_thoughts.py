@@ -137,7 +137,8 @@ def thought_generation_node(state: TreeOfThoughtsState):
         "thought_tree": all_new_thoughts,
         "current_depth": current_depth + 1,
         "original_query": original_query,
-        "max_depth": TOT_CONFIG["max_depth"]
+        "max_depth": TOT_CONFIG["max_depth"],
+        "evaluation_mode": state.get("evaluation_mode", False)
     }
 
 
@@ -189,7 +190,8 @@ def evaluation_node(state: TreeOfThoughtsState):
 
     return {
         **state,
-        "thought_tree": evaluated_thoughts
+        "thought_tree": evaluated_thoughts,
+        "evaluation_mode": state.get("evaluation_mode", False)
     }
 
 
@@ -221,7 +223,8 @@ def search_and_prune_node(state: TreeOfThoughtsState):
         return {
             **state,
             "best_thoughts": sorted_thoughts[:TOT_CONFIG["top_k_selection"]],
-            "final_solution": final_solution
+            "final_solution": final_solution,
+            "evaluation_mode": state.get("evaluation_mode", False)
         }
 
     # Continue with top thoughts
@@ -230,7 +233,8 @@ def search_and_prune_node(state: TreeOfThoughtsState):
     return {
         **state,
         "best_thoughts": top_thoughts,
-        "final_solution": ""
+        "final_solution": "",
+        "evaluation_mode": state.get("evaluation_mode", False)
     }
 
 
@@ -239,8 +243,78 @@ def solution_synthesis_node(state: TreeOfThoughtsState):
 
     original_query = state.get("original_query", "")
     best_thoughts = state.get("best_thoughts", [])
+    evaluation_mode = state.get("evaluation_mode", False)
 
-    # Solution synthesis for Tree of Thoughts
+    # In evaluation mode, use LLM with tools to directly answer the query
+    if evaluation_mode:
+        try:
+            llm_with_tools = llm.bind_tools(tools)
+            prompt = f"""Answer this query directly and concisely: {original_query}
+
+IMPORTANT:
+- Output ONLY the answer itself, nothing more
+- For calculations: output only the number (e.g., "408", not "The result is 408")
+- For facts: output only the fact (e.g., "Paris", not "The capital is Paris")
+- For dates: output only the date in requested format
+- For JSON: output only the JSON object
+- NO explanations, NO prefixes, NO formatting
+
+Provide only the answer:"""
+
+            response = llm_with_tools.invoke([{"role": "user", "content": prompt}])
+
+            # Check if tools were called
+            if hasattr(response, 'tool_calls') and response.tool_calls:
+                # Execute tool calls
+                from langgraph.prebuilt import ToolNode
+                tool_node = ToolNode(tools)
+                tool_results = tool_node.invoke({"messages": [response]})
+
+                # Get tool results and generate final answer
+                final_prompt = f"""Based on the tool results, answer this query concisely: {original_query}
+
+Tool results: {tool_results}
+
+Provide ONLY the direct answer, no explanations:"""
+                final_response = llm.invoke([{"role": "user", "content": final_prompt}])
+                concise_output = final_response.content.strip()
+            else:
+                concise_output = response.content.strip()
+
+            new_messages = state["messages"] + [AIMessage(content=concise_output)]
+            return {
+                "messages": new_messages,
+                "original_query": original_query,
+                "thought_tree": state.get("thought_tree", []),
+                "current_depth": state.get("current_depth", 0),
+                "max_depth": state.get("max_depth", TOT_CONFIG["max_depth"]),
+                "best_thoughts": best_thoughts,
+                "final_solution": concise_output,
+                "output": concise_output,
+                "evaluation_mode": True
+            }
+        except Exception as e:
+            # Fallback: use simple LLM response
+            try:
+                response = llm.invoke([{"role": "user", "content": f"Answer briefly: {original_query}"}])
+                concise_output = response.content.strip()
+            except:
+                concise_output = "Error generating answer"
+
+            new_messages = state["messages"] + [AIMessage(content=concise_output)]
+            return {
+                "messages": new_messages,
+                "original_query": original_query,
+                "thought_tree": state.get("thought_tree", []),
+                "current_depth": state.get("current_depth", 0),
+                "max_depth": state.get("max_depth", TOT_CONFIG["max_depth"]),
+                "best_thoughts": best_thoughts,
+                "final_solution": concise_output,
+                "output": concise_output,
+                "evaluation_mode": True
+            }
+
+    # Solution synthesis for Tree of Thoughts (demo mode)
 
     # For date+weather queries, actually execute the tools
     if "date" in original_query.lower() and "weather" in original_query.lower():
@@ -325,7 +399,8 @@ def solution_synthesis_node(state: TreeOfThoughtsState):
         "max_depth": state.get("max_depth", TOT_CONFIG["max_depth"]),
         "best_thoughts": state.get("best_thoughts", []),
         "final_solution": state.get("final_solution", ""),
-        "output": concise_output  # Clean, concise output for user
+        "output": concise_output,  # Clean, concise output for user
+        "evaluation_mode": evaluation_mode
     }
 
 

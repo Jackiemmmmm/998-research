@@ -79,13 +79,15 @@ class ReportGenerator:
         # Summary table
         lines.append("## Summary Comparison")
         lines.append("")
-        lines.append("| Pattern | Success Rate | Avg Latency (s) | Avg Tokens | Degradation (%) | Controllability |")
-        lines.append("|---------|--------------|-----------------|------------|-----------------|-----------------|")
+        lines.append("| Pattern | Strict | Lenient | Gap | Avg Latency (s) | Avg Tokens | Degradation (%) | Controllability |")
+        lines.append("|---------|--------|---------|-----|-----------------|------------|-----------------|-----------------|")
 
         for row in comparison["summary_table"]:
             lines.append(
                 f"| {row['pattern']:12s} | "
-                f"{row['success_rate']:12.1%} | "
+                f"{row['success_rate_strict']:6.1%} | "
+                f"{row['success_rate_lenient']:7.1%} | "
+                f"{row['controllability_gap']:3.1%} | "
                 f"{row['avg_latency_sec']:15.2f} | "
                 f"{row['avg_tokens']:10.0f} | "
                 f"{row['degradation_pct']:15.1f} | "
@@ -213,12 +215,14 @@ class ReportGenerator:
 
         # Build CSV
         lines = []
-        lines.append("Pattern,Success Rate,Avg Latency (s),Avg Tokens,Degradation (%),Controllability")
+        lines.append("Pattern,Success Rate (Strict),Success Rate (Lenient),Controllability Gap,Avg Latency (s),Avg Tokens,Degradation (%),Controllability")
 
         for row in comparison["summary_table"]:
             lines.append(
                 f"{row['pattern']},"
-                f"{row['success_rate']:.3f},"
+                f"{row['success_rate_strict']:.3f},"
+                f"{row['success_rate_lenient']:.3f},"
+                f"{row['controllability_gap']:.3f},"
                 f"{row['avg_latency_sec']:.2f},"
                 f"{row['avg_tokens']:.0f},"
                 f"{row['degradation_pct']:.2f},"
