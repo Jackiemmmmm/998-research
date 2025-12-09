@@ -6,7 +6,8 @@
       "Bash(rm:*)",
       "Bash(chmod:*)",
       "Bash(pip install:*)",
-      "Bash(timeout 60 python:*)"
+      "Bash(timeout 60 python:*)",
+      "Bash(uv run ruff:*)"
     ],
     "deny": [],
     "ask": []

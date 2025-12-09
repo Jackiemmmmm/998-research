@@ -1,7 +1,7 @@
-"""
-Reflex Agent Pattern Demo - 反射代理模式
+"""Reflex Agent Pattern Demo - 反射代理模式.
+
 适用场景：简单快速响应，基于规则的决策
-特点：直接的if-then规则匹配，立即响应，极低延迟
+特点：直接的if-then规则匹配，立即响应，极低延迟.
 
 Based on plan.md requirements:
 - Receives input
@@ -9,18 +9,20 @@ Based on plan.md requirements:
 - Executes action immediately
 """
 
-from typing import Annotated, Literal
-from typing_extensions import TypedDict
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langchain_core.messages import AIMessage
-# 不需要 ToolNode 和 tools_condition - Reflex Agent 直接调用工具
-from src.tool import tools
-from src.llm_config import get_llm
 import re
+from typing import Annotated
+
+from langchain_core.messages import AIMessage
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from typing_extensions import TypedDict
+
+from src.llm_config import get_llm
 
 
 class ReflexState(TypedDict):
+    """State for reflex agent pattern."""
+
     messages: Annotated[list, add_messages]
     matched_rule: str
     action_taken: str
@@ -98,8 +100,7 @@ REFLEX_RULES = [
 
 
 def rule_matcher_node(state: ReflexState):
-    """规则匹配节点：分析输入，匹配多个规则并立即执行对应动作"""
-
+    """规则匹配节点：分析输入，匹配多个规则并立即执行对应动作."""
     # 获取用户输入
     user_input = state["messages"][-1].content if state["messages"] else ""
     user_input_lower = user_input.lower()
@@ -111,11 +112,12 @@ def rule_matcher_node(state: ReflexState):
     # This allows Reflex to handle diverse tasks that don't fit predefined rules
     if evaluation_mode:
         from src.llm_config import get_llm
+        from src.tool import tools as eval_tools
         llm_eval = get_llm()
 
         try:
             # Use LLM with tools to answer directly
-            llm_with_tools = llm_eval.bind_tools(tools)
+            llm_with_tools = llm_eval.bind_tools(eval_tools)
 
             prompt = f"""Answer this query directly and concisely: {user_input}
 
@@ -135,7 +137,7 @@ Provide only the answer:"""
             if hasattr(response, 'tool_calls') and response.tool_calls:
                 # Execute tool calls
                 from langgraph.prebuilt import ToolNode
-                tool_node = ToolNode(tools)
+                tool_node = ToolNode(eval_tools)
                 tool_results = tool_node.invoke({"messages": [response]})
 
                 # Get tool results and generate final answer
@@ -167,7 +169,7 @@ Provide only the answer:"""
             try:
                 response = llm_eval.invoke([{"role": "user", "content": f"Answer briefly: {user_input}"}])
                 final_answer = response.content.strip()
-            except:
+            except Exception:
                 final_answer = f"Error: {str(e)}"
 
             messages = state["messages"]
@@ -194,7 +196,7 @@ Provide only the answer:"""
     actions_taken = []
 
     # Reflex Agent: 根据匹配的规则执行对应动作
-    from src.tool import tools  # 移到循环外部，确保所有分支都能访问
+    from src.tool import tools
 
     for rule in matched_rules:
         action = rule["action"]
@@ -299,7 +301,7 @@ Provide only the answer:"""
                 else:
                     response_parts.append(f"🔧 General Help:\n{result}")
                 tools_used.append("tavily_search_results_json")
-            except Exception as e:
+            except Exception:
                 if evaluation_mode:
                     response_parts.append(rule.get('response', 'How can I assist you?'))
                 else:
@@ -325,7 +327,7 @@ Provide only the answer:"""
 
 
 def _handle_calculation(user_input: str, evaluation_mode: bool = False) -> str:
-    """处理简单的数学计算"""
+    """处理简单的数学计算."""
     import re
 
     # 查找简单的数学表达式
@@ -365,7 +367,7 @@ def _handle_calculation(user_input: str, evaluation_mode: bool = False) -> str:
             else:
                 # Demo mode: return full calculation
                 return f"Calculation: {num1} {operator} {num2} = {result}"
-        except:
+        except Exception:
             return "Error: Could not perform calculation!"
 
     if evaluation_mode:

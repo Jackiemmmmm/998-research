@@ -1,6 +1,6 @@
-"""
-Test Suite Definition - 16 standardized tasks for pattern evaluation
-Based on evaluation.md specifications
+"""Test Suite Definition - 16 standardized tasks for pattern evaluation.
+
+Based on evaluation.md specifications.
 
 Categories:
 - A (baseline): Simple arithmetic, formatting, factual QA
@@ -9,13 +9,13 @@ Categories:
 - D (planning): Multi-step tasks, structured output
 """
 
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
 class TestTask:
-    """Single test task definition"""
+    """Single test task definition."""
 
     id: str
     category: str
@@ -29,13 +29,13 @@ class TestTask:
     complexity: str = "medium"  # simple, medium, complex
 
     def get_perturbations(self) -> List[str]:
-        """Get input perturbations for robustness testing"""
+        """Get input perturbations for robustness testing."""
         if self.robustness and "perturbations" in self.robustness:
             return self.robustness["perturbations"]
         return []
 
     def get_tool_failure_prob(self) -> float:
-        """Get tool failure probability for robustness testing"""
+        """Get tool failure probability for robustness testing."""
         if self.robustness and "tool_failure_prob" in self.robustness:
             return self.robustness["tool_failure_prob"]
         return 0.0
@@ -369,8 +369,7 @@ def load_test_suite(
     complexity: Optional[str] = None,
     task_ids: Optional[List[str]] = None
 ) -> List[TestTask]:
-    """
-    Load test suite with optional filtering
+    """Load test suite with optional filtering.
 
     Args:
         category: Filter by category (baseline, reasoning, tool, planning)
@@ -395,7 +394,7 @@ def load_test_suite(
 
 
 def get_task_by_id(task_id: str) -> Optional[TestTask]:
-    """Get a specific task by ID"""
+    """Get a specific task by ID."""
     for task in TEST_SUITE:
         if task.id == task_id:
             return task
@@ -403,44 +402,30 @@ def get_task_by_id(task_id: str) -> Optional[TestTask]:
 
 
 def get_categories() -> List[str]:
-    """Get all unique categories"""
+    """Get all unique categories."""
     return list(set(task.category for task in TEST_SUITE))
 
 
 def get_complexities() -> List[str]:
-    """Get all unique complexity levels"""
+    """Get all unique complexity levels."""
     return list(set(task.complexity for task in TEST_SUITE))
 
 
 # Statistics
 def print_test_suite_stats():
-    """Print test suite statistics"""
-    print("=" * 60)
-    print("TEST SUITE STATISTICS")
-    print("=" * 60)
-    print(f"Total tasks: {len(TEST_SUITE)}")
-    print()
-
-    print("By Category:")
+    """Print test suite statistics."""
     for category in get_categories():
         count = len([t for t in TEST_SUITE if t.category == category])
-        print(f"  {category:12s}: {count:2d} tasks")
-    print()
 
-    print("By Complexity:")
     for complexity in get_complexities():
         count = len([t for t in TEST_SUITE if t.complexity == complexity])
-        print(f"  {complexity:12s}: {count:2d} tasks")
-    print()
 
-    print("Judge Modes:")
     judge_modes = {}
     for task in TEST_SUITE:
         mode = task.judge.get("mode", "unknown")
         judge_modes[mode] = judge_modes.get(mode, 0) + 1
     for mode, count in judge_modes.items():
-        print(f"  {mode:12s}: {count:2d} tasks")
-    print("=" * 60)
+        pass
 
 
 if __name__ == "__main__":

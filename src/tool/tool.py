@@ -1,6 +1,13 @@
+"""Tool definitions for agent.
+
+This module defines tools available to agents, including search and date tools.
+"""
+
 import os
 from pathlib import Path
+
 from langchain_core.tools import tool
+
 from .current_date import get_current_date
 
 # 确保加载环境变量
@@ -21,7 +28,10 @@ except ImportError:
 
 @tool
 def mock_search(query: str) -> str:
-    """A mock search tool for demonstration purposes when Tavily API is not available."""
+    """Return mock search results for demonstration purposes.
+
+    Use this when Tavily API is not available.
+    """
     return f"Mock search results for: {query}\n- Demo result 1: Information about {query}\n- Demo result 2: Additional context about {query}"
 
 # 尝试使用Tavily搜索工具
@@ -35,12 +45,9 @@ if os.getenv("TAVILY_API_KEY"):
             warnings.simplefilter("ignore")  # 临时抑制deprecation警告
             from langchain_community.tools import TavilySearchResults
             search_tool = TavilySearchResults(max_results=2)
-        print("✅ Using Tavily search tool (community version)")
-    except Exception as e:
-        print(f"Warning: Could not initialize Tavily search tool: {e}")
-        print("Using mock search tool instead")
+    except Exception:
         search_tool = mock_search
 else:
-    print("ℹ️  No TAVILY_API_KEY found, using mock search tool")
+    pass
 
 tools = [search_tool, get_current_date]

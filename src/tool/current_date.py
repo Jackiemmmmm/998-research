@@ -1,11 +1,16 @@
+"""Current date tool module.
+
+This module provides a tool to get the current date.
+"""
+
 import datetime
+
 from langchain_core.tools import tool
 
 
 @tool
 def get_current_date() -> str:
-    """
-    get the current date
+    """Get the current date.
 
     Returns:
         the current date, format as YYYY-MM-DD

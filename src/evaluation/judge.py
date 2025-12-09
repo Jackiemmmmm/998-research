@@ -1,16 +1,17 @@
-"""
-Judge module - Evaluate agent outputs against ground truth
-Supports 3 modes: exact, json, regex
+"""Judge module - Evaluate agent outputs against ground truth.
+
+Supports 3 modes: exact, json, regex.
 """
 
-import re
 import json
+import re
 from typing import Any, Dict, Optional, Tuple
-from jsonschema import validate, ValidationError
+
+from jsonschema import ValidationError, validate
 
 
 class Judge:
-    """Judge for evaluating agent outputs"""
+    """Judge for evaluating agent outputs."""
 
     @staticmethod
     def evaluate(
@@ -20,8 +21,7 @@ class Judge:
         schema: Optional[Dict[str, Any]] = None,
         lenient: bool = False
     ) -> Tuple[bool, str]:
-        """
-        Evaluate output against ground truth
+        """Evaluate output against ground truth.
 
         Args:
             output: Agent output (string)
@@ -54,8 +54,7 @@ class Judge:
         ground_truth: Any,
         judge_config: Dict[str, Any]
     ) -> str:
-        """
-        Intelligently extract the actual answer from verbose model output
+        """Intelligently extract the actual answer from verbose model output.
 
         Examples:
             "The cost of 12 apples is $20." -> "20"
@@ -125,8 +124,7 @@ class Judge:
 
     @staticmethod
     def _judge_exact(output: str, ground_truth: Any) -> Tuple[bool, str]:
-        """
-        Exact match judge - output must exactly match ground truth
+        """Exact match judge - output must exactly match ground truth.
 
         Examples:
             "408" == "408" → True
@@ -148,8 +146,7 @@ class Judge:
         judge_config: Dict[str, Any],
         schema: Optional[Dict[str, Any]] = None
     ) -> Tuple[bool, str]:
-        """
-        JSON judge - parse output as JSON and validate
+        """JSON judge - parse output as JSON and validate.
 
         Steps:
         1. Parse output as JSON
@@ -193,8 +190,7 @@ class Judge:
 
     @staticmethod
     def _judge_regex(output: str, judge_config: Dict[str, Any]) -> Tuple[bool, str]:
-        """
-        Regex judge - check if output matches regex pattern
+        """Regex judge - check if output matches regex pattern.
 
         Example:
             pattern: r"(?i)^paris$"
@@ -217,8 +213,7 @@ class Judge:
 
     @staticmethod
     def _extract_and_parse_json(text: str) -> Any:
-        """
-        Extract and parse JSON from text
+        """Extract and parse JSON from text.
 
         Handles:
         - Pure JSON
@@ -256,14 +251,13 @@ class Judge:
 
 
 class LLMJudge:
-    """
-    LLM-as-Judge for qualitative evaluation
-    Uses a strong LLM to evaluate output quality
+    """LLM-as-Judge for qualitative evaluation.
+
+    Uses a strong LLM to evaluate output quality.
     """
 
     def __init__(self, model_name: Optional[str] = None):
-        """
-        Initialize LLM judge
+        """Initialize LLM judge.
 
         Args:
             model_name: Optional model name. If None, uses configured LLM
@@ -281,8 +275,7 @@ class LLMJudge:
         output: str,
         ground_truth: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Evaluate output quality using LLM
+        """Evaluate output quality using LLM.
 
         Args:
             query: Original user query
@@ -314,7 +307,7 @@ class LLMJudge:
         output: str,
         ground_truth: Optional[str]
     ) -> str:
-        """Build evaluation prompt for LLM"""
+        """Build evaluation prompt for LLM."""
         prompt = f"""Evaluate the following agent output on a scale of 1-10 for each dimension:
 
 Query: {query}
@@ -344,7 +337,7 @@ Return JSON:
         return prompt
 
     def _parse_llm_response(self, response: str) -> Dict[str, Any]:
-        """Parse LLM evaluation response"""
+        """Parse LLM evaluation response."""
         try:
             # Extract JSON from response
             parsed = Judge._extract_and_parse_json(response)
@@ -373,20 +366,11 @@ Return JSON:
 
 if __name__ == "__main__":
     # Test exact judge
-    print("=" * 60)
-    print("TEST: Exact Judge")
-    print("=" * 60)
     success, msg = Judge.evaluate("408", "408", {"mode": "exact"})
-    print(f"Result: {success}, Message: {msg}")
 
     success, msg = Judge.evaluate("Paris", "paris", {"mode": "exact"})
-    print(f"Result: {success}, Message: {msg}")
-    print()
 
     # Test JSON judge
-    print("=" * 60)
-    print("TEST: JSON Judge")
-    print("=" * 60)
     output = '{"name": "iPhone 15", "price": 999}'
     ground_truth = {"name": "iPhone 15", "price": 999}
     schema = {
@@ -398,15 +382,8 @@ if __name__ == "__main__":
         "required": ["name", "price"]
     }
     success, msg = Judge.evaluate(output, ground_truth, {"mode": "json"}, schema)
-    print(f"Result: {success}, Message: {msg}")
-    print()
 
     # Test regex judge
-    print("=" * 60)
-    print("TEST: Regex Judge")
-    print("=" * 60)
     success, msg = Judge.evaluate("Paris", None, {"mode": "regex", "pattern": r"(?i)^paris$"})
-    print(f"Result: {success}, Message: {msg}")
 
     success, msg = Judge.evaluate("PARIS", None, {"mode": "regex", "pattern": r"(?i)^paris$"})
-    print(f"Result: {success}, Message: {msg}")

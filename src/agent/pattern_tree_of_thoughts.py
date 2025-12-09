@@ -1,7 +1,7 @@
-"""
-Tree of Thoughts (ToT) Pattern Demo - 思维树模式 (Improved)
+"""Tree of Thoughts (ToT) Pattern Demo - 思维树模式 (Improved).
+
 适用场景：复杂推理任务，需要探索多个解决路径
-特点：并行生成多个思考分支，评估和剪枝，搜索最优解
+特点：并行生成多个思考分支，评估和剪枝，搜索最优解.
 
 Based on IBM's Tree of Thoughts framework:
 - Thought Generation: Generate multiple distinct thought branches
@@ -10,17 +10,21 @@ Based on IBM's Tree of Thoughts framework:
 - Repeat until optimal solution is found
 """
 
-from typing import Annotated, List, Dict, Literal
-from typing_extensions import TypedDict
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langchain_core.messages import AIMessage
-from src.tool import tools
-from src.llm_config import get_llm
 import json
+from typing import Annotated, Dict, List, Literal
+
+from langchain_core.messages import AIMessage
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from typing_extensions import TypedDict
+
+from src.llm_config import get_llm
+from src.tool import tools
 
 
 class TreeOfThoughtsState(TypedDict):
+    """State for Tree of Thoughts pattern with thought tree exploration."""
+
     messages: Annotated[list, add_messages]
     original_query: str
     thought_tree: List[Dict]  # Current thoughts
@@ -45,8 +49,7 @@ TOT_CONFIG = {
 
 
 def thought_generation_node(state: TreeOfThoughtsState):
-    """Generate multiple distinct thought branches in parallel"""
-
+    """Generate multiple distinct thought branches in parallel."""
     original_query = state.get("original_query") or (
         state["messages"][0].content if state["messages"] else "No query"
     )
@@ -99,7 +102,7 @@ def thought_generation_node(state: TreeOfThoughtsState):
             try:
                 data = json.loads(text)
                 thoughts = data.get("thoughts", [])
-            except:
+            except (json.JSONDecodeError, ValueError):
                 thoughts = [
                     {"content": f"Approach {i+1}: Systematic problem solving", "reasoning": "Fallback"}
                     for i in range(3)
@@ -118,7 +121,7 @@ def thought_generation_node(state: TreeOfThoughtsState):
                 }
                 all_new_thoughts.append(thought_node)
 
-        except Exception as e:
+        except Exception:
             # Fallback thoughts
             for i in range(3):
                 content = f"Approach {i+1}: Alternative solution method"
@@ -143,8 +146,7 @@ def thought_generation_node(state: TreeOfThoughtsState):
 
 
 def evaluation_node(state: TreeOfThoughtsState):
-    """Evaluate quality of each thought branch with scores"""
-
+    """Evaluate quality of each thought branch with scores."""
     thought_tree = state.get("thought_tree", [])
     original_query = state.get("original_query", "")
 
@@ -176,10 +178,10 @@ def evaluation_node(state: TreeOfThoughtsState):
             try:
                 eval_data = json.loads(text)
                 score = eval_data.get("overall_score", 0.5)
-            except:
+            except (json.JSONDecodeError, ValueError):
                 score = 0.5
 
-        except:
+        except Exception:
             score = 0.5
 
         evaluated_thought = {
@@ -196,8 +198,7 @@ def evaluation_node(state: TreeOfThoughtsState):
 
 
 def search_and_prune_node(state: TreeOfThoughtsState):
-    """Select most promising branches for continued exploration"""
-
+    """Select most promising branches for continued exploration."""
     thought_tree = state.get("thought_tree", [])
     current_depth = state.get("current_depth", 0)
     max_depth = state.get("max_depth", TOT_CONFIG["max_depth"])
@@ -239,8 +240,7 @@ def search_and_prune_node(state: TreeOfThoughtsState):
 
 
 def solution_synthesis_node(state: TreeOfThoughtsState):
-    """Execute the best solution path and provide actual results"""
-
+    """Execute the best solution path and provide actual results."""
     original_query = state.get("original_query", "")
     best_thoughts = state.get("best_thoughts", [])
     evaluation_mode = state.get("evaluation_mode", False)
@@ -293,12 +293,12 @@ Provide ONLY the direct answer, no explanations:"""
                 "output": concise_output,
                 "evaluation_mode": True
             }
-        except Exception as e:
+        except Exception:
             # Fallback: use simple LLM response
             try:
                 response = llm.invoke([{"role": "user", "content": f"Answer briefly: {original_query}"}])
                 concise_output = response.content.strip()
-            except:
+            except Exception:
                 concise_output = "Error generating answer"
 
             new_messages = state["messages"] + [AIMessage(content=concise_output)]
@@ -336,7 +336,7 @@ Provide ONLY the direct answer, no explanations:"""
         search_tool = next((tool for tool in tools if "tavily_search_results_json" in tool.name), None)
         if search_tool:
             try:
-                weather_result = search_tool.invoke({"query": f"weather Wollongong"})
+                weather_result = search_tool.invoke({"query": "weather Wollongong"})
                 if isinstance(weather_result, list) and weather_result:
                     weather_info = weather_result[0].get('content', 'No weather data')[:300]
                     actual_results.append(f"Weather Information: {weather_info}")
@@ -352,7 +352,7 @@ Provide ONLY the direct answer, no explanations:"""
         # Create concise output
         concise_output = f"Today is {clean_results.get('date', 'unknown')}. Weather in Wollongong: {clean_results.get('weather', 'unavailable')}"
 
-        final_answer = f"""Tree of Thoughts Solution
+        f"""Tree of Thoughts Solution
 
             Query: {original_query}
 
@@ -371,7 +371,7 @@ Provide ONLY the direct answer, no explanations:"""
 
         if best_thoughts:
             best_path = " -> ".join(best_thoughts[0].get("path", []))
-            final_answer = f"""Tree of Thoughts Analysis
+            f"""Tree of Thoughts Analysis
 
                 Query: {original_query}
 
@@ -385,7 +385,6 @@ Provide ONLY the direct answer, no explanations:"""
             else:
                 concise_output = f"Best approach: {best_path}"  # Formatted for demo
         else:
-            final_answer = f"Tree of Thoughts exploration for '{original_query}' completed. Simple answer: For 2+2, the result is 4."
             concise_output = "Completed exploration"
 
     new_messages = state["messages"] + [AIMessage(content=concise_output)]
@@ -406,6 +405,7 @@ Provide ONLY the direct answer, no explanations:"""
 
 # Route functions
 def route_after_generation(state: TreeOfThoughtsState) -> Literal["evaluation", "solution_synthesis"]:
+    """Route after thought generation based on tree content."""
     thought_tree = state.get("thought_tree", [])
     if not thought_tree:
         return "solution_synthesis"
@@ -413,10 +413,12 @@ def route_after_generation(state: TreeOfThoughtsState) -> Literal["evaluation", 
 
 
 def route_after_evaluation(state: TreeOfThoughtsState) -> Literal["search_and_prune"]:
+    """Route after evaluation to search and prune."""
     return "search_and_prune"
 
 
 def route_after_search(state: TreeOfThoughtsState) -> Literal["thought_generation", "solution_synthesis"]:
+    """Route after search based on completion status."""
     final_solution = state.get("final_solution", "")
     current_depth = state.get("current_depth", 0)
     max_depth = state.get("max_depth", TOT_CONFIG["max_depth"])

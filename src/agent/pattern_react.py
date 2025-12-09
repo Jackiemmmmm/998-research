@@ -1,7 +1,7 @@
-"""
-ReAct Pattern Demo - 反应式模式 (Enhanced)
+"""ReAct Pattern Demo - 反应式模式 (Enhanced).
+
 适用场景：复杂推理任务，多步骤问题解决，工具调用序列
-特点：推理-行动-观察循环，动态任务分解，可解释推理过程
+特点：推理-行动-观察循环，动态任务分解，可解释推理过程.
 
 Based on IBM's ReAct agent best practices:
 - Combines reasoning and acting in iterative loops
@@ -11,9 +11,9 @@ Based on IBM's ReAct agent best practices:
 - Includes termination conditions and iteration limits
 """
 from langgraph.prebuilt import create_react_agent
-from langchain_core.messages import SystemMessage
-from src.tool import tools
+
 from src.llm_config import get_llm
+from src.tool import tools
 
 # Enhanced ReAct agent with improved reasoning-action-observation loop
 # System message that guides the agent's behavior according to ReAct principles
@@ -75,8 +75,7 @@ REACT_CONFIG = {
 
 # Create a wrapper function to add system prompt to the ReAct agent
 def create_enhanced_react_agent_with_prompt(model, tools, system_prompt=None):
-    """
-    Create a ReAct agent with enhanced system prompt
+    """Create a ReAct agent with enhanced system prompt.
 
     Uses the `prompt` parameter of create_react_agent to inject system message.
     This is the correct way per LangGraph API.

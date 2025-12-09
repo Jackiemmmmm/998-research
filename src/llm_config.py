@@ -1,15 +1,16 @@
-"""
-LLM Configuration - Central configuration for different LLM providers
-Supports: Ollama, Groq, Cerebras, Google Gemini
+"""LLM Configuration - Central configuration for different LLM providers.
+
+Supports: Ollama, Groq, Cerebras, Google Gemini.
 """
 
 import os
 from typing import Optional
+
 from langchain.chat_models import init_chat_model
 
 
 class LLMConfig:
-    """Configuration for LLM providers"""
+    """Configuration for LLM providers."""
 
     # Provider configurations
     PROVIDERS = {
@@ -41,8 +42,7 @@ class LLMConfig:
 
     @staticmethod
     def get_model(provider: Optional[str] = None):
-        """
-        Get initialized chat model for specified provider
+        """Get initialized chat model for specified provider.
 
         Args:
             provider: Provider name (ollama, groq, cerebras, google_genai)
@@ -85,7 +85,6 @@ class LLMConfig:
         # Special handling for Ollama
         if provider == "ollama":
             base_url = config["base_url"]
-            print(f"✅ Using Ollama: {model_name} at {base_url}")
 
             # Use ChatOllama directly for better tool support
             try:
@@ -103,12 +102,11 @@ class LLMConfig:
                     base_url=base_url,
                 )
         else:
-            print(f"✅ Using {provider.title()}: {model_name}")
             return init_chat_model(model_string)
 
     @staticmethod
     def get_model_info(provider: Optional[str] = None) -> dict:
-        """Get information about configured model"""
+        """Get information about configured model."""
         if provider is None:
             provider = os.getenv("LLM_PROVIDER", "google_genai")
 
@@ -126,13 +124,12 @@ class LLMConfig:
 
     @staticmethod
     def list_providers() -> list:
-        """List all available providers"""
+        """List all available providers."""
         return list(LLMConfig.PROVIDERS.keys())
 
     @staticmethod
     def check_setup(provider: Optional[str] = None) -> dict:
-        """
-        Check if provider is properly configured
+        """Check if provider is properly configured.
 
         Returns:
             dict with status and message
@@ -197,7 +194,7 @@ class LLMConfig:
 
 # Convenience function
 def get_llm(provider: Optional[str] = None):
-    """Shorthand to get LLM model"""
+    """Shorthand to get LLM model."""
     return LLMConfig.get_model(provider)
 
 
@@ -207,28 +204,19 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
     load_dotenv()
 
-    print("=" * 60)
-    print("LLM Configuration Test")
-    print("=" * 60)
 
     # List providers
-    print("\nAvailable providers:")
     for p in LLMConfig.list_providers():
-        print(f"  - {p}")
+        pass
 
     # Get current provider
     current = os.getenv("LLM_PROVIDER", "google_genai")
-    print(f"\nCurrent provider: {current}")
 
     # Check setup
     check = LLMConfig.check_setup()
-    print(f"\nSetup check: {check}")
 
     # Try to initialize
     try:
         model = LLMConfig.get_model()
-        print(f"\n✅ Model initialized successfully")
-        print(f"   Provider: {check.get('provider')}")
-        print(f"   Model: {check.get('model')}")
-    except Exception as e:
-        print(f"\n❌ Failed to initialize model: {e}")
+    except Exception:
+        pass

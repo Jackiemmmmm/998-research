@@ -1,20 +1,23 @@
-"""
-Sequential Pattern Demo - 顺序处理模式
+"""Sequential Pattern Demo - 顺序处理模式.
+
 适用场景：多步骤标准化流程
-特点：规划→执行→审查的流水线，高延迟但结果可靠
+特点：规划→执行→审查的流水线，高延迟但结果可靠.
 """
 
 from typing import Annotated
-from typing_extensions import TypedDict
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
+
 from langchain_core.messages import AIMessage
-from langgraph.prebuilt import ToolNode, tools_condition
-from src.tool import tools
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from typing_extensions import TypedDict
+
 from src.llm_config import get_llm
+from src.tool import tools
 
 
 class SequentialState(TypedDict):
+    """State for sequential pattern with planning, execution, and review stages."""
+
     messages: Annotated[list, add_messages]
     stage: str
     plan: str
@@ -28,7 +31,7 @@ llm = get_llm()
 
 # 规划节点
 def planning_node(state: SequentialState):
-    """第一阶段：任务规划"""
+    """第一阶段：任务规划."""
     planning_llm = llm.bind_tools([])  # 规划阶段不使用工具
 
     # 获取用户的原始查询
@@ -70,7 +73,7 @@ Format: "PLAN: [your detailed plan here]"
 
 # 执行节点
 def execution_node(state: SequentialState):
-    """第二阶段：计划执行"""
+    """第二阶段：计划执行."""
     # 绑定工具，让execution阶段可以使用工具
     execution_llm = llm.bind_tools(tools)
 
@@ -122,7 +125,7 @@ Your goal is to provide a final, complete answer to the user's question.""",
 
 # 审查节点
 def review_node(state: SequentialState):
-    """第三阶段：结果审查"""
+    """第三阶段：结果审查."""
     review_llm = llm.bind_tools([])  # 审查阶段不使用工具
 
     # 获取原始用户查询

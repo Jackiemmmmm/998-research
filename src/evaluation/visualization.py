@@ -1,23 +1,22 @@
-"""
-Visualization module - Generate charts and plots for evaluation results
-"""
+"""Visualization module - Generate charts and plots for evaluation results."""
 
-import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.pyplot as plt
+
 matplotlib.use('Agg')  # Use non-interactive backend
-import numpy as np
-from typing import Dict, List, Optional
 from pathlib import Path
+from typing import Dict, List
+
+import numpy as np
 
 from .metrics import PatternMetrics
 
 
 class EvaluationVisualizer:
-    """Generate visualizations for pattern evaluation results"""
+    """Generate visualizations for pattern evaluation results."""
 
     def __init__(self, output_dir: str = "reports/figures"):
-        """
-        Initialize visualizer
+        """Initialize visualizer.
 
         Args:
             output_dir: Directory to save figures
@@ -33,8 +32,7 @@ class EvaluationVisualizer:
         self,
         pattern_metrics: Dict[str, PatternMetrics],
     ) -> List[str]:
-        """
-        Generate all visualization plots
+        """Generate all visualization plots.
 
         Args:
             pattern_metrics: Dict of {pattern_name: PatternMetrics}
@@ -44,7 +42,6 @@ class EvaluationVisualizer:
         """
         generated_files = []
 
-        print(f"\n📊 Generating visualizations...")
 
         # 1. Success rate comparison
         path = self.plot_success_rates(pattern_metrics)
@@ -70,7 +67,6 @@ class EvaluationVisualizer:
         path = self.plot_success_by_category(pattern_metrics)
         generated_files.append(path)
 
-        print(f"✅ Generated {len(generated_files)} visualizations in {self.output_dir}")
 
         return generated_files
 
@@ -78,7 +74,7 @@ class EvaluationVisualizer:
         self,
         pattern_metrics: Dict[str, PatternMetrics],
     ) -> str:
-        """Plot success rates comparison"""
+        """Plot success rates comparison."""
         patterns = list(pattern_metrics.keys())
         success_rates = [metrics.success.success_rate() * 100 for metrics in pattern_metrics.values()]
 
@@ -105,14 +101,13 @@ class EvaluationVisualizer:
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
 
-        print(f"  ✓ Success rate plot: {output_path}")
         return str(output_path)
 
     def plot_efficiency_comparison(
         self,
         pattern_metrics: Dict[str, PatternMetrics],
     ) -> str:
-        """Plot efficiency metrics (latency and tokens)"""
+        """Plot efficiency metrics (latency and tokens)."""
         patterns = list(pattern_metrics.keys())
         latencies = [metrics.efficiency.avg_latency() for metrics in pattern_metrics.values()]
         tokens = [metrics.efficiency.avg_total_tokens() for metrics in pattern_metrics.values()]
@@ -150,14 +145,13 @@ class EvaluationVisualizer:
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
 
-        print(f"  ✓ Efficiency plot: {output_path}")
         return str(output_path)
 
     def plot_robustness(
         self,
         pattern_metrics: Dict[str, PatternMetrics],
     ) -> str:
-        """Plot robustness metrics"""
+        """Plot robustness metrics."""
         patterns = list(pattern_metrics.keys())
         original_rates = [metrics.robustness.original_success_rate * 100 for metrics in pattern_metrics.values()]
         perturbed_rates = [metrics.robustness.perturbed_success_rate * 100 for metrics in pattern_metrics.values()]
@@ -193,14 +187,13 @@ class EvaluationVisualizer:
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
 
-        print(f"  ✓ Robustness plot: {output_path}")
         return str(output_path)
 
     def plot_controllability(
         self,
         pattern_metrics: Dict[str, PatternMetrics],
     ) -> str:
-        """Plot controllability metrics"""
+        """Plot controllability metrics."""
         patterns = list(pattern_metrics.keys())
         schema_compliance = [
             metrics.controllability.schema_compliance_rate() * 100
@@ -243,14 +236,13 @@ class EvaluationVisualizer:
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
 
-        print(f"  ✓ Controllability plot: {output_path}")
         return str(output_path)
 
     def plot_radar_comparison(
         self,
         pattern_metrics: Dict[str, PatternMetrics],
     ) -> str:
-        """Plot radar chart comparing all dimensions"""
+        """Plot radar chart comparing all dimensions."""
         patterns = list(pattern_metrics.keys())
 
         # Prepare data (normalize to 0-100 scale)
@@ -303,14 +295,13 @@ class EvaluationVisualizer:
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
 
-        print(f"  ✓ Radar chart: {output_path}")
         return str(output_path)
 
     def plot_success_by_category(
         self,
         pattern_metrics: Dict[str, PatternMetrics],
     ) -> str:
-        """Plot success rates by task category"""
+        """Plot success rates by task category."""
         patterns = list(pattern_metrics.keys())
 
         # Get all categories
@@ -362,5 +353,4 @@ class EvaluationVisualizer:
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
 
-        print(f"  ✓ Success by category plot: {output_path}")
         return str(output_path)

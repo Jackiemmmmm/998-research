@@ -1,11 +1,10 @@
+"""Agent graph configuration module.
+
+This module sets up the default graph for the agent.
+"""
+
 from dotenv import load_dotenv
 
-from agent.graph_simple import graph_simple
-from agent.graph_manual import graph_manual
-
-from agent.pattern_react import graph_pattern_react, enhanced_graph_pattern_react
-from agent.pattern_sequential import graph_pattern_sequential
-from agent.pattern_reflex import graph_pattern_reflex
 from agent.pattern_tree_of_thoughts import graph_pattern_tree_of_thoughts
 
 load_dotenv()

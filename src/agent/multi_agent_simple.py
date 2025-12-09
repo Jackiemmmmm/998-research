@@ -1,8 +1,14 @@
-from langgraph.prebuilt import create_react_agent
-from langchain.chat_models import init_chat_model
+"""Simple multi-agent workflow implementation.
+
+This module creates a simple multi-agent workflow using prebuilt ReAct agents
+for research and analysis tasks.
+"""
+
 from dotenv import load_dotenv
-from src.tool import tools
+from langgraph.prebuilt import create_react_agent
+
 from src.llm_config import get_llm
+from src.tool import tools
 
 load_dotenv()
 
@@ -21,8 +27,7 @@ analysis_agent = create_react_agent(
 
 # 协调器函数
 def multi_agent_workflow(user_input):
-    """协调多个agent的工作流程"""
-    
+    """协调多个agent的工作流程."""
     # 第一步：研究agent收集信息
     research_result = research_agent.invoke({
         "messages": [{"role": "user", "content": f"Research: {user_input}"}]

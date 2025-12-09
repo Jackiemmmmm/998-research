@@ -1,28 +1,28 @@
-"""
-Pattern Evaluator - Main evaluation engine
-Runs test tasks on patterns and collects metrics
+"""Pattern Evaluator - Main evaluation engine.
+
+Runs test tasks on patterns and collects metrics.
 """
 
-import time
 import asyncio
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, field
+import time
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
-from .test_suite import TestTask, TEST_SUITE
 from .judge import Judge, LLMJudge
 from .metrics import (
-    PatternMetrics,
-    SuccessMetrics,
-    EfficiencyMetrics,
-    RobustnessMetrics,
     ControllabilityMetrics,
+    EfficiencyMetrics,
     MetricsAggregator,
+    PatternMetrics,
+    RobustnessMetrics,
+    SuccessMetrics,
 )
+from .test_suite import TEST_SUITE, TestTask
 
 
 @dataclass
 class TaskResult:
-    """Result of running a single task"""
+    """Result of running a single task."""
 
     task_id: str
     task_category: str
@@ -55,7 +55,7 @@ class TaskResult:
     tool_policy_compliant: bool = True
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary"""
+        """Convert to dictionary."""
         return {
             "task_id": self.task_id,
             "pattern": self.pattern_name,
@@ -71,11 +71,10 @@ class TaskResult:
 
 
 class PatternEvaluator:
-    """Main evaluator for agentic patterns"""
+    """Main evaluator for agentic patterns."""
 
     def __init__(self, use_llm_judge: bool = False, delay_between_tasks: float = 2.0):
-        """
-        Initialize evaluator
+        """Initialize evaluator.
 
         Args:
             use_llm_judge: Whether to use LLM-as-Judge for quality evaluation
@@ -93,8 +92,7 @@ class PatternEvaluator:
         test_tasks: Optional[List[TestTask]] = None,
         include_robustness: bool = True,
     ) -> PatternMetrics:
-        """
-        Evaluate a single pattern on test suite
+        """Evaluate a single pattern on test suite.
 
         Args:
             pattern_name: Name of the pattern (e.g., "ReAct", "CoT")
@@ -108,16 +106,11 @@ class PatternEvaluator:
         if test_tasks is None:
             test_tasks = TEST_SUITE
 
-        print(f"\n{'='*60}")
-        print(f"Evaluating Pattern: {pattern_name}")
-        print(f"{'='*60}")
-        print(f"Total tasks: {len(test_tasks)}")
 
         # Initialize metrics
         metrics = PatternMetrics(pattern_name=pattern_name)
 
         # Run original tasks
-        print(f"\n[1/2] Running original tasks...")
         original_results = await self._run_tasks(
             pattern_name, graph, test_tasks, variant="original"
         )
@@ -132,7 +125,6 @@ class PatternEvaluator:
 
         # Run robustness tests
         if include_robustness:
-            print(f"\n[2/2] Running robustness tests (perturbations)...")
             perturbed_results = await self._run_robustness_tests(
                 pattern_name, graph, test_tasks
             )
@@ -142,17 +134,8 @@ class PatternEvaluator:
                 metrics.robustness, original_results, perturbed_results
             )
         else:
-            print(f"\n[2/2] Skipping robustness tests")
+            pass
 
-        print(f"\n{'='*60}")
-        print(f"Evaluation Complete: {pattern_name}")
-        print(f"{'='*60}")
-        print(f"Success Rate (Strict): {metrics.success.success_rate():.1%}")
-        print(f"Success Rate (Lenient): {metrics.success.lenient_success_rate():.1%}")
-        print(f"Controllability Gap: {metrics.success.controllability_gap():.1%}")
-        print(f"Avg Latency: {metrics.efficiency.avg_latency():.2f}s")
-        print(f"Avg Tokens: {metrics.efficiency.avg_total_tokens():.0f}")
-        print(f"Controllability: {metrics.controllability.overall_controllability():.1%}")
 
         return metrics
 
@@ -163,7 +146,7 @@ class PatternEvaluator:
         tasks: List[TestTask],
         variant: str = "original",
     ) -> List[TaskResult]:
-        """Run a list of tasks on a pattern"""
+        """Run a list of tasks on a pattern."""
         results = []
 
         for i, task in enumerate(tasks, 1):
@@ -172,19 +155,15 @@ class PatternEvaluator:
                 # Use first perturbation
                 prompt = task.get_perturbations()[0]
 
-            print(f"  [{i}/{len(tasks)}] Task {task.id}: {prompt[:50]}...")
 
             result = await self._run_single_task(pattern_name, graph, task, prompt)
             results.append(result)
 
             # Display strict evaluation result
-            strict_status = "✓" if result.judge_success else "✗"
-            print(f"           Strict:  {strict_status} {result.judge_message[:50]}")
 
             # If lenient result differs, show it as well
             if result.lenient_judge_success != result.judge_success:
-                lenient_status = "✓" if result.lenient_judge_success else "✗"
-                print(f"           Lenient: {lenient_status} {result.lenient_judge_message[:50]}")
+                pass
 
             # Add delay between tasks to avoid rate limits
             if i < len(tasks) and self.delay_between_tasks > 0:
@@ -199,7 +178,7 @@ class PatternEvaluator:
         task: TestTask,
         prompt: str,
     ) -> TaskResult:
-        """Run a single task and collect metrics"""
+        """Run a single task and collect metrics."""
         result = TaskResult(
             task_id=task.id,
             task_category=task.category,
@@ -296,7 +275,7 @@ class PatternEvaluator:
         graph,
         tasks: List[TestTask],
     ) -> List[TaskResult]:
-        """Run robustness tests with perturbations"""
+        """Run robustness tests with perturbations."""
         perturbed_tasks = []
 
         # Collect tasks with perturbations
@@ -317,7 +296,7 @@ class PatternEvaluator:
         results: List[TaskResult],
         tasks: List[TestTask],
     ):
-        """Collect success dimension metrics (both strict and lenient)"""
+        """Collect success dimension metrics (both strict and lenient)."""
         success_metrics.total_tasks = len(results)
         success_metrics.successful_tasks = sum(1 for r in results if r.judge_success)
         success_metrics.lenient_successful_tasks = sum(1 for r in results if r.lenient_judge_success)
@@ -344,7 +323,7 @@ class PatternEvaluator:
         efficiency_metrics: EfficiencyMetrics,
         results: List[TaskResult],
     ):
-        """Collect efficiency dimension metrics"""
+        """Collect efficiency dimension metrics."""
         for result in results:
             if result.success:
                 efficiency_metrics.latencies.append(result.latency)
@@ -359,7 +338,7 @@ class PatternEvaluator:
         original_results: List[TaskResult],
         perturbed_results: List[TaskResult],
     ):
-        """Collect robustness dimension metrics"""
+        """Collect robustness dimension metrics."""
         if not perturbed_results:
             return
 
@@ -400,7 +379,7 @@ class PatternEvaluator:
         results: List[TaskResult],
         tasks: List[TestTask],
     ):
-        """Collect controllability dimension metrics"""
+        """Collect controllability dimension metrics."""
         # Schema compliance
         json_tasks = [t for t in tasks if t.schema is not None]
         controllability_metrics.total_json_tasks = len(json_tasks)
@@ -431,8 +410,7 @@ async def evaluate_multiple_patterns(
     include_robustness: bool = True,
     delay_between_tasks: float = 3.0,
 ) -> Dict[str, PatternMetrics]:
-    """
-    Evaluate multiple patterns and compare
+    """Evaluate multiple patterns and compare.
 
     Args:
         patterns: Dict of {pattern_name: graph}
@@ -453,27 +431,13 @@ async def evaluate_multiple_patterns(
         results[pattern_name] = metrics
 
     # Print comparison
-    print(f"\n\n{'='*60}")
-    print("PATTERN COMPARISON")
-    print(f"{'='*60}")
 
-    comparison = MetricsAggregator.compare_patterns(results)
+    MetricsAggregator.compare_patterns(results)
 
-    print("\nSuccess Dimension:")
-    print(f"  Best: {comparison['success_dimension']['best_pattern']} "
-          f"({comparison['success_dimension']['best_score']:.1%})")
 
-    print("\nEfficiency Dimension:")
-    print(f"  Fastest: {comparison['efficiency_dimension']['fastest_pattern']} "
-          f"({comparison['efficiency_dimension']['fastest_latency']:.2f}s)")
 
     if include_robustness:
-        print("\nRobustness Dimension:")
-        print(f"  Most Robust: {comparison['robustness_dimension']['most_robust_pattern']} "
-              f"({comparison['robustness_dimension']['lowest_degradation']:.1f}% degradation)")
+        pass
 
-    print("\nControllability Dimension:")
-    print(f"  Most Controllable: {comparison['controllability_dimension']['most_controllable_pattern']} "
-          f"({comparison['controllability_dimension']['best_score']:.1%})")
 
     return results

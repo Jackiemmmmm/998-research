@@ -1,19 +1,19 @@
-"""
-Metrics module - Calculate evaluation metrics for 4 dimensions
+"""Metrics module - Calculate evaluation metrics for 4 dimensions.
+
 1. Success: Task completion rate, accuracy
 2. Efficiency: Latency, token usage, steps
 3. Robustness: Performance under perturbations
-4. Controllability: Schema compliance, tool policy adherence
+4. Controllability: Schema compliance, tool policy adherence.
 """
 
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, field
 import statistics
+from dataclasses import dataclass, field
+from typing import Any, Dict, List
 
 
 @dataclass
 class SuccessMetrics:
-    """Success dimension metrics"""
+    """Success dimension metrics."""
 
     total_tasks: int = 0
     successful_tasks: int = 0  # Strict: exact match
@@ -28,29 +28,29 @@ class SuccessMetrics:
     success_by_complexity: Dict[str, float] = field(default_factory=dict)
 
     def success_rate(self) -> float:
-        """Overall success rate (strict)"""
+        """Overall success rate (strict)."""
         if self.total_tasks == 0:
             return 0.0
         return self.successful_tasks / self.total_tasks
 
     def lenient_success_rate(self) -> float:
-        """Overall success rate (lenient with answer extraction)"""
+        """Overall success rate (lenient with answer extraction)."""
         if self.total_tasks == 0:
             return 0.0
         return self.lenient_successful_tasks / self.total_tasks
 
     def controllability_gap(self) -> float:
-        """Gap between lenient and strict success (indicates output format control)"""
+        """Gap between lenient and strict success (indicates output format control)."""
         return self.lenient_success_rate() - self.success_rate()
 
     def failure_rate(self) -> float:
-        """Overall failure rate"""
+        """Overall failure rate."""
         if self.total_tasks == 0:
             return 0.0
         return self.failed_tasks / self.total_tasks
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary"""
+        """Convert to dictionary."""
         return {
             "total_tasks": self.total_tasks,
             "successful_tasks_strict": self.successful_tasks,
@@ -68,7 +68,7 @@ class SuccessMetrics:
 
 @dataclass
 class EfficiencyMetrics:
-    """Efficiency dimension metrics"""
+    """Efficiency dimension metrics."""
 
     # Latency (seconds)
     latencies: List[float] = field(default_factory=list)
@@ -84,30 +84,30 @@ class EfficiencyMetrics:
     tool_call_counts: List[int] = field(default_factory=list)
 
     def avg_latency(self) -> float:
-        """Average latency in seconds"""
+        """Average latency in seconds."""
         return statistics.mean(self.latencies) if self.latencies else 0.0
 
     def median_latency(self) -> float:
-        """Median latency in seconds"""
+        """Median latency in seconds."""
         return statistics.median(self.latencies) if self.latencies else 0.0
 
     def avg_total_tokens(self) -> float:
-        """Average total token usage"""
+        """Average total token usage."""
         if not self.input_tokens or not self.output_tokens:
             return 0.0
         totals = [i + o for i, o in zip(self.input_tokens, self.output_tokens)]
         return statistics.mean(totals)
 
     def avg_steps(self) -> float:
-        """Average number of steps"""
+        """Average number of steps."""
         return statistics.mean(self.step_counts) if self.step_counts else 0.0
 
     def avg_tool_calls(self) -> float:
-        """Average number of tool calls"""
+        """Average number of tool calls."""
         return statistics.mean(self.tool_call_counts) if self.tool_call_counts else 0.0
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary"""
+        """Convert to dictionary."""
         return {
             "avg_latency_sec": round(self.avg_latency(), 2),
             "median_latency_sec": round(self.median_latency(), 2),
@@ -124,7 +124,7 @@ class EfficiencyMetrics:
 
 @dataclass
 class RobustnessMetrics:
-    """Robustness dimension metrics"""
+    """Robustness dimension metrics."""
 
     # Original vs perturbed performance
     original_success_rate: float = 0.0
@@ -141,7 +141,7 @@ class RobustnessMetrics:
     task_robustness_scores: Dict[str, float] = field(default_factory=dict)
 
     def calculate_degradation(self):
-        """Calculate performance degradation percentage"""
+        """Calculate performance degradation percentage."""
         if self.original_success_rate == 0:
             self.degradation_percentage = 0.0
         else:
@@ -149,13 +149,13 @@ class RobustnessMetrics:
             self.degradation_percentage = degradation * 100
 
     def avg_robustness_score(self) -> float:
-        """Average robustness score across tasks"""
+        """Average robustness score across tasks."""
         if not self.task_robustness_scores:
             return 0.0
         return statistics.mean(self.task_robustness_scores.values())
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary"""
+        """Convert to dictionary."""
         return {
             "original_success_rate": round(self.original_success_rate, 3),
             "perturbed_success_rate": round(self.perturbed_success_rate, 3),
@@ -169,7 +169,7 @@ class RobustnessMetrics:
 
 @dataclass
 class ControllabilityMetrics:
-    """Controllability dimension metrics"""
+    """Controllability dimension metrics."""
 
     # Schema compliance
     total_json_tasks: int = 0
@@ -187,19 +187,19 @@ class ControllabilityMetrics:
     avg_interpretability_score: float = 0.0
 
     def schema_compliance_rate(self) -> float:
-        """Schema compliance rate"""
+        """Calculate schema compliance rate."""
         if self.total_json_tasks == 0:
             return 0.0
         return self.schema_compliant_tasks / self.total_json_tasks
 
     def tool_policy_compliance_rate(self) -> float:
-        """Tool policy compliance rate"""
+        """Tool policy compliance rate."""
         if self.total_tool_tasks == 0:
             return 0.0
         return self.tool_policy_compliant_tasks / self.total_tool_tasks
 
     def overall_controllability(self) -> float:
-        """Overall controllability score (0-1)"""
+        """Overall controllability score (0-1)."""
         scores = []
 
         if self.total_json_tasks > 0:
@@ -216,7 +216,7 @@ class ControllabilityMetrics:
         return statistics.mean(scores) if scores else 0.0
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary"""
+        """Convert to dictionary."""
         return {
             "schema_compliance_rate": round(self.schema_compliance_rate(), 3),
             "tool_policy_compliance_rate": round(self.tool_policy_compliance_rate(), 3),
@@ -233,7 +233,7 @@ class ControllabilityMetrics:
 
 @dataclass
 class PatternMetrics:
-    """Complete metrics for a pattern across all dimensions"""
+    """Complete metrics for a pattern across all dimensions."""
 
     pattern_name: str
     success: SuccessMetrics = field(default_factory=SuccessMetrics)
@@ -242,7 +242,7 @@ class PatternMetrics:
     controllability: ControllabilityMetrics = field(default_factory=ControllabilityMetrics)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary"""
+        """Convert to dictionary."""
         return {
             "pattern_name": self.pattern_name,
             "success": self.success.to_dict(),
@@ -252,7 +252,7 @@ class PatternMetrics:
         }
 
     def summary(self) -> Dict[str, Any]:
-        """Get summary metrics"""
+        """Get summary metrics."""
         return {
             "pattern": self.pattern_name,
             "success_rate_strict": round(self.success.success_rate(), 3),
@@ -266,14 +266,13 @@ class PatternMetrics:
 
 
 class MetricsAggregator:
-    """Aggregate and compare metrics across patterns"""
+    """Aggregate and compare metrics across patterns."""
 
     @staticmethod
     def compare_patterns(
         pattern_metrics: Dict[str, PatternMetrics]
     ) -> Dict[str, Any]:
-        """
-        Compare patterns across all dimensions
+        """Compare patterns across all dimensions.
 
         Returns a comparison report with winners in each dimension
         """
@@ -295,7 +294,7 @@ class MetricsAggregator:
     def _compare_success(
         pattern_metrics: Dict[str, PatternMetrics]
     ) -> Dict[str, Any]:
-        """Compare success rates"""
+        """Compare success rates."""
         success_rates = {
             name: metrics.success.success_rate()
             for name, metrics in pattern_metrics.items()
@@ -317,7 +316,7 @@ class MetricsAggregator:
     def _compare_efficiency(
         pattern_metrics: Dict[str, PatternMetrics]
     ) -> Dict[str, Any]:
-        """Compare efficiency (lower latency is better)"""
+        """Compare efficiency (lower latency is better)."""
         latencies = {
             name: metrics.efficiency.avg_latency()
             for name, metrics in pattern_metrics.items()
@@ -339,7 +338,7 @@ class MetricsAggregator:
     def _compare_robustness(
         pattern_metrics: Dict[str, PatternMetrics]
     ) -> Dict[str, Any]:
-        """Compare robustness (lower degradation is better)"""
+        """Compare robustness (lower degradation is better)."""
         degradations = {
             name: metrics.robustness.degradation_percentage
             for name, metrics in pattern_metrics.items()
@@ -361,7 +360,7 @@ class MetricsAggregator:
     def _compare_controllability(
         pattern_metrics: Dict[str, PatternMetrics]
     ) -> Dict[str, Any]:
-        """Compare controllability"""
+        """Compare controllability."""
         controllability_scores = {
             name: metrics.controllability.overall_controllability()
             for name, metrics in pattern_metrics.items()
@@ -383,5 +382,5 @@ class MetricsAggregator:
     def _build_summary_table(
         pattern_metrics: Dict[str, PatternMetrics]
     ) -> List[Dict[str, Any]]:
-        """Build summary comparison table"""
+        """Build summary comparison table."""
         return [metrics.summary() for metrics in pattern_metrics.values()]

@@ -1,16 +1,26 @@
+"""Hybrid multi-agent implementation.
+
+This module implements a hybrid multi-agent system combining custom StateGraph
+with prebuilt ReAct agents for research and analysis tasks.
+"""
+
 from typing import Annotated, Literal
-from typing_extensions import TypedDict
-from langgraph.graph import StateGraph, START, END
+
+from dotenv import load_dotenv
+from langgraph.graph import START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import create_react_agent
-from dotenv import load_dotenv
-from src.tool import tools
+from typing_extensions import TypedDict
+
 from src.llm_config import get_llm
+from src.tool import tools
 
 load_dotenv()
 
-# 定义状态
+
 class HybridState(TypedDict):
+    """State for hybrid multi-agent workflow."""
+
     messages: Annotated[list, add_messages]
     stage: str
 
@@ -29,7 +39,7 @@ analysis_agent = create_react_agent(
 
 # 包装函数，使agent适配StateGraph
 def research_node(state: HybridState):
-    """研究节点 - 使用create_react_agent"""
+    """研究节点 - 使用create_react_agent."""
     result = research_agent.invoke(state)
     return {
         "messages": result["messages"],
@@ -37,7 +47,7 @@ def research_node(state: HybridState):
     }
 
 def analysis_node(state: HybridState):
-    """分析节点 - 使用create_react_agent"""
+    """分析节点 - 使用create_react_agent."""
     result = analysis_agent.invoke(state)
     return {
         "messages": result["messages"],
@@ -46,7 +56,7 @@ def analysis_node(state: HybridState):
 
 # 路由函数
 def route_next(state: HybridState) -> Literal["analysis", "__end__"]:
-    """决定下一步路由"""
+    """决定下一步路由."""
     if state.get("stage") == "research_complete":
         return "analysis"
     else:

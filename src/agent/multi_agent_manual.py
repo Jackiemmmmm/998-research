@@ -1,17 +1,26 @@
+"""Manual multi-agent implementation.
+
+This module provides a manually constructed multi-agent system with
+research and analysis agents using StateGraph.
+"""
+
 from typing import Annotated, Literal
-from typing_extensions import TypedDict
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langchain.chat_models import init_chat_model
-from langgraph.prebuilt import ToolNode
+
 from dotenv import load_dotenv
-from src.tool import tools
+from langgraph.graph import START, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
+from typing_extensions import TypedDict
+
 from src.llm_config import get_llm
+from src.tool import tools
 
 load_dotenv()
 
-# 定义状态
+
 class MultiAgentState(TypedDict):
+    """State for multi-agent workflow with research and analysis phases."""
+
     messages: Annotated[list, add_messages]
     current_agent: str
     research_complete: bool
@@ -23,7 +32,7 @@ llm_with_tools = llm.bind_tools(tools)
 
 # 研究agent节点
 def research_agent(state: MultiAgentState):
-    """专门负责研究和信息收集的agent"""
+    """专门负责研究和信息收集的agent."""
     system_msg = {"role": "system", "content": "You are a research agent. Focus on gathering comprehensive information using available tools."}
     messages = [system_msg] + state["messages"]
     
@@ -36,7 +45,7 @@ def research_agent(state: MultiAgentState):
 
 # 分析agent节点
 def analysis_agent(state: MultiAgentState):
-    """专门负责分析和总结的agent"""
+    """专门负责分析和总结的agent."""
     system_msg = {"role": "system", "content": "You are an analysis agent. Analyze the research findings and provide insights."}
     messages = [system_msg] + state["messages"]
     
@@ -49,7 +58,7 @@ def analysis_agent(state: MultiAgentState):
 
 # 决策函数：决定下一步去哪里
 def decide_next_step(state: MultiAgentState) -> Literal["research", "analysis", "tools", "__end__"]:
-    """决定工作流的下一步"""
+    """决定工作流的下一步."""
     last_message = state["messages"][-1]
     
     # 如果有tool调用，去执行工具
@@ -78,7 +87,7 @@ builder.add_conditional_edges("analysis", decide_next_step)
 
 # 工具执行后的路由
 def after_tools(state: MultiAgentState) -> Literal["research", "analysis"]:
-    """工具执行后返回到相应的agent"""
+    """工具执行后返回到相应的agent."""
     return state.get("current_agent", "research")
 
 builder.add_conditional_edges("tools", after_tools)

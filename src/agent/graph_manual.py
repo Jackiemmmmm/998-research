@@ -1,14 +1,22 @@
+"""Manual graph implementation for LangGraph agent.
+
+This module provides a manually constructed StateGraph for the chatbot agent.
+"""
+
 from typing import Annotated
-from typing_extensions import TypedDict
-from langgraph.graph import StateGraph, START
+
+from langgraph.graph import START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
+from typing_extensions import TypedDict
 
-from src.tool import tools
 from src.llm_config import get_llm
+from src.tool import tools
 
 
 class State(TypedDict):
+    """State for the chatbot containing messages."""
+
     messages: Annotated[list, add_messages]
 
 
@@ -18,9 +26,8 @@ graph_builder = StateGraph(State)
 
 
 def chatbot(state: State):
+    """Process user message and generate response."""
     response = llm_with_tools.invoke(state["messages"])
-    print(f"LLM response type: {type(response)}")
-    print(f"Has tool_calls: {hasattr(response, 'tool_calls') and response.tool_calls}")
     return {"messages": [response]}
 
 

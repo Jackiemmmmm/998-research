@@ -1,25 +1,22 @@
-"""
-Report Generator - Generate evaluation reports
-"""
+"""Report Generator - Generate evaluation reports."""
 
 import json
 from datetime import datetime
-from typing import Dict, Any, List, Optional
 from pathlib import Path
+from typing import Any, Dict, Optional
 
-from .metrics import PatternMetrics, MetricsAggregator
+from .metrics import MetricsAggregator, PatternMetrics
 
 
 class ReportGenerator:
-    """Generate evaluation reports in various formats"""
+    """Generate evaluation reports in various formats."""
 
     @staticmethod
     def generate_json_report(
         pattern_metrics: Dict[str, PatternMetrics],
         output_path: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Generate JSON report
+        """Generate JSON report.
 
         Args:
             pattern_metrics: Dict of {pattern_name: PatternMetrics}
@@ -47,7 +44,6 @@ class ReportGenerator:
             Path(output_path).parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(report, f, indent=2, ensure_ascii=False)
-            print(f"\n📄 JSON report saved to: {output_path}")
 
         return report
 
@@ -56,8 +52,7 @@ class ReportGenerator:
         pattern_metrics: Dict[str, PatternMetrics],
         output_path: Optional[str] = None,
     ) -> str:
-        """
-        Generate Markdown report
+        """Generate Markdown report.
 
         Args:
             pattern_metrics: Dict of {pattern_name: PatternMetrics}
@@ -192,7 +187,6 @@ class ReportGenerator:
             Path(output_path).parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as f:
                 f.write(markdown)
-            print(f"\n📄 Markdown report saved to: {output_path}")
 
         return markdown
 
@@ -201,8 +195,7 @@ class ReportGenerator:
         pattern_metrics: Dict[str, PatternMetrics],
         output_path: Optional[str] = None,
     ) -> str:
-        """
-        Generate CSV comparison table
+        """Generate CSV comparison table.
 
         Args:
             pattern_metrics: Dict of {pattern_name: PatternMetrics}
@@ -236,53 +229,20 @@ class ReportGenerator:
             Path(output_path).parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as f:
                 f.write(csv)
-            print(f"\n📄 CSV report saved to: {output_path}")
 
         return csv
 
     @staticmethod
     def print_console_report(pattern_metrics: Dict[str, PatternMetrics]):
-        """Print a concise report to console"""
+        """Print a concise report to console."""
         comparison = MetricsAggregator.compare_patterns(pattern_metrics)
 
-        print("\n" + "="*70)
-        print(" " * 20 + "EVALUATION REPORT")
-        print("="*70)
 
         # Summary table with both success rates
-        print("\n📊 SUMMARY COMPARISON")
-        print("-"*80)
-        print(f"{'Pattern':<12} {'Strict':<9} {'Lenient':<9} {'Gap':<7} {'Latency':<10} {'Tokens':<8} {'Robust':<8}")
-        print("-"*80)
 
         for row in comparison["summary_table"]:
-            print(
-                f"{row['pattern']:<12} "
-                f"{row['success_rate_strict']:>7.1%}  "
-                f"{row['success_rate_lenient']:>7.1%}  "
-                f"{row['controllability_gap']:>5.1%}  "
-                f"{row['avg_latency_sec']:>8.2f}s  "
-                f"{row['avg_tokens']:>6.0f}  "
-                f"{row['degradation_pct']:>6.1f}%"
-            )
+            pass
 
-        print("-"*80)
-        print("\nLegend:")
-        print("  Strict:  Exact match evaluation")
-        print("  Lenient: With intelligent answer extraction")
-        print("  Gap:     Controllability gap (lenient - strict)")
-        print("-"*80)
 
         # Winners
-        print("\n🏆 DIMENSION WINNERS")
-        print("-"*70)
-        print(f"Success:        {comparison['success_dimension']['best_pattern']:>15} "
-              f"({comparison['success_dimension']['best_score']:.1%})")
-        print(f"Efficiency:     {comparison['efficiency_dimension']['fastest_pattern']:>15} "
-              f"({comparison['efficiency_dimension']['fastest_latency']:.2f}s)")
-        print(f"Robustness:     {comparison['robustness_dimension']['most_robust_pattern']:>15} "
-              f"({comparison['robustness_dimension']['lowest_degradation']:.1f}% degradation)")
-        print(f"Controllability:{comparison['controllability_dimension']['most_controllable_pattern']:>15} "
-              f"({comparison['controllability_dimension']['best_score']:.1%})")
 
-        print("="*70 + "\n")

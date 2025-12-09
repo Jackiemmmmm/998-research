@@ -1,57 +1,36 @@
 #!/usr/bin/env python3
-"""
-Agentic Pattern Evaluation Runner
+"""Agentic Pattern Evaluation Runner.
+
 Evaluates ReAct, CoT, Reflex, and Tree of Thoughts patterns
-Based on evaluation.md specifications
+Based on evaluation.md specifications.
 """
 
 import asyncio
 import sys
 from pathlib import Path
 
-# Add src to path
+# Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent / "src" / "agent"))
 
 from dotenv import load_dotenv
+from pattern_react import enhanced_graph_pattern_react, graph_pattern_react
+from pattern_reflex import graph_pattern_reflex
+from pattern_sequential import graph_pattern_sequential
+from pattern_tree_of_thoughts import graph_pattern_tree_of_thoughts
+
+from src.evaluation import (
+    ReportGenerator,
+    load_test_suite,
+)
+from src.evaluation.evaluator import evaluate_multiple_patterns
+from src.evaluation.visualization import EvaluationVisualizer
 
 # Load environment variables
 load_dotenv()
 
-from src.evaluation import (
-    load_test_suite,
-    PatternEvaluator,
-    ReportGenerator,
-)
-from src.evaluation.visualization import EvaluationVisualizer
-from src.evaluation.evaluator import evaluate_multiple_patterns
-
-# Import patterns directly to avoid __init__.py imports
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent / "src" / "agent"))
-
-from pattern_react import graph_pattern_react, enhanced_graph_pattern_react
-from pattern_sequential import graph_pattern_sequential
-from pattern_reflex import graph_pattern_reflex
-from pattern_tree_of_thoughts import graph_pattern_tree_of_thoughts
-
-
 async def run_full_evaluation(delay: float = 3.0):
-    """Run complete evaluation on all 5 patterns"""
-    print("=" * 70)
-    print(" " * 15 + "AGENTIC PATTERN EVALUATION")
-    print("=" * 70)
-    print("\nEvaluating 5 design patterns:")
-    print("  1. ReAct - Reasoning + Acting (basic)")
-    print("  2. ReAct Enhanced - With output formatting & reasoning guidance")
-    print("  3. Chain of Thought (Sequential) - Step-by-step reasoning")
-    print("  4. Reflex - Rule-based fast response")
-    print("  5. Tree of Thoughts - Parallel exploration")
-    print("\nTest Suite: 16 tasks across 4 categories")
-    print("Dimensions: Success, Efficiency, Robustness, Controllability")
-    print(f"\n⏱️  Delay between tasks: {delay}s (to avoid rate limits)")
-    print("=" * 70)
-
+    """Run complete evaluation on all 5 patterns."""
     # Define patterns to evaluate
     patterns = {
         "ReAct": graph_pattern_react,
@@ -65,7 +44,6 @@ async def run_full_evaluation(delay: float = 3.0):
     test_tasks = load_test_suite()
 
     # Run evaluation
-    print(f"\n🚀 Starting evaluation...\n")
     pattern_metrics = await evaluate_multiple_patterns(
         patterns=patterns,
         test_tasks=test_tasks,
@@ -74,7 +52,6 @@ async def run_full_evaluation(delay: float = 3.0):
     )
 
     # Generate reports
-    print(f"\n📊 Generating reports...\n")
 
     # JSON report
     ReportGenerator.generate_json_report(
@@ -101,20 +78,10 @@ async def run_full_evaluation(delay: float = 3.0):
     visualizer = EvaluationVisualizer(output_dir="reports/figures")
     visualizer.generate_all_plots(pattern_metrics)
 
-    print(f"\n✅ Evaluation complete!")
-    print(f"\n📁 Results saved to:")
-    print(f"  - reports/evaluation_results.json")
-    print(f"  - reports/evaluation_report.md")
-    print(f"  - reports/comparison_table.csv")
-    print(f"  - reports/figures/*.png")
-    print()
 
 
 async def run_quick_test(delay: float = 3.0):
-    """Run quick test on subset of tasks"""
-    print("⚡ Quick Evaluation Test")
-    print(f"⏱️  Delay between tasks: {delay}s\n")
-
+    """Run quick test on subset of tasks."""
     patterns = {
         "ReAct": graph_pattern_react,
         "ReAct_Enhanced": enhanced_graph_pattern_react,
@@ -124,7 +91,6 @@ async def run_quick_test(delay: float = 3.0):
     # Use only baseline tasks
     test_tasks = load_test_suite(category="baseline")
 
-    print(f"Running {len(test_tasks)} baseline tasks on 3 patterns...\n")
 
     pattern_metrics = await evaluate_multiple_patterns(
         patterns=patterns,
@@ -137,10 +103,7 @@ async def run_quick_test(delay: float = 3.0):
 
 
 async def run_category_test(category: str, delay: float = 3.0):
-    """Run evaluation on specific category"""
-    print(f"📋 Evaluating category: {category}")
-    print(f"⏱️  Delay between tasks: {delay}s\n")
-
+    """Run evaluation on specific category."""
     patterns = {
         "ReAct": graph_pattern_react,
         "ReAct_Enhanced": enhanced_graph_pattern_react,
@@ -152,10 +115,8 @@ async def run_category_test(category: str, delay: float = 3.0):
     test_tasks = load_test_suite(category=category)
 
     if not test_tasks:
-        print(f"❌ No tasks found for category: {category}")
         return
 
-    print(f"Running {len(test_tasks)} {category} tasks...\n")
 
     pattern_metrics = await evaluate_multiple_patterns(
         patterns=patterns,
@@ -168,7 +129,7 @@ async def run_category_test(category: str, delay: float = 3.0):
 
 
 def main():
-    """Main entry point"""
+    """Run the evaluation as main entry point."""
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -200,7 +161,6 @@ def main():
         asyncio.run(run_quick_test(delay=args.delay))
     elif args.mode == "category":
         if not args.category:
-            print("❌ Please specify --category for category mode")
             parser.print_help()
             return
         asyncio.run(run_category_test(args.category, delay=args.delay))
