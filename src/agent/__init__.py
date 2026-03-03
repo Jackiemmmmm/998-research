@@ -1,14 +1,10 @@
-"""New LangGraph Agent.
+"""Agent module - Agentic design pattern implementations.
 
-This module defines a custom graph.
+Provides 4 core patterns: ReAct, Reflex, Sequential (CoT), Tree of Thoughts (ToT).
 """
 
 from agent.graph import graph
-from agent.graph_manual import graph_manual
-from agent.graph_simple import graph_simple
 
 __all__ = [
     "graph",
-    "graph_simple",
-    "graph_manual",
 ]
