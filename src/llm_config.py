@@ -70,7 +70,7 @@ class LLMConfig:
 
         # Check API key if required
         if config["requires_api_key"]:
-            api_key_env = config["api_key_env"]
+            api_key_env = str(config["api_key_env"])
             api_key = os.getenv(api_key_env)
             if not api_key:
                 raise ValueError(
@@ -79,12 +79,13 @@ class LLMConfig:
                 )
 
         # Build model string
-        model_name = config["model"]
-        model_string = config["model_string"].format(model=model_name)
+        model_name = str(config["model"])
+        model_string_template = str(config["model_string"])
+        model_string = model_string_template.format(model=model_name)
 
         # Special handling for Ollama
         if provider == "ollama":
-            base_url = config["base_url"]
+            base_url = str(config["base_url"])
 
             # Use ChatOllama directly for better tool support
             try:
@@ -149,7 +150,7 @@ class LLMConfig:
 
         # Check API key if required
         if config["requires_api_key"]:
-            api_key_env = config["api_key_env"]
+            api_key_env = str(config["api_key_env"])
             api_key = os.getenv(api_key_env)
             if not api_key:
                 return {
@@ -161,7 +162,7 @@ class LLMConfig:
         # Special check for Ollama
         if provider == "ollama":
             import requests
-            base_url = config["base_url"]
+            base_url = str(config["base_url"])
             try:
                 response = requests.get(f"{base_url}/api/tags", timeout=5)
                 if response.status_code == 200:

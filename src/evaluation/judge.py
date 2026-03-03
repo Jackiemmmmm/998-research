@@ -289,7 +289,8 @@ class LLMJudge:
 
         try:
             response = self.llm.invoke([{"role": "user", "content": prompt}])
-            result = self._parse_llm_response(response.content)
+            content = response.content if isinstance(response.content, str) else str(response.content)
+            result = self._parse_llm_response(content)
             return result
         except Exception as e:
             return {

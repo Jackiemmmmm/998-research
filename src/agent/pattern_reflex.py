@@ -181,9 +181,11 @@ Provide only the answer:"""
             }
 
     # 查找所有匹配的规则（按优先级排序）- 支持复合查询，但排除默认规则以避免重复
-    matched_rules = []
-    for rule in sorted(REFLEX_RULES, key=lambda x: x["priority"]):
-        if rule["action"] != "general_response" and re.search(rule["pattern"], user_input_lower, re.IGNORECASE):
+    matched_rules: list[dict[str, object]] = []
+    sorted_rules = sorted(REFLEX_RULES, key=lambda x: x.get("priority", 999))  # type: ignore[arg-type, return-value]
+    for rule in sorted_rules:
+        pattern = str(rule["pattern"])
+        if rule["action"] != "general_response" and re.search(pattern, user_input_lower, re.IGNORECASE):
             matched_rules.append(rule)
 
     # 如果没有匹配到任何具体规则，使用默认规则
@@ -319,8 +321,8 @@ Provide only the answer:"""
 
     return {
         "messages": messages + [AIMessage(content=final_response)],
-        "matched_rule": ", ".join(actions_taken),
-        "action_taken": f"Reflex executed: {', '.join(actions_taken)} | Tools: {', '.join(set(tools_used))}",
+        "matched_rule": ", ".join(str(a) for a in actions_taken),
+        "action_taken": f"Reflex executed: {', '.join(str(a) for a in actions_taken)} | Tools: {', '.join(str(t) for t in set(tools_used))}",
         "evaluation_mode": evaluation_mode
     }
 

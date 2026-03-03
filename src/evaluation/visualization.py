@@ -305,7 +305,7 @@ class EvaluationVisualizer:
         patterns = list(pattern_metrics.keys())
 
         # Get all categories
-        all_categories = set()
+        all_categories: set[str] = set()
         for metrics in pattern_metrics.values():
             all_categories.update(metrics.success.success_by_category.keys())
 

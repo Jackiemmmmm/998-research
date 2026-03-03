@@ -40,7 +40,7 @@ class TreeOfThoughtsState(TypedDict):
 llm = get_llm()
 
 # Configuration
-TOT_CONFIG = {
+TOT_CONFIG: dict[str, int | float] = {
     "max_depth": 3,
     "thoughts_per_level": 3,
     "top_k_selection": 2,
@@ -223,13 +223,13 @@ def search_and_prune_node(state: TreeOfThoughtsState):
 
         return {
             **state,
-            "best_thoughts": sorted_thoughts[:TOT_CONFIG["top_k_selection"]],
+            "best_thoughts": sorted_thoughts[:int(TOT_CONFIG["top_k_selection"])],
             "final_solution": final_solution,
             "evaluation_mode": state.get("evaluation_mode", False)
         }
 
     # Continue with top thoughts
-    top_thoughts = sorted_thoughts[:TOT_CONFIG["top_k_selection"]]
+    top_thoughts = sorted_thoughts[:int(TOT_CONFIG["top_k_selection"])]
 
     return {
         **state,

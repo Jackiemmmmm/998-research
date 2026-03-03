@@ -300,8 +300,8 @@ class MetricsAggregator:
             for name, metrics in pattern_metrics.items()
         }
 
-        best_pattern = max(success_rates, key=success_rates.get)
-        worst_pattern = min(success_rates, key=success_rates.get)
+        best_pattern = max(success_rates, key=lambda x: success_rates[x])
+        worst_pattern = min(success_rates, key=lambda x: success_rates[x])
 
         return {
             "metric": "success_rate",
@@ -322,8 +322,8 @@ class MetricsAggregator:
             for name, metrics in pattern_metrics.items()
         }
 
-        fastest_pattern = min(latencies, key=latencies.get)
-        slowest_pattern = max(latencies, key=latencies.get)
+        fastest_pattern = min(latencies, key=lambda x: latencies[x])
+        slowest_pattern = max(latencies, key=lambda x: latencies[x])
 
         return {
             "metric": "avg_latency_sec",
@@ -344,8 +344,8 @@ class MetricsAggregator:
             for name, metrics in pattern_metrics.items()
         }
 
-        most_robust = min(degradations, key=degradations.get)
-        least_robust = max(degradations, key=degradations.get)
+        most_robust = min(degradations, key=lambda x: degradations[x])
+        least_robust = max(degradations, key=lambda x: degradations[x])
 
         return {
             "metric": "degradation_percentage",
@@ -366,8 +366,8 @@ class MetricsAggregator:
             for name, metrics in pattern_metrics.items()
         }
 
-        most_controllable = max(controllability_scores, key=controllability_scores.get)
-        least_controllable = min(controllability_scores, key=controllability_scores.get)
+        most_controllable = max(controllability_scores, key=lambda x: controllability_scores[x])
+        least_controllable = min(controllability_scores, key=lambda x: controllability_scores[x])
 
         return {
             "metric": "overall_controllability",

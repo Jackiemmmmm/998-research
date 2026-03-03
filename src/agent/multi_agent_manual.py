@@ -88,7 +88,10 @@ builder.add_conditional_edges("analysis", decide_next_step)
 # 工具执行后的路由
 def after_tools(state: MultiAgentState) -> Literal["research", "analysis"]:
     """工具执行后返回到相应的agent."""
-    return state.get("current_agent", "research")
+    current = state.get("current_agent", "research")
+    if current == "analysis":
+        return "analysis"
+    return "research"
 
 builder.add_conditional_edges("tools", after_tools)
 

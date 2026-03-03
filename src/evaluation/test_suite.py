@@ -420,7 +420,7 @@ def print_test_suite_stats():
     for complexity in get_complexities():
         count = len([t for t in TEST_SUITE if t.complexity == complexity])
 
-    judge_modes = {}
+    judge_modes: dict[str, int] = {}
     for task in TEST_SUITE:
         mode = task.judge.get("mode", "unknown")
         judge_modes[mode] = judge_modes.get(mode, 0) + 1
