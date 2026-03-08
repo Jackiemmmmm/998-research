@@ -1,7 +1,20 @@
 # Project Gap Analysis & Implementation Plan
 
 > Generated: 2026-03-03
+> Last Updated: 2026-03-03 (Phase A completed)
 > Based on: Group-1.pdf (Project Proposal) + CLAUDE.md + Current Codebase Review
+
+## Phase Implementation Status
+
+| Phase | Description | Status | Implementation Doc |
+|-------|-------------|--------|-------------------|
+| **A** | Unified Telemetry & Adapter Layer | **COMPLETED** | [PHASE_A_UNIFIED_TELEMETRY.md](./PHASE_A_UNIFIED_TELEMETRY.md) |
+| **B** | Cognitive Layer (Dim 1 & 2) | NOT STARTED | — |
+| **C** | Behavioural Layer (Dim 3, 4, 5) | NOT STARTED | — |
+| **D** | Systemic Layer (Dim 6 & 7) | NOT STARTED | — |
+| **E** | Normalization & Composite Scoring | NOT STARTED | — |
+| **F** | Statistical Rigor & Reproducibility | NOT STARTED | — |
+| **G** | Report & Visualization Polish | NOT STARTED | — |
 
 ---
 
@@ -11,17 +24,17 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 
 ### Summary Table
 
-| # | Dimension | Layer | Status | Completion |
-|---|-----------|-------|--------|------------|
-| 1 | Reasoning Quality | Cognitive | NOT IMPLEMENTED | 0% |
-| 2 | Cognitive Safety & Constraint Adherence | Cognitive | NOT IMPLEMENTED | 0% |
-| 3 | Action-Decision Alignment | Behavioural | NOT IMPLEMENTED | 0% |
-| 4 | Success & Efficiency | Behavioural | PARTIALLY DONE | ~70% |
-| 5 | Behavioural Safety | Behavioural | NOT IMPLEMENTED | 5% |
-| 6 | Robustness & Scalability | Systemic | PARTIALLY DONE | ~40% |
-| 7 | Controllability, Transparency & Resource Efficiency | Systemic | PARTIALLY DONE | ~35% |
+| # | Dimension | Layer | Status | Completion | Phase A Impact |
+|---|-----------|-------|--------|------------|---------------|
+| 1 | Reasoning Quality | Cognitive | NOT IMPLEMENTED | 0% | Trace foundation ready |
+| 2 | Cognitive Safety & Constraint Adherence | Cognitive | NOT IMPLEMENTED | 0% | Trace foundation ready |
+| 3 | Action-Decision Alignment | Behavioural | PREREQUISITE READY | 10% | THINK/ACT steps now captured |
+| 4 | Success & Efficiency | Behavioural | PARTIALLY DONE | ~75% | Token accuracy improved |
+| 5 | Behavioural Safety | Behavioural | NOT IMPLEMENTED | 5% | ToolCallRecord enables enforcement |
+| 6 | Robustness & Scalability | Systemic | PARTIALLY DONE | ~40% | — |
+| 7 | Controllability, Transparency & Resource Efficiency | Systemic | PARTIALLY DONE | ~45% | TAO cycle tracking enabled |
 
-**Overall estimated completion: ~25% of the 7-dimension framework**
+**Overall estimated completion: ~25% → ~28% of the 7-dimension framework** (Phase A provides foundation for Dim 1, 3, 5, 7)
 
 ---
 
@@ -61,7 +74,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 
 ---
 
-#### Dimension 3: Action-Decision Alignment (Behavioural) - 0%
+#### Dimension 3: Action-Decision Alignment (Behavioural) - 0% → 10%
 
 **Proposal requires:**
 - Semantic comparison between planned and executed actions
@@ -71,11 +84,11 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 **Current status:**
 - `TestTask` has a `plan` field (e.g., `["weather_api"]`) but it is never used during evaluation
 - No comparison between agent's stated intention and actual actions
-- No telemetry captures the think-act-observe cycle per step
+- ~~No telemetry captures the think-act-observe cycle per step~~ **RESOLVED by [Phase A](./PHASE_A_UNIFIED_TELEMETRY.md)**: `TraceExtractor` now captures `THINK` (intentions) and `ACT` (tool calls with `ToolCallRecord`) per step, enabling alignment comparison in Phase C1
 
 ---
 
-#### Dimension 4: Success & Efficiency (Behavioural) - ~70%
+#### Dimension 4: Success & Efficiency (Behavioural) - ~70% → ~75%
 
 **Proposal requires:**
 - Binary success outcome per run
@@ -88,6 +101,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 - `EfficiencyMetrics`: latency, token usage, step counts, tool calls
 - Per-category and per-complexity breakdown
 - Controllability gap (lenient vs strict)
+- **[Phase A](./PHASE_A_UNIFIED_TELEMETRY.md)**: Token counts now use `usage_metadata` when available (accurate), with `tokens_estimated` flag for fallback; `tool_call_count` is now accurately tracked; `tao_cycle_counts` added to `EfficiencyMetrics`
 
 **Current status (MISSING):**
 - No normalized cost score (proposal requires combining token + time into single 0-1 score)
@@ -136,7 +150,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 
 ---
 
-#### Dimension 7: Controllability, Transparency & Resource Efficiency (Systemic) - ~35%
+#### Dimension 7: Controllability, Transparency & Resource Efficiency (Systemic) - ~35% → ~45%
 
 **Proposal requires:**
 - Controllability: runtime override tests (stop/redo success rate)
@@ -148,10 +162,11 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 - `ControllabilityMetrics`: schema compliance, tool policy compliance, format compliance
 - `LLMJudge` exists for qualitative evaluation
 - Radar chart with 4-dimension comparison
+- **[Phase A](./PHASE_A_UNIFIED_TELEMETRY.md)**: Unified think-act-observe log now exists — `AgentTrace.tao_cycles` and step type distribution enable `trace_completeness` calculation in Phase D2
 
 **Current status (MISSING):**
 - No runtime override tests
-- No trace completeness measurement (no unified think-act-observe log)
+- ~~No trace completeness measurement (no unified think-act-observe log)~~ **PREREQUISITE RESOLVED by Phase A** — trace exists, but `trace_completeness` metric formula not yet implemented (Phase D2)
 - No transparency scoring
 - No resource efficiency normalization to 0-1 scale
 
@@ -159,15 +174,15 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 
 ### Cross-Cutting Gaps
 
-| Gap Area | Description |
-|----------|-------------|
-| **Unified Adapter API** | Proposal requires a standardized think-act-observe interface across all patterns. Currently each pattern has its own ad-hoc state management. |
-| **Unified Telemetry Schema** | No standardized log schema with: thought, action, observation, token_usage, latency, policy_flags, termination_state per step. |
-| **0-1 Normalization** | Proposal requires all sub-indicators normalized to 0-1 range. Current metrics are raw values. |
-| **Dimension-Level Scoring** | No averaging of sub-indicators into dimension scores. |
-| **Composite Scoring** | No weighted/uniform combination of dimension scores into a final composite. |
-| **Statistical Rigor** | No multiple runs (3-5), no confidence intervals, no seed fixing. |
-| **Sensitivity Analysis** | No weight variation analysis in appendix. |
+| Gap Area | Description | Status | Resolved By |
+|----------|-------------|--------|-------------|
+| **Unified Adapter API** | Proposal requires a standardized think-act-observe interface across all patterns. | **RESOLVED** | [Phase A](./PHASE_A_UNIFIED_TELEMETRY.md) — `TraceExtractor` provides unified extraction across all 4 patterns via post-hoc parsing |
+| **Unified Telemetry Schema** | No standardized log schema with: thought, action, observation, token_usage, latency, policy_flags, termination_state per step. | **RESOLVED** | [Phase A](./PHASE_A_UNIFIED_TELEMETRY.md) — `StepRecord` + `AgentTrace` with `StepType` enum (INPUT/THINK/ACT/OBSERVE/OUTPUT), token tracking, and TAO cycle detection |
+| **0-1 Normalization** | Proposal requires all sub-indicators normalized to 0-1 range. Current metrics are raw values. | OPEN | Phase E |
+| **Dimension-Level Scoring** | No averaging of sub-indicators into dimension scores. | OPEN | Phase E |
+| **Composite Scoring** | No weighted/uniform combination of dimension scores into a final composite. | OPEN | Phase E |
+| **Statistical Rigor** | No multiple runs (3-5), no confidence intervals, no seed fixing. | OPEN | Phase F |
+| **Sensitivity Analysis** | No weight variation analysis in appendix. | OPEN | Phase F |
 
 ---
 
@@ -188,49 +203,30 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 
 ## Part 3: Implementation Plan (Prioritized Phases)
 
-### Phase A: Unified Telemetry & Adapter Layer (Foundation - CRITICAL)
+### Phase A: Unified Telemetry & Adapter Layer (Foundation - CRITICAL) — COMPLETED
 
+> **Status: COMPLETED** (2026-03-03)
+> Full implementation details: **[PHASE_A_UNIFIED_TELEMETRY.md](./PHASE_A_UNIFIED_TELEMETRY.md)**
+>
 > This is the foundation for dimensions 1, 3, and 7. Without unified logging, most metrics cannot be collected.
 
-**A1. Design and implement a `StepRecord` dataclass**
-```
-StepRecord:
-  - step_index: int
-  - thought: str          # Agent's reasoning text
-  - action: str           # Tool name or "respond"
-  - action_input: dict    # Tool arguments
-  - observation: str      # Tool result or final response
-  - tokens_used: int
-  - latency_ms: float
-  - policy_flags: list    # Any policy violations detected
-  - termination: str      # "continue" | "done" | "error" | "timeout"
-```
+**Implementation Summary:**
 
-**A2. Design and implement an `AgentTrace` wrapper**
-```
-AgentTrace:
-  - pattern_name: str
-  - task_id: str
-  - steps: List[StepRecord]
-  - total_latency: float
-  - total_tokens: int
-  - final_output: str
-  - metadata: dict
-```
+Adopted a **post-hoc message parsing** strategy instead of modifying pattern internals:
 
-**A3. Add trace collection hooks to each pattern**
-- Modify `pattern_react.py`, `pattern_reflex.py`, `pattern_sequential.py`, `pattern_tree_of_thoughts.py`
-- Each pattern emits `StepRecord` objects via a callback or state field
-- Minimize invasiveness: use LangGraph callbacks or post-processing of message history
+| Task | Planned | Implemented | Notes |
+|------|---------|-------------|-------|
+| A1. StepRecord | `telemetry.py` | `trace.py` — `StepRecord` + `StepType` enum + `ToolCallRecord` | Enhanced with TAO type system (INPUT/THINK/ACT/OBSERVE/OUTPUT) |
+| A2. AgentTrace | `telemetry.py` | `trace.py` — `AgentTrace` with `compute_aggregates()`, `tao_cycles` | Includes token estimation tracking |
+| A3. Pattern hooks | Modify 4 pattern files | `TraceExtractor` with 5 extractors | **Zero pattern modifications** — post-hoc parsing from response |
+| A4. Evaluator integration | Modify evaluator | `evaluator.py` — `_run_single_task()` uses `TraceExtractor` | `tool_call_count`, `step_count` now accurate |
 
-**A4. Update `PatternEvaluator` to use `AgentTrace`**
-- Evaluator collects traces instead of raw output
-- Traces used for all downstream metrics computation
-
-**Files to create/modify:**
-- `src/evaluation/telemetry.py` (NEW - StepRecord, AgentTrace)
-- `src/agent/pattern_*.py` (MODIFY - add trace emission)
-- `src/evaluation/evaluator.py` (MODIFY - collect traces)
+**Files created/modified:**
+- `src/evaluation/trace.py` (NEW — core module)
+- `tests/unit_tests/test_trace.py` (NEW — 28 tests, all passing)
+- `src/evaluation/evaluator.py` (MODIFIED — trace integration)
+- `src/evaluation/__init__.py` (MODIFIED — exports)
+- `src/evaluation/metrics.py` (MODIFIED — `tao_cycle_counts`, `any_tokens_estimated`)
 
 ---
 
@@ -400,24 +396,24 @@ AgentTrace:
 
 Given the project timeline (Figure 1 in proposal: Stage 3 Full Evaluation is ~Mar-May 2026), the recommended implementation order is:
 
-| Priority | Phase | Description | Estimated Effort |
-|----------|-------|-------------|-----------------|
-| **P0** | A | Unified Telemetry & Adapter | High (foundation) |
-| **P1** | E | Normalization & Composite Scoring | Medium |
-| **P1** | F | Statistical Rigor (multi-run, CI) | Medium |
-| **P2** | B1 | Reasoning Quality | Medium-High |
-| **P2** | C1 | Action-Decision Alignment | Medium |
-| **P2** | C2 | Complete Success & Efficiency | Low |
-| **P3** | D1 | Enhance Robustness | Medium |
-| **P3** | D2 | Controllability & Transparency | Medium |
-| **P3** | C3 | Behavioural Safety | Medium |
-| **P4** | B2 | Cognitive Safety (proxy) | Medium |
-| **P5** | G | Report & Visualization Polish | Medium |
+| Priority | Phase | Description | Estimated Effort | Status |
+|----------|-------|-------------|-----------------|--------|
+| **P0** | A | Unified Telemetry & Adapter | High (foundation) | **COMPLETED** → [details](./PHASE_A_UNIFIED_TELEMETRY.md) |
+| **P1** | E | Normalization & Composite Scoring | Medium | NOT STARTED |
+| **P1** | F | Statistical Rigor (multi-run, CI) | Medium | NOT STARTED |
+| **P2** | B1 | Reasoning Quality | Medium-High | NOT STARTED |
+| **P2** | C1 | Action-Decision Alignment | Medium | NOT STARTED (prerequisite Phase A ready) |
+| **P2** | C2 | Complete Success & Efficiency | Low | NOT STARTED |
+| **P3** | D1 | Enhance Robustness | Medium | NOT STARTED |
+| **P3** | D2 | Controllability & Transparency | Medium | NOT STARTED (prerequisite Phase A ready) |
+| **P3** | C3 | Behavioural Safety | Medium | NOT STARTED (prerequisite Phase A ready) |
+| **P4** | B2 | Cognitive Safety (proxy) | Medium | NOT STARTED |
+| **P5** | G | Report & Visualization Polish | Medium | NOT STARTED |
 
 **Rationale:**
-- Phase A is the foundation; without it, dimensions 1/3/7 cannot be properly measured
-- Phase E/F provide the statistical framework the proposal explicitly requires
-- Phase B/C fill the biggest dimensional gaps (3 out of 7 dimensions at 0%)
+- ~~Phase A is the foundation; without it, dimensions 1/3/7 cannot be properly measured~~ **Phase A COMPLETED** — foundation is now in place
+- **Next priority**: Phase E/F provide the statistical framework the proposal explicitly requires
+- Phase B/C fill the biggest dimensional gaps (3 out of 7 dimensions at 0%) — now **unblocked** by Phase A
 - Phase D/G enhances and polishes what partially exists
 
 ---

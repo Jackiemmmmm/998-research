@@ -1,0 +1,218 @@
+# 10-Week Project Plan: 3-Person Team
+
+> **Date**: 2026-03-09
+> **Team**: Yiming Wang (P2), Yucheng Tu (P1), Kapila Wijetunge (P3)
+> **Final Goal**: Demonstrate different agent workflows via LangGraph execution and present comparative evaluation results across agent patterns to the supervisor
+
+### Related Documents
+
+| Document | Description |
+|----------|-------------|
+| [Group-1.pdf](../Group-1.pdf) | Project Proposal — defines the 3-layer, 7-dimension evaluation framework, methodology, and timeline |
+| [PROJECT_GAP_ANALYSIS_AND_PLAN.md](./PROJECT_GAP_ANALYSIS_AND_PLAN.md) | Gap Analysis — defines Phase A–G implementation plan and per-dimension completion status |
+| [PHASE_A_UNIFIED_TELEMETRY.md](./PHASE_A_UNIFIED_TELEMETRY.md) | Phase A Implementation Doc — technical details of the unified telemetry layer |
+
+---
+
+## 1. Current Status (~28% Complete)
+
+> Completion assessment source: [PROJECT_GAP_ANALYSIS_AND_PLAN.md § Summary Table](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#part-1-current-completion-status-gap-analysis)
+
+### 1.1 Completed
+
+| Module | Details | Files |
+|--------|---------|-------|
+| Agent Patterns | Four patterns implemented: Reflex, ReAct, CoT, ToT | `src/agent/pattern_*.py` |
+| Unified Telemetry | [Phase A](./PHASE_A_UNIFIED_TELEMETRY.md) — StepType, ToolCallRecord, StepRecord, AgentTrace, TraceExtractor | `src/evaluation/trace.py` |
+| Base Evaluation Framework | Judge (3 modes), TestSuite (16 tasks), ReportGenerator, Visualization | `src/evaluation/` |
+| Test Coverage | 28 unit tests (Phase A trace extraction) | `tests/unit_tests/test_trace.py` |
+| CI/CD | GitHub Actions (unit tests, integration tests, lint, type check) | `.github/` |
+
+### 1.2 Evaluation Framework Completion (7 Dimensions)
+
+> Framework definition source: [Group-1.pdf § 2.1 Table 1](../Group-1.pdf) | Completion assessment source: [Gap Analysis § Summary Table](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#part-1-current-completion-status-gap-analysis)
+
+| # | Dimension | Layer | Completion | Notes | Gap Details |
+|---|-----------|-------|------------|-------|-------------|
+| 1 | Reasoning Quality | Cognitive | 0% | Not implemented | [Dim1 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-1-reasoning-quality-cognitive---0) |
+| 2 | Cognitive Safety & Constraint Adherence | Cognitive | 0% | Not implemented | [Dim2 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-2-cognitive-safety--constraint-adherence-cognitive---0) |
+| 3 | Action–Decision Alignment | Behavioural | 10% | [Phase A](./PHASE_A_UNIFIED_TELEMETRY.md) provides prerequisite data foundation | [Dim3 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-3-actiondecision-alignment-behavioural---0--10) |
+| 4 | Success & Efficiency | Behavioural | ~75% | Basic judge + metrics exist; missing normalised cost score | [Dim4 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-4-success--efficiency-behavioural---70--75) |
+| 5 | Behavioural Safety | Behavioural | 5% | Framework placeholder only | [Dim5 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-5-behavioural-safety-behavioural---5) |
+| 6 | Robustness & Scalability | Systemic | ~40% | Perturbation framework exists; missing temperature sweep / multi-run variance | [Dim6 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-6-robustness--scalability-systemic---40) |
+| 7 | Controllability, Transparency & Resource Efficiency | Systemic | ~45% | Trace completeness foundation exists; missing policy-flag / override tests | [Dim7 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-7-controllability-transparency--resource-efficiency-systemic---35--45) |
+
+### 1.3 Missing Key Modules
+
+> Each item below is explicitly promised in the Proposal but not yet implemented in the codebase
+
+| Missing Module | Proposal Source | Corresponding Phase |
+|----------------|----------------|---------------------|
+| Normalisation (0–1) + Composite Scoring | [Group-1.pdf § 2.2](../Group-1.pdf) p5: "each sub-indicator is normalised to the 0–1 range...composite results are computed" | [Phase E](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-e-normalization-aggregation--composite-scoring) |
+| Statistical Rigor (3–5 repeats, mean ± 95% CI) | [Group-1.pdf § 2.3 Table 2 C4](../Group-1.pdf) p8: "3–5 repeats; report mean ± 95% CI" | [Phase F](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-f-statistical-rigor--reproducibility) |
+| Sensitivity Analysis (weight variation impact on conclusions) | [Group-1.pdf § 2.2](../Group-1.pdf) p5: "sensitivity analysis of weight variation...in the appendix" | [Phase F](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-f-statistical-rigor--reproducibility) |
+| Complete Visualisation Suite (7-dim radar, trade-off scatter) | [Group-1.pdf § 3.3](../Group-1.pdf) p10: "Reusable scripts or tools that automate data collection and analysis" | [Phase G](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-g-final-report--visualization-polish) |
+| Final Report | [Group-1.pdf § 3.4](../Group-1.pdf) p10: "comprehensive comparison report...quantitative results and qualitative observations" | [Phase G](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-g-final-report--visualization-polish) |
+
+---
+
+## 2. Team Roles
+
+| Role | Member | Primary Responsibilities | Rationale |
+|------|--------|--------------------------|-----------|
+| **P1** | Yucheng Tu | Agent implementation + system integration + Demo | Most familiar with the codebase and LangGraph |
+| **P2** | Yiming Wang | Evaluation metric development + data analysis + statistics | Strengths in data analysis and methodology |
+| **P3** | Kapila Wijetunge | Report writing + visualisation + Safety dimensions | Strengths in documentation and quality assurance |
+
+---
+
+## 3. Weekly Plan
+
+### Week 1–2: Core Evaluation Completion + Agent Stabilisation
+
+**Objective**: Ensure all 4 agents run end-to-end; fill critical gaps in the evaluation framework
+
+| Member | Task | Details | Deliverable |
+|--------|------|---------|-------------|
+| P1 | Agent end-to-end stabilisation | Fix all 4 agents to run successfully under `run_evaluation.py`; ensure every pattern passes all 16 tasks; unify error handling | Run logs showing all 4 patterns passing |
+| P2 | [Phase E](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-e-normalization-aggregation--composite-scoring): Normalisation + Composite Scoring | Implement `NormalizationEngine` (normalise each sub-indicator to 0–1); implement `CompositeScorer` (uniform/weighted combination); complete Dim4 token/time normalised cost score | New modules in `metrics.py` |
+| P3 | [Phase D2](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-d-systemic-layer-enhancement-dimensions-6--7): Controllability Completion | Implement trace completeness calculation (proportion of steps with full TAO records); policy-flag frequency statistics; resource efficiency normalisation | Dim7 metrics fully operational |
+
+**Acceptance Criteria**: `python run_evaluation.py --mode full` succeeds for all 4 patterns and outputs scores
+
+---
+
+### Week 3–4: Behavioural Layer — Three Dimensions
+
+**Objective**: Complete all 3 Behavioural layer dimensions (Dim3, Dim4, Dim5)
+
+| Member | Task | Details | Deliverable |
+|--------|------|---------|-------------|
+| P1 | [Phase C1](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-c-behavioural-layer-completion-dimensions-3-4-5): Action–Decision Alignment (Dim3) | Extract plan string vs actual action from traces; implement string-level matching; verb–tool mapping (e.g. "search" → `tavily_search`); compute alignment score. Ref: [Proposal § 2.2.2 Dim3](../Group-1.pdf) | Alignment scoring logic |
+| P2 | [Phase D1](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-d-systemic-layer-enhancement-dimensions-6--7): Enhanced Robustness (Dim6) | Implement input perturbation (typos/paraphrases via nlpaug or simple character substitution); temperature sweep (0.0, 0.3, 0.7, 1.0); multi-run variance calculation; degradation Δ = \|S_clean − S_noisy\|. Ref: [Proposal § 2.2.3 Dim6](../Group-1.pdf) | Perturbation test pipeline + stability index |
+| P3 | [Phase C3](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-c-behavioural-layer-completion-dimensions-3-4-5): Behavioural Safety (Dim5) | Tool whitelist validation (check agents only call allowed tools); domain regex checks; violation rate statistics; blocked attempt logging. Ref: [Proposal § 2.2.2 Dim5](../Group-1.pdf) | Safety scoring module |
+
+**Acceptance Criteria**: Dim3, 4, 5 all produce numerical output; robustness perturbation tests operational
+
+---
+
+### Week 5–6: Cognitive Layer + Statistical Rigor
+
+**Objective**: Complete all 7 dimensions; establish multi-run + statistical analysis pipeline
+
+| Member | Task | Details | Deliverable |
+|--------|------|---------|-------------|
+| P1 | [Phase B1](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-b-cognitive-layer-implementation-dimensions-1--2): Reasoning Quality (Dim1) | Use Judge-LLM for coherence scoring on reasoning traces (extract THINK steps, have external LLM score 1–5); self-consistency: run each task multiple times, compare final answer agreement. Ref: [Proposal § 2.2.1 Dim1](../Group-1.pdf) | Reasoning quality scoring pipeline |
+| P2 | [Phase F](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-f-statistical-rigor--reproducibility): Statistical Rigor | Implement multi-run pipeline (each pattern × task runs 3–5 times); compute mean ± 95% CI; compute effect size (Cohen's d); output statistical summary tables. Ref: [Proposal § 2.3 Table 2 C4](../Group-1.pdf) | Statistical analysis module |
+| P3 | [Phase B2](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-b-cognitive-layer-implementation-dimensions-1--2): Cognitive Safety (Dim2) | Hallucination detection: keyword-based anomaly detection (flag unverified claims in reasoning traces); toxicity screening (lightweight lexical filter); heuristic scoring as proxy. Ref: [Proposal § 2.2.1 Dim2](../Group-1.pdf) | Cognitive safety scoring module |
+
+**Acceptance Criteria**: All 7 dimensions produce scores; multi-run and CI calculation supported
+
+---
+
+### Week 7–8: Full Experiment Execution + Data Collection
+
+**Objective**: Collect complete experimental data; finalise all visualisations
+
+| Member | Task | Details | Deliverable |
+|--------|------|---------|-------------|
+| P1 | Full experiment execution | Run 4 patterns × 16 tasks × 3–5 repeats; handle runtime bugs and edge cases; collect raw data; ensure reproducibility | Complete raw result dataset (JSON) |
+| P2 | Sensitivity analysis + cross-comparison | Analyse weight variation impact on composite scores; cross-dimension analysis (e.g. reasoning depth vs efficiency trade-off); identify strengths/weaknesses per pattern | Sensitivity analysis results + trade-off analysis |
+| P3 | [Phase G](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-g-final-report--visualization-polish): Visualisation upgrade | 7-dimension radar chart; per-pattern success heatmap; trade-off scatter plot; robustness degradation bar chart; statistical significance annotations; export all figures | Complete figure set in `reports/figures/` |
+
+**Acceptance Criteria**: Complete dataset collected; all visualisation figures generated
+
+---
+
+### Week 9: Demo Preparation + Report Writing
+
+**Objective**: Prepare supervisor demonstration; complete report body
+
+| Member | Task | Details | Deliverable |
+|--------|------|---------|-------------|
+| P1 | Demo preparation | Prepare LangGraph Studio demonstration — show each agent's think→act→observe workflow; prepare comparison demo script (same task across 4 patterns); record/screenshot key workflows | Demo script + presentation materials |
+| P2 | Report: Results & Analysis | Write experimental results chapter; comparative analysis of all patterns across 7 dimensions; trade-off discussion (corresponding to [Proposal § 3.1](../Group-1.pdf) and [§ 3.4](../Group-1.pdf)); statistical data tables | Report core chapter |
+| P3 | Report: Methodology + Visualisation | Write methodology chapter (evaluation framework description, corresponding to [Proposal § 2](../Group-1.pdf)); embed visualisation results; compile evaluation guide (corresponding to [Proposal § 3.3](../Group-1.pdf)) | Report methodology chapter |
+
+---
+
+### Week 10: Buffer + Final Integration
+
+**Objective**: Integrate all components; ensure quality
+
+| Member | Task | Details | Deliverable |
+|--------|------|---------|-------------|
+| All | Report integration & review | Merge all chapters; unify formatting and terminology; cross-review | Final report |
+| P1 | Code cleanup + reproducibility | Ensure `run_evaluation.py` reproduces all results end-to-end; clean up code; update README | Clean repository |
+| P2 | Appendix + data | Supplement appendix (sensitivity analysis tables, raw data, confidence intervals) | Complete appendix |
+| P3 | Final proofreading + formatting | Final report formatting; reference verification; ensure consistent figure numbering | Submission-ready report |
+
+---
+
+## 4. Key Milestones
+
+| Deadline | Milestone | Acceptance Criteria |
+|----------|-----------|---------------------|
+| **End of Week 2** | Agent + Evaluation Pipeline runs end-to-end | `run_evaluation.py --mode full` succeeds for all 4 patterns |
+| **End of Week 4** | Behavioural layer — all 3 dimensions computable | Dim3, 4, 5 all produce numerical output |
+| **End of Week 6** | All 7 dimensions computable + statistical framework ready | All 7 dimensions produce scores; multi-run supported |
+| **End of Week 8** | Full experimental data collected | Complete dataset + all visualisation figures |
+| **End of Week 9** | Demo ready + report body complete | Demonstrable + report draft |
+| **End of Week 10** | Final delivery | Report + code + Demo all ready |
+
+---
+
+## 5. Prioritisation Strategy
+
+### 5.1 Must Have
+
+| Item | Rationale |
+|------|-----------|
+| Dim4 Success & Efficiency | Core comparison metric; highest supervisor interest. Ref: [Proposal § 2.2.2 Dim4](../Group-1.pdf) |
+| Dim6 Robustness (perturbation) | Explicitly promised in Proposal; a key differentiator. Ref: [Proposal § 2.2.3 Dim6](../Group-1.pdf) |
+| Dim7 Controllability & Transparency | Trace completeness foundation already exists; easy to complete. Ref: [Proposal § 2.2.3 Dim7](../Group-1.pdf) |
+| Normalisation + Composite Scoring | Without this, fair cross-pattern comparison is impossible. Ref: [Phase E](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-e-normalization-aggregation--composite-scoring) |
+| Statistical Rigor (3–5 repeats + CI) | Explicitly promised in Proposal. Ref: [Proposal Table 2 C4](../Group-1.pdf) / [Phase F](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-f-statistical-rigor--reproducibility) |
+| LangGraph Workflow Demo | Core requirement of the final goal. Ref: [Proposal § 3.4](../Group-1.pdf) |
+
+### 5.2 Nice to Have (Can Use Proxy Substitutes)
+
+| Item | Simplified Approach |
+|------|---------------------|
+| Dim2 Cognitive Safety | Simple keyword filter as proxy; no need for full retrieval verification |
+| Dim5 Behavioural Safety | Static regex check as proxy |
+| Dim1 Reasoning Quality | Self-consistency (multi-run comparison) is easier to implement than Judge-LLM |
+| Dim3 Action–Decision Alignment | String-level matching is sufficient; no need for embedding-based similarity |
+
+### 5.3 Minimum Viable Plan (If Time Is Severely Limited)
+
+Focus on the following to present effective results to the supervisor:
+
+1. All 4 agents running end-to-end + Demo
+2. Dim4 (Success & Efficiency) + Dim6 (Robustness) + Dim7 (Controllability) — full comparison across 3 dimensions
+3. Normalisation + Composite Score
+4. 3 repeated runs + basic statistics
+5. Radar chart + comparison table + report
+
+---
+
+## 6. Risks & Mitigation
+
+> Challenges and mitigation strategies defined in the Proposal: [Group-1.pdf § 2.3 Table 2](../Group-1.pdf)
+
+| Risk | Proposal Challenge | Impact | Mitigation Strategy |
+|------|-------------------|--------|---------------------|
+| Unstable agent execution / frequent errors | C7 (Slow runs) | Blocks full experiments | Prioritise in Week 1–2; set token/time budgets and early-stop |
+| LLM API cost overrun | C3 (Cost & latency) | Cannot complete enough repeated runs | Use free/low-cost providers (Ollama local, Groq); cache tool results |
+| A dimension is too complex to implement | C2 (Metric availability) | Delays overall progress | Downgrade to proxy indicator; document in report |
+| Uneven team progress | C6 (Scope & timeline) | Integration difficulties | Weekly sync meetings; hard checkpoints at Week 2, 4, 6 |
+| ToT runs too slowly | C7 (Slow runs) | Limits repeated experiment efficiency | Limit depth=2, beam=2; set 30min/run cap; parallel queue |
+
+---
+
+## 7. Weekly Sync Mechanism
+
+- **Weekly team meeting** (30 min): progress sync + blocker discussion
+- **End of Week 2, 4, 6**: Hard checkpoint reviews (against milestone acceptance criteria)
+- **Shared board**: Use GitHub Issues/Projects to track each Phase's status
+- **Code standards**: All code merged to main via PR review only

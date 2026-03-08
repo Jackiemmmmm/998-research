@@ -17,6 +17,7 @@ from .metrics import (
     RobustnessMetrics,
     SuccessMetrics,
 )
+from .trace import AgentTrace, TraceExtractor
 from .test_suite import TEST_SUITE, TestTask
 
 
@@ -46,6 +47,10 @@ class TaskResult:
     step_count: int = 0
     tool_call_count: int = 0
 
+    # Trace
+    trace: Optional[AgentTrace] = None
+    tokens_estimated: bool = False
+
     # Validation
     judge_success: bool = False  # Strict evaluation
     judge_message: str = ""
@@ -56,7 +61,7 @@ class TaskResult:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
-        return {
+        result = {
             "task_id": self.task_id,
             "pattern": self.pattern_name,
             "success": self.success,
@@ -64,10 +69,21 @@ class TaskResult:
             "latency": round(self.latency, 3),
             "total_tokens": self.total_tokens,
             "step_count": self.step_count,
+            "tool_call_count": self.tool_call_count,
             "output": self.output[:200] + "..." if len(self.output) > 200 else self.output,
             "error": self.error,
             "judge_message": self.judge_message,
+            "tokens_estimated": self.tokens_estimated,
         }
+        if self.trace:
+            result["trace_summary"] = {
+                "think_steps": self.trace.total_think_steps,
+                "act_steps": self.trace.total_act_steps,
+                "observe_steps": self.trace.total_observe_steps,
+                "tao_cycles": self.trace.tao_cycles,
+                "total_tool_calls": self.trace.total_tool_calls,
+            }
+        return result
 
 
 class PatternEvaluator:
@@ -223,15 +239,24 @@ class PatternEvaluator:
 
             result.success = True
 
-            # Count steps (approximate from message length)
-            if isinstance(response, dict) and "values" in response:
-                messages = response["values"].get("messages", [])
-                result.step_count = len(messages)
+            # Extract structured trace
+            trace = TraceExtractor.extract(response, pattern_name, task.id)
+            result.trace = trace
 
-            # Estimate tokens (rough approximation: 1 token ≈ 4 chars)
-            result.input_tokens = len(prompt) // 4
-            result.output_tokens = len(result.output) // 4
-            result.total_tokens = result.input_tokens + result.output_tokens
+            # Populate metrics from trace
+            result.step_count = len(trace.steps)
+            result.tool_call_count = trace.total_tool_calls
+            result.input_tokens = trace.total_input_tokens
+            result.output_tokens = trace.total_output_tokens
+            result.total_tokens = trace.total_tokens
+            result.tokens_estimated = trace.any_tokens_estimated
+
+            # Fallback: if trace tokens are all zero, use old estimation
+            if result.total_tokens == 0:
+                result.input_tokens = len(prompt) // 4
+                result.output_tokens = len(result.output) // 4
+                result.total_tokens = result.input_tokens + result.output_tokens
+                result.tokens_estimated = True
 
             # Judge output - Strict evaluation (exact match)
             judge_success, judge_msg = Judge.evaluate(
@@ -331,6 +356,10 @@ class PatternEvaluator:
                 efficiency_metrics.output_tokens.append(result.output_tokens)
                 efficiency_metrics.step_counts.append(result.step_count)
                 efficiency_metrics.tool_call_counts.append(result.tool_call_count)
+                if result.trace:
+                    efficiency_metrics.tao_cycle_counts.append(result.trace.tao_cycles)
+                    if result.tokens_estimated:
+                        efficiency_metrics.any_tokens_estimated = True
 
     def _collect_robustness_metrics(
         self,

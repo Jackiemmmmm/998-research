@@ -83,6 +83,10 @@ class EfficiencyMetrics:
     # Tool calls
     tool_call_counts: List[int] = field(default_factory=list)
 
+    # TAO telemetry
+    tao_cycle_counts: List[int] = field(default_factory=list)
+    any_tokens_estimated: bool = False
+
     def avg_latency(self) -> float:
         """Average latency in seconds."""
         return statistics.mean(self.latencies) if self.latencies else 0.0

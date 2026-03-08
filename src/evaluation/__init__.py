@@ -12,6 +12,7 @@ from .metrics import (
 )
 from .report_generator import ReportGenerator
 from .test_suite import TEST_SUITE, load_test_suite
+from .trace import AgentTrace, StepRecord, StepType, TraceExtractor
 
 __all__ = [
     "TEST_SUITE",
@@ -22,4 +23,8 @@ __all__ = [
     "RobustnessMetrics",
     "ControllabilityMetrics",
     "ReportGenerator",
+    "AgentTrace",
+    "StepRecord",
+    "StepType",
+    "TraceExtractor",
 ]
