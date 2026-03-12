@@ -29,7 +29,7 @@ from src.evaluation.visualization import EvaluationVisualizer
 # Load environment variables
 load_dotenv()
 
-async def run_full_evaluation(delay: float = 3.0):
+async def run_full_evaluation(delay: float = 3.0, task_timeout: float = 180.0):
     """Run complete evaluation on all 5 patterns."""
     # Define patterns to evaluate
     patterns = {
@@ -49,6 +49,7 @@ async def run_full_evaluation(delay: float = 3.0):
         test_tasks=test_tasks,
         include_robustness=True,
         delay_between_tasks=delay,
+        task_timeout=task_timeout,
     )
 
     # Generate reports
@@ -80,7 +81,7 @@ async def run_full_evaluation(delay: float = 3.0):
 
 
 
-async def run_quick_test(delay: float = 3.0):
+async def run_quick_test(delay: float = 3.0, task_timeout: float = 180.0):
     """Run quick test on subset of tasks."""
     patterns = {
         "ReAct": graph_pattern_react,
@@ -97,12 +98,13 @@ async def run_quick_test(delay: float = 3.0):
         test_tasks=test_tasks,
         include_robustness=False,
         delay_between_tasks=delay,
+        task_timeout=task_timeout,
     )
 
     ReportGenerator.print_console_report(pattern_metrics)
 
 
-async def run_category_test(category: str, delay: float = 3.0):
+async def run_category_test(category: str, delay: float = 3.0, task_timeout: float = 180.0):
     """Run evaluation on specific category."""
     patterns = {
         "ReAct": graph_pattern_react,
@@ -123,6 +125,7 @@ async def run_category_test(category: str, delay: float = 3.0):
         test_tasks=test_tasks,
         include_robustness=True,
         delay_between_tasks=delay,
+        task_timeout=task_timeout,
     )
 
     ReportGenerator.print_console_report(pattern_metrics)
@@ -152,18 +155,24 @@ def main():
         default=5.0,
         help="Delay in seconds between tasks to avoid rate limits (default: 5.0)"
     )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=180.0,
+        help="Timeout in seconds per task. Tasks exceeding this are marked as timeout/incomplete (default: 180.0 = 3 minutes)"
+    )
 
     args = parser.parse_args()
 
     if args.mode == "full":
-        asyncio.run(run_full_evaluation(delay=args.delay))
+        asyncio.run(run_full_evaluation(delay=args.delay, task_timeout=args.timeout))
     elif args.mode == "quick":
-        asyncio.run(run_quick_test(delay=args.delay))
+        asyncio.run(run_quick_test(delay=args.delay, task_timeout=args.timeout))
     elif args.mode == "category":
         if not args.category:
             parser.print_help()
             return
-        asyncio.run(run_category_test(args.category, delay=args.delay))
+        asyncio.run(run_category_test(args.category, delay=args.delay, task_timeout=args.timeout))
 
 
 if __name__ == "__main__":

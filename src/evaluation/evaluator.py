@@ -89,17 +89,22 @@ class TaskResult:
 class PatternEvaluator:
     """Main evaluator for agentic patterns."""
 
-    def __init__(self, use_llm_judge: bool = False, delay_between_tasks: float = 2.0):
+    # Default timeout per task in seconds (3 minutes)
+    DEFAULT_TASK_TIMEOUT = 180
+
+    def __init__(self, use_llm_judge: bool = False, delay_between_tasks: float = 2.0, task_timeout: float = DEFAULT_TASK_TIMEOUT):
         """Initialize evaluator.
 
         Args:
             use_llm_judge: Whether to use LLM-as-Judge for quality evaluation
             delay_between_tasks: Delay in seconds between tasks to avoid rate limits
+            task_timeout: Timeout in seconds per task (default: 180s / 3 minutes)
         """
         self.use_llm_judge = use_llm_judge
         self.llm_judge = LLMJudge() if use_llm_judge else None
         self.results: List[TaskResult] = []
         self.delay_between_tasks = delay_between_tasks
+        self.task_timeout = task_timeout
 
     async def evaluate_pattern(
         self,
@@ -203,18 +208,35 @@ class PatternEvaluator:
         )
 
         try:
-            # Execute task
+            # Execute task with timeout
             start_time = time.time()
 
-            # Invoke graph with evaluation_mode enabled
-            # This tells patterns (Reflex, ToT) to output clean results without decorative formatting
-            response = await asyncio.to_thread(
-                graph.invoke,
-                {
-                    "messages": [{"role": "user", "content": prompt}],
-                    "evaluation_mode": True  # Clean output for evaluation
-                }
-            )
+            try:
+                # Invoke graph with evaluation_mode enabled
+                # This tells patterns (Reflex, ToT) to output clean results without decorative formatting
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        graph.invoke,
+                        {
+                            "messages": [{"role": "user", "content": prompt}],
+                            "evaluation_mode": True  # Clean output for evaluation
+                        }
+                    ),
+                    timeout=self.task_timeout,
+                )
+            except asyncio.TimeoutError:
+                end_time = time.time()
+                result.start_time = start_time
+                result.end_time = end_time
+                result.latency = end_time - start_time
+                result.success = False
+                result.error = f"Task timed out after {self.task_timeout}s (>{self.task_timeout/60:.0f} min)"
+                result.output = ""
+                result.judge_success = False
+                result.judge_message = f"Timeout: task did not complete within {self.task_timeout/60:.0f} minutes"
+                result.lenient_judge_success = False
+                result.lenient_judge_message = f"Timeout: task did not complete within {self.task_timeout/60:.0f} minutes"
+                return result
 
             end_time = time.time()
 
@@ -438,6 +460,7 @@ async def evaluate_multiple_patterns(
     test_tasks: Optional[List[TestTask]] = None,
     include_robustness: bool = True,
     delay_between_tasks: float = 3.0,
+    task_timeout: float = PatternEvaluator.DEFAULT_TASK_TIMEOUT,
 ) -> Dict[str, PatternMetrics]:
     """Evaluate multiple patterns and compare.
 
@@ -446,11 +469,12 @@ async def evaluate_multiple_patterns(
         test_tasks: Test tasks to run (default: all)
         include_robustness: Whether to run robustness tests
         delay_between_tasks: Delay in seconds between tasks (default: 3.0)
+        task_timeout: Timeout in seconds per task (default: 180s / 3 minutes)
 
     Returns:
         Dict of {pattern_name: PatternMetrics}
     """
-    evaluator = PatternEvaluator(delay_between_tasks=delay_between_tasks)
+    evaluator = PatternEvaluator(delay_between_tasks=delay_between_tasks, task_timeout=task_timeout)
     results = {}
 
     for pattern_name, graph in patterns.items():
