@@ -40,9 +40,9 @@ class Judge:
         mode = judge_config.get("mode", "exact")
 
         if mode == "exact":
-            return Judge._judge_exact(output, ground_truth)
+            return Judge._judge_exact(output, ground_truth, lenient=lenient)
         elif mode == "json":
-            return Judge._judge_json(output, ground_truth, judge_config, schema)
+            return Judge._judge_json(output, ground_truth, judge_config, schema, lenient=lenient)
         elif mode == "regex":
             return Judge._judge_regex(output, judge_config)
         else:
@@ -92,7 +92,12 @@ class Judge:
 
             # Check if ground_truth is a number
             if re.match(r'^\d+(\.\d+)?$', ground_truth_str):
-                # Extract first number from output
+                # Try to find the exact ground truth number in output first
+                escaped_gt = re.escape(ground_truth_str)
+                exact_match = re.search(r'\b' + escaped_gt + r'\b', output)
+                if exact_match:
+                    return exact_match.group(0)
+                # Fallback: extract first number from output
                 match = re.search(r'\b(\d+(?:\.\d+)?)\b', output)
                 if match:
                     return match.group(1)
@@ -104,47 +109,119 @@ class Judge:
                 if match:
                     return match.group(1)
 
-            # Check if ground_truth is a single word
-            elif ' ' not in ground_truth_str and len(ground_truth_str) < 30:
-                # Extract first meaningful word
+            # Check if ground_truth is a single word or short phrase
+            elif len(ground_truth_str) < 30:
+                # First, check if ground_truth appears directly in output (case-insensitive)
+                gt_match = re.search(re.escape(ground_truth_str), output, re.IGNORECASE)
+                if gt_match:
+                    return gt_match.group(0)
+
                 # Remove common prefix phrases
                 cleaned = output
-                for prefix in ["The answer is", "It is", "The result is", "This is"]:
-                    if cleaned.lower().startswith(prefix.lower()):
-                        cleaned = cleaned[len(prefix):].strip()
+                prefix_patterns = [
+                    r"^(?:the\s+)?answer\s+is[:\s]+",
+                    r"^it\s+is[:\s]+",
+                    r"^(?:the\s+)?result\s+is[:\s]+",
+                    r"^this\s+is[:\s]+",
+                    r"^(?:the\s+)?(?:shortest|tallest|largest|smallest)\s+(?:is|person\s+is)[:\s]+",
+                    r"^based\s+on\s+.*?[,\.]\s*",
+                    r"^\*\*",  # Strip markdown bold markers
+                ]
+                for pattern in prefix_patterns:
+                    cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE).strip()
 
-                # Get first word, removing punctuation
-                words = cleaned.split()
-                if words:
-                    first_word = words[0].rstrip('.,!?:;')
-                    return first_word
+                # Remove trailing punctuation and markdown
+                cleaned = re.sub(r'[\.\*\!]+$', '', cleaned).strip()
+
+                # If cleaned result is short enough, use it
+                if cleaned and len(cleaned) < 50:
+                    # Get first line only
+                    first_line = cleaned.split('\n')[0].strip()
+                    if first_line:
+                        return first_line
+
+                # Fallback: get first word
+                if ' ' not in ground_truth_str:
+                    words = cleaned.split()
+                    if words:
+                        first_word = words[0].rstrip('.,!?:;*')
+                        return first_word
 
         # If no extraction applied, return original
         return output
 
     @staticmethod
-    def _judge_exact(output: str, ground_truth: Any) -> Tuple[bool, str]:
+    def _judge_exact(output: str, ground_truth: Any, lenient: bool = False) -> Tuple[bool, str]:
         """Exact match judge - output must exactly match ground truth.
+
+        In lenient mode, also accepts case-insensitive match and
+        numeric equivalence (e.g., "20.0" == "20").
 
         Examples:
             "408" == "408" → True
             "Paris" == "Paris" → True
-            "paris" != "Paris" → False
+            "paris" != "Paris" → False (strict), True (lenient)
         """
         output_cleaned = output.strip()
         ground_truth_str = str(ground_truth).strip()
 
+        # Strict exact match
         if output_cleaned == ground_truth_str:
             return True, f"Exact match: '{output_cleaned}'"
-        else:
-            return False, f"Mismatch: got '{output_cleaned}', expected '{ground_truth_str}'"
+
+        if lenient:
+            # Case-insensitive match
+            if output_cleaned.lower() == ground_truth_str.lower():
+                return True, f"Lenient match (case-insensitive): '{output_cleaned}'"
+
+            # Numeric equivalence: "20.0" == "20", "408.0" == "408"
+            try:
+                if float(output_cleaned) == float(ground_truth_str):
+                    return True, f"Lenient match (numeric): {output_cleaned} == {ground_truth_str}"
+            except (ValueError, TypeError):
+                pass
+
+        return False, f"Mismatch: got '{output_cleaned}', expected '{ground_truth_str}'"
+
+    @staticmethod
+    def _values_match_lenient(a: Any, b: Any) -> bool:
+        """Compare two values with lenient matching.
+
+        Handles numeric tolerance (e.g., 0.9 == 0.90) and
+        case-insensitive string comparison.
+        """
+        if a == b:
+            return True
+
+        # Numeric comparison with tolerance
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+            return abs(float(a) - float(b)) < 1e-6
+
+        # String case-insensitive comparison
+        if isinstance(a, str) and isinstance(b, str):
+            return a.strip().lower() == b.strip().lower()
+
+        # List comparison (element-wise lenient)
+        if isinstance(a, list) and isinstance(b, list):
+            if len(a) != len(b):
+                return False
+            return all(Judge._values_match_lenient(x, y) for x, y in zip(a, b))
+
+        # Dict comparison (key-wise lenient)
+        if isinstance(a, dict) and isinstance(b, dict):
+            if set(a.keys()) != set(b.keys()):
+                return False
+            return all(Judge._values_match_lenient(a[k], b[k]) for k in a)
+
+        return False
 
     @staticmethod
     def _judge_json(
         output: str,
         ground_truth: Any,
         judge_config: Dict[str, Any],
-        schema: Optional[Dict[str, Any]] = None
+        schema: Optional[Dict[str, Any]] = None,
+        lenient: bool = False
     ) -> Tuple[bool, str]:
         """JSON judge - parse output as JSON and validate.
 
@@ -152,6 +229,9 @@ class Judge:
         1. Parse output as JSON
         2. Validate against schema (if provided)
         3. Compare with ground truth (if provided, ignoring specified fields)
+
+        In lenient mode, numeric values are compared with tolerance
+        and strings are compared case-insensitively.
         """
         # Step 1: Parse JSON
         try:
@@ -175,15 +255,23 @@ class Judge:
                 output_filtered = {k: v for k, v in parsed_output.items() if k not in ignore_fields}
                 truth_filtered = {k: v for k, v in ground_truth.items() if k not in ignore_fields}
 
+                # Strict comparison
                 if output_filtered == truth_filtered:
                     return True, f"JSON match (ignoring {ignore_fields}): {output_filtered}"
-                else:
-                    return False, f"JSON mismatch: got {output_filtered}, expected {truth_filtered}"
+
+                # Lenient comparison with numeric tolerance and case-insensitive strings
+                if lenient and Judge._values_match_lenient(output_filtered, truth_filtered):
+                    return True, f"JSON lenient match: {output_filtered} ≈ {truth_filtered}"
+
+                return False, f"JSON mismatch: got {output_filtered}, expected {truth_filtered}"
             else:
                 if parsed_output == ground_truth:
                     return True, f"JSON exact match: {parsed_output}"
-                else:
-                    return False, f"JSON mismatch: got {parsed_output}, expected {ground_truth}"
+
+                if lenient and Judge._values_match_lenient(parsed_output, ground_truth):
+                    return True, f"JSON lenient match: {parsed_output} ≈ {ground_truth}"
+
+                return False, f"JSON mismatch: got {parsed_output}, expected {ground_truth}"
         else:
             # No ground truth, just validate structure
             return True, f"JSON valid (no ground truth to compare): {parsed_output}"

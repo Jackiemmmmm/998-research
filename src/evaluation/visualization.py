@@ -26,7 +26,8 @@ class EvaluationVisualizer:
 
         # Set style
         plt.style.use('seaborn-v0_8-darkgrid')
-        self.colors = ['#2E86AB', '#A23B72', '#F18F01', '#C73E1D', '#6A994E']
+        self.colors = ['#888888', '#2E86AB', '#A23B72', '#F18F01', '#C73E1D', '#6A994E',
+                       '#3D5A80', '#EE6C4D', '#293241', '#98C1D9']
 
     def generate_all_plots(
         self,

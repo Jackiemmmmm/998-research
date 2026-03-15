@@ -160,6 +160,35 @@ class PatternEvaluator:
 
         return metrics
 
+    @staticmethod
+    def _wrap_prompt_for_evaluation(prompt: str, task: TestTask) -> str:
+        """Wrap task prompt with output format instructions for evaluation.
+
+        This only affects the evaluation pipeline, not the agent's own behavior.
+        Adds explicit formatting guidance so agent output is easier to judge.
+        """
+        mode = task.judge.get("mode", "exact")
+
+        if mode == "json":
+            # For JSON tasks, emphasize strict JSON-only output
+            return (
+                f"{prompt}\n\n"
+                "CRITICAL: Your response must contain ONLY a valid JSON object. "
+                "No explanations, no markdown formatting, no code blocks, no extra text. "
+                "Output the raw JSON object directly."
+            )
+        elif mode == "exact":
+            # For exact match tasks, emphasize concise output
+            return (
+                f"{prompt}\n\n"
+                "CRITICAL: Output ONLY the direct answer with no extra words, explanations, or formatting. "
+                "For numbers, output only the number. For names, output only the name. "
+                "For Yes/No questions, output only 'Yes' or 'No'."
+            )
+        else:
+            # For regex and other modes, return as-is
+            return prompt
+
     async def _run_tasks(
         self,
         pattern_name: str,
@@ -176,6 +205,8 @@ class PatternEvaluator:
                 # Use first perturbation
                 prompt = task.get_perturbations()[0]
 
+            # Wrap prompt with evaluation format instructions
+            prompt = self._wrap_prompt_for_evaluation(prompt, task)
 
             result = await self._run_single_task(pattern_name, graph, task, prompt)
             results.append(result)
@@ -461,6 +492,8 @@ async def evaluate_multiple_patterns(
     include_robustness: bool = True,
     delay_between_tasks: float = 3.0,
     task_timeout: float = PatternEvaluator.DEFAULT_TASK_TIMEOUT,
+    parallel: bool = True,
+    max_concurrency: int = 2,
 ) -> Dict[str, PatternMetrics]:
     """Evaluate multiple patterns and compare.
 
@@ -470,27 +503,47 @@ async def evaluate_multiple_patterns(
         include_robustness: Whether to run robustness tests
         delay_between_tasks: Delay in seconds between tasks (default: 3.0)
         task_timeout: Timeout in seconds per task (default: 180s / 3 minutes)
+        parallel: Whether to run patterns in parallel (default: True)
+        max_concurrency: Max number of patterns to run concurrently (default: 2).
+            Prevents resource contention on local LLM backends like Ollama.
 
     Returns:
         Dict of {pattern_name: PatternMetrics}
     """
-    evaluator = PatternEvaluator(delay_between_tasks=delay_between_tasks, task_timeout=task_timeout)
     results = {}
 
-    for pattern_name, graph in patterns.items():
-        metrics = await evaluator.evaluate_pattern(
-            pattern_name, graph, test_tasks, include_robustness
+    if parallel:
+        # Use semaphore to limit concurrency — prevents Ollama resource contention
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def _eval_one(name: str, graph) -> tuple:
+            async with semaphore:
+                print(f"  [Parallel] Starting evaluation: {name}")
+                evaluator = PatternEvaluator(
+                    delay_between_tasks=delay_between_tasks, task_timeout=task_timeout
+                )
+                metrics = await evaluator.evaluate_pattern(
+                    name, graph, test_tasks, include_robustness
+                )
+                print(f"  [Parallel] Completed evaluation: {name}")
+                return name, metrics
+
+        tasks = [_eval_one(name, graph) for name, graph in patterns.items()]
+        completed = await asyncio.gather(*tasks)
+        for name, metrics in completed:
+            results[name] = metrics
+    else:
+        # Sequential fallback
+        evaluator = PatternEvaluator(
+            delay_between_tasks=delay_between_tasks, task_timeout=task_timeout
         )
-        results[pattern_name] = metrics
+        for pattern_name, graph in patterns.items():
+            metrics = await evaluator.evaluate_pattern(
+                pattern_name, graph, test_tasks, include_robustness
+            )
+            results[pattern_name] = metrics
 
     # Print comparison
-
     MetricsAggregator.compare_patterns(results)
-
-
-
-    if include_robustness:
-        pass
-
 
     return results

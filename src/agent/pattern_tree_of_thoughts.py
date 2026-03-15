@@ -41,9 +41,9 @@ llm = get_llm()
 
 # Configuration
 TOT_CONFIG: dict[str, int | float] = {
-    "max_depth": 3,
-    "thoughts_per_level": 3,
-    "top_k_selection": 2,
+    "max_depth": 2,           # Reduced from 3 to avoid timeout (>3min)
+    "thoughts_per_level": 2,  # Reduced from 3 to cut LLM calls per task
+    "top_k_selection": 1,     # Reduced from 2 to limit branching
     "evaluation_threshold": 0.7
 }
 

@@ -1,7 +1,7 @@
 # Project Gap Analysis & Implementation Plan
 
 > Generated: 2026-03-03
-> Last Updated: 2026-03-03 (Phase A completed)
+> Last Updated: 2026-03-12 (Week 1-2 P1 Agent 稳定化修复)
 > Based on: Group-1.pdf (Project Proposal) + CLAUDE.md + Current Codebase Review
 
 ## Phase Implementation Status
@@ -29,8 +29,8 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 | 1 | Reasoning Quality | Cognitive | NOT IMPLEMENTED | 0% | Trace foundation ready |
 | 2 | Cognitive Safety & Constraint Adherence | Cognitive | NOT IMPLEMENTED | 0% | Trace foundation ready |
 | 3 | Action-Decision Alignment | Behavioural | PREREQUISITE READY | 10% | THINK/ACT steps now captured |
-| 4 | Success & Efficiency | Behavioural | PARTIALLY DONE | ~75% | Token accuracy improved |
-| 5 | Behavioural Safety | Behavioural | NOT IMPLEMENTED | 5% | ToolCallRecord enables enforcement |
+| 4 | Success & Efficiency | Behavioural | PARTIALLY DONE | ~75% | Token accuracy improved; Reflex token tracking fixed (2026-03-12) |
+| 5 | Behavioural Safety | Behavioural | NOT IMPLEMENTED | 5% | ToolCallRecord enables enforcement; mock tools added for C1-C4 (2026-03-12) |
 | 6 | Robustness & Scalability | Systemic | PARTIALLY DONE | ~40% | — |
 | 7 | Controllability, Transparency & Resource Efficiency | Systemic | PARTIALLY DONE | ~45% | TAO cycle tracking enabled |
 
@@ -85,6 +85,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 - `TestTask` has a `plan` field (e.g., `["weather_api"]`) but it is never used during evaluation
 - No comparison between agent's stated intention and actual actions
 - ~~No telemetry captures the think-act-observe cycle per step~~ **RESOLVED by [Phase A](./PHASE_A_UNIFIED_TELEMETRY.md)**: `TraceExtractor` now captures `THINK` (intentions) and `ACT` (tool calls with `ToolCallRecord`) per step, enabling alignment comparison in Phase C1
+- **(2026-03-12)**: C1-C4 任务所需的 mock 工具（`weather_api`, `fx_api`, `calculator`, `wiki_search`, `shopping_search`）已实现并注册到 `src/tool/tool.py`，agent 现在可以正确调用这些工具完成 tool 类任务
 
 ---
 
@@ -102,6 +103,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 - Per-category and per-complexity breakdown
 - Controllability gap (lenient vs strict)
 - **[Phase A](./PHASE_A_UNIFIED_TELEMETRY.md)**: Token counts now use `usage_metadata` when available (accurate), with `tokens_estimated` flag for fallback; `tool_call_count` is now accurately tracked; `tao_cycle_counts` added to `EfficiencyMetrics`
+- **(2026-03-12)**: Reflex pattern token tracking fixed — `AIMessage.usage_metadata` now preserved from all LLM calls instead of being discarded when constructing the final response message
 
 **Current status (MISSING):**
 - No normalized cost score (proposal requires combining token + time into single 0-1 score)
@@ -124,6 +126,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 - `ControllabilityMetrics` has `unauthorized_tool_uses` field but is always 0 (never tracked)
 - No sandbox or controlled execution environment
 - No violation tracking
+- **(2026-03-12)**: Mock 工具已实现（`weather_api`, `fx_api`, `calculator`, `wiki_search`, `shopping_search`），为后续 tool whitelist 执行验证提供了前置条件
 
 ---
 
@@ -190,8 +193,10 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 
 | Area | Assessment |
 |------|------------|
-| **4 Agent Patterns** | Reflex, ReAct, CoT (Sequential), ToT all implemented in LangGraph |
-| **16 Test Tasks** | Well-structured across 4 categories (A/B/C/D) with complexity levels |
+| **5+1 Patterns** | Baseline (raw LLM control group) + Reflex, ReAct, CoT (Sequential), ToT all implemented in LangGraph; ToT config optimized (depth=2, thoughts=2, top_k=1) to avoid timeout |
+| **16 Test Tasks** | Well-structured across 4 categories (A/B/C/D) with complexity levels; C1-C4 mock tools implemented |
+| **Task Timeout** | Per-task timeout (default 3min) via `asyncio.wait_for()`, configurable via `--timeout` CLI arg |
+| **Parallel Execution** | Patterns run concurrently via `asyncio.gather` (default); `--sequential` flag for serial fallback; delay reduced from 5s to 1s |
 | **Judge System** | 3 modes (exact, json, regex) with dual strict/lenient evaluation |
 | **Metrics Collection** | 4-dimension structure mirrors the proposal's intent |
 | **Visualization** | 6 plot types including radar chart |
@@ -423,6 +428,7 @@ Given the project timeline (Figure 1 in proposal: Stage 3 Full Evaluation is ~Ma
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | Trace collection adds overhead to pattern execution | Slight latency increase | Use lightweight callbacks, measure overhead |
+| ~~ToT task timeout (>3min per task)~~ | ~~10/16 tasks timing out~~ | **MITIGATED (2026-03-12)**: Reduced ToT config (depth 3→2, thoughts 3→2, top_k 2→1); added per-task timeout with `--timeout` CLI arg |
 | LLM-as-Judge reliability for reasoning quality | Scoring variance | Use multiple judge runs, average scores |
 | Token budget for multi-run experiments | Cost increase ~3-5x | Start with N=3, use cheaper models (Groq) for repeat runs |
 | Some proxy indicators may not correlate with proposal's intended measures | Academic rigor concern | Document assumptions clearly, cross-validate with human samples |

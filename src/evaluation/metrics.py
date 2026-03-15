@@ -145,12 +145,12 @@ class RobustnessMetrics:
     task_robustness_scores: Dict[str, float] = field(default_factory=dict)
 
     def calculate_degradation(self):
-        """Calculate performance degradation percentage."""
+        """Calculate performance degradation percentage (clamped to 0-100%)."""
         if self.original_success_rate == 0:
             self.degradation_percentage = 0.0
         else:
             degradation = (self.original_success_rate - self.perturbed_success_rate) / self.original_success_rate
-            self.degradation_percentage = degradation * 100
+            self.degradation_percentage = max(0.0, min(100.0, degradation * 100))
 
     def avg_robustness_score(self) -> float:
         """Average robustness score across tasks."""

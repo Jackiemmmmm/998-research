@@ -108,73 +108,84 @@ def rule_matcher_node(state: ReflexState):
     # Check evaluation mode
     evaluation_mode = state.get("evaluation_mode", False)
 
-    # In evaluation mode, use LLM-based approach instead of rule matching
-    # This allows Reflex to handle diverse tasks that don't fit predefined rules
+    # In evaluation mode, use rule matching first, then LLM for unmatched queries.
+    # This preserves Reflex's core design: fast rule-based dispatch + LLM fallback.
     if evaluation_mode:
-        from src.llm_config import get_llm
-        from src.tool import tools as eval_tools
-        llm_eval = get_llm()
+        # Reuse module-level llm instance (avoid creating new connections per task)
+        llm_eval = llm
+
+        # Step 1: Try rule matching (Reflex core behavior)
+        matched_tool_rule = None
+        sorted_rules = sorted(REFLEX_RULES, key=lambda x: x.get("priority", 999))
+        for rule in sorted_rules:
+            pattern = str(rule["pattern"])
+            if rule["action"] != "general_response" and re.search(pattern, user_input_lower, re.IGNORECASE):
+                if rule.get("tool_required"):
+                    matched_tool_rule = rule
+                break
+
+        total_input_tokens = 0
+        total_output_tokens = 0
 
         try:
-            # Use LLM with tools to answer directly
-            llm_with_tools = llm_eval.bind_tools(eval_tools)
-
-            prompt = f"""Answer this query directly and concisely: {user_input}
-
-IMPORTANT - Output format:
-- For calculations: output only the number (e.g., "408")
-- For facts: output only the fact (e.g., "Paris")
-- For yes/no: output only "Yes" or "No"
-- For dates: output only the date in requested format
-- For JSON: output only the JSON object
-- NO explanations, NO prefixes, NO tool result formatting
-
-Provide only the answer:"""
-
-            response = llm_with_tools.invoke([{"role": "user", "content": prompt}])
-
-            # Check if tools were called
-            if hasattr(response, 'tool_calls') and response.tool_calls:
-                # Execute tool calls
+            # Step 2: If a tool rule matched, use LLM with tools for that specific query
+            if matched_tool_rule:
+                from src.tool import tools as eval_tools
                 from langgraph.prebuilt import ToolNode
-                tool_node = ToolNode(eval_tools)
-                tool_results = tool_node.invoke({"messages": [response]})
+                llm_with_tools = llm_eval.bind_tools(eval_tools)
 
-                # Get tool results and generate final answer
-                final_prompt = f"""Based on the tool results, answer this query concisely: {user_input}
+                response = llm_with_tools.invoke([{"role": "user", "content": user_input}])
+                if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                    total_input_tokens += response.usage_metadata.get('input_tokens', 0)
+                    total_output_tokens += response.usage_metadata.get('output_tokens', 0)
 
-Tool results: {tool_results}
-
-Remember:
-- Output ONLY the direct answer
-- NO explanations or prefixes
-- Extract the key information from tool results
-
-Provide only the answer:"""
-                final_response = llm_eval.invoke([{"role": "user", "content": final_prompt}])
-                final_answer = final_response.content.strip()
+                if hasattr(response, 'tool_calls') and response.tool_calls:
+                    tool_node = ToolNode(eval_tools)
+                    tool_results = tool_node.invoke({"messages": [response]})
+                    final_response = llm_eval.invoke([
+                        {"role": "user", "content": f"{user_input}\n\nTool results: {tool_results}\n\nOutput ONLY the direct answer:"}
+                    ])
+                    final_answer = final_response.content.strip()
+                    if hasattr(final_response, 'usage_metadata') and final_response.usage_metadata:
+                        total_input_tokens += final_response.usage_metadata.get('input_tokens', 0)
+                        total_output_tokens += final_response.usage_metadata.get('output_tokens', 0)
+                else:
+                    final_answer = response.content.strip()
             else:
+                # Step 3: No tool rule matched — single LLM call, no tools (like Baseline)
+                response = llm_eval.invoke([{"role": "user", "content": user_input}])
                 final_answer = response.content.strip()
+                if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                    total_input_tokens += response.usage_metadata.get('input_tokens', 0)
+                    total_output_tokens += response.usage_metadata.get('output_tokens', 0)
+
+            ai_msg = AIMessage(content=final_answer)
+            ai_msg.usage_metadata = {
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "total_tokens": total_input_tokens + total_output_tokens,
+            }
 
             messages = state["messages"]
             return {
-                "messages": messages + [AIMessage(content=final_answer)],
-                "matched_rule": "llm_evaluation_mode",
-                "action_taken": "LLM-based direct answer",
+                "messages": messages + [ai_msg],
+                "matched_rule": matched_tool_rule["action"] if matched_tool_rule else "llm_direct",
+                "action_taken": f"Reflex: {'tool-assisted' if matched_tool_rule else 'direct LLM'}",
                 "evaluation_mode": True
             }
 
         except Exception as e:
-            # Fallback to simple LLM response
             try:
-                response = llm_eval.invoke([{"role": "user", "content": f"Answer briefly: {user_input}"}])
-                final_answer = response.content.strip()
+                response = llm_eval.invoke([{"role": "user", "content": user_input}])
+                ai_msg = AIMessage(content=response.content.strip())
+                if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                    ai_msg.usage_metadata = response.usage_metadata
             except Exception:
-                final_answer = f"Error: {str(e)}"
+                ai_msg = AIMessage(content=f"Error: {str(e)}")
 
             messages = state["messages"]
             return {
-                "messages": messages + [AIMessage(content=final_answer)],
+                "messages": messages + [ai_msg],
                 "matched_rule": "llm_fallback",
                 "action_taken": "LLM fallback response",
                 "evaluation_mode": True
