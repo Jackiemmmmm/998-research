@@ -9,7 +9,7 @@
 | Phase | Description | Status | Implementation Doc |
 |-------|-------------|--------|-------------------|
 | **A** | Unified Telemetry & Adapter Layer | **COMPLETED** | [PHASE_A_UNIFIED_TELEMETRY.md](./PHASE_A_UNIFIED_TELEMETRY.md) |
-| **B** | Cognitive Layer (Dim 1 & 2) | NOT STARTED | — |
+| **B** | Cognitive Layer (Dim 1 & 2) | NOT STARTED | [PHASE_B_COGNITIVE_LAYER_PLAN.md](./PHASE_B_COGNITIVE_LAYER_PLAN.md) |
 | **C** | Behavioural Layer (Dim 3, 4, 5) | NOT STARTED | — |
 | **D** | Systemic Layer (Dim 6 & 7) | NOT STARTED | — |
 | **E** | Normalization & Composite Scoring | NOT STARTED | — |
