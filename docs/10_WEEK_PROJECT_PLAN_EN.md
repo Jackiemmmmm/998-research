@@ -64,6 +64,78 @@
 | **P2** | Yiming Wang | Evaluation metric development + data analysis + statistics | Strengths in data analysis and methodology |
 | **P3** | Kapila Wijetunge | Report writing + visualisation + Safety dimensions | Strengths in documentation and quality assurance |
 
+### 2.1 Collaboration Model: Spec → Implement → Document
+
+Since P1 handles all code implementation, P2 and P3 contribute by writing **Implementation Specs** — short, precise documents that tell P1 exactly what to build.
+
+**Workflow per task:**
+
+```
+Step 1: P2/P3 writes an Implementation Spec       (docs/specs/)
+Step 2: P1 reviews the spec, asks questions        (GitHub PR or sync meeting)
+Step 3: P1 implements the code                     (src/)
+Step 4: P1 writes the Implementation Doc           (docs/PHASE_X_*.md, like Phase A)
+Step 5: Update Gap Analysis status table           (docs/PROJECT_GAP_ANALYSIS_AND_PLAN.md)
+```
+
+**Document roles:**
+
+| Document | Owner | Purpose | When |
+|----------|-------|---------|------|
+| Implementation Spec (`docs/specs/`) | P2 or P3 | Tell P1 what to build — inputs, outputs, formulas, edge cases, test cases | Before implementation |
+| Implementation Doc (`docs/PHASE_X_*.md`) | P1 | Record what was actually built — architecture, data structures, verification results | After implementation |
+| Gap Analysis (`docs/PROJECT_GAP_ANALYSIS_AND_PLAN.md`) | Anyone | Track phase status + link to specs and implementation docs | Updated at each milestone |
+
+### 2.2 Implementation Spec Format
+
+Every spec follows a fixed 7-section structure. Templates are available in `docs/specs/`.
+
+```
+1. Objective          — one sentence
+2. Input              — exact field names, source files, value ranges, sample values
+3. Output             — exact dataclass definitions P1 should create
+4. Computation Logic  — formulas, edge cases, aggregation weights with justification
+5. Integration Points — which files to create/modify
+6. Verification Cases — concrete input → expected output pairs (become test cases)
+7. Open Questions     — anything unresolved (team decides before P1 starts coding)
+```
+
+**Spec naming convention:** `{week}_{phase}_{short-name}.md`
+Example: `week1-2_phase-e_normalisation.md`
+
+### 2.3 Spec Quality Checklist
+
+P2/P3 must verify all items before handing a spec to P1:
+
+| # | Check | Why It Matters |
+|---|-------|----------------|
+| 1 | Every field name matches the actual codebase (`metrics.py`, `trace.py`, etc.) | P1 should not have to guess or search |
+| 2 | Every formula is unambiguous — P1 can write `=` directly | Prevents back-and-forth |
+| 3 | Every edge case has a defined behaviour (division by zero, missing data, all-same values) | Prevents P1 from making arbitrary decisions |
+| 4 | Every verification case has concrete expected output | P1 can copy directly into a unit test |
+| 5 | Integration points list exact file paths | P1 knows which files to touch |
+| 6 | Document is under 5 pages | Forces precision, prevents spec drift |
+
+**Core principle**: After reading the spec, P1's only job is to write code. No further questions should be needed.
+
+### 2.4 Spec Lifecycle
+
+```
+DRAFT  →  P2/P3 writing, not yet ready for P1
+READY  →  Spec complete, all checklist items verified, handed to P1
+IN PROGRESS → P1 is implementing
+DONE   →  Code merged, implementation doc written, Gap Analysis updated
+```
+
+Update the `Status` field in the spec header as it progresses.
+
+### 2.5 Current Specs
+
+| Spec | Owner | Phase | Status |
+|------|-------|-------|--------|
+| [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) | P2 | Phase E | DRAFT |
+| [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) | P3 | Phase D2 | DRAFT |
+
 ---
 
 ## 3. Weekly Plan
@@ -75,8 +147,8 @@
 | Member | Task | Details | Deliverable |
 |--------|------|---------|-------------|
 | P1 | Agent end-to-end stabilisation | Fix all 4 agents to run successfully under `run_evaluation.py`; ensure every pattern passes all 16 tasks; unify error handling | Run logs showing all 4 patterns passing |
-| P2 | [Phase E](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-e-normalization-aggregation--composite-scoring): Normalisation + Composite Scoring | Implement `NormalizationEngine` (normalise each sub-indicator to 0–1); implement `CompositeScorer` (uniform/weighted combination); complete Dim4 token/time normalised cost score | New modules in `metrics.py` |
-| P3 | [Phase D2](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-d-systemic-layer-enhancement-dimensions-6--7): Controllability Completion | Implement trace completeness calculation (proportion of steps with full TAO records); policy-flag frequency statistics; resource efficiency normalisation | Dim7 metrics fully operational |
+| P2 | [Phase E](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-e-normalization-aggregation--composite-scoring): Normalisation + Composite Scoring | Write [Implementation Spec](./specs/week1-2_phase-e_normalisation.md) defining normalisation formula, dimension-to-sub-indicator mapping, composite scoring formula, edge cases, and verification cases. P1 implements after spec is READY. | Completed spec → P1 delivers new modules in `src/evaluation/scoring.py` |
+| P3 | [Phase D2](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-d-systemic-layer-enhancement-dimensions-6--7): Controllability Completion | Write [Implementation Spec](./specs/week1-2_phase-d2_controllability.md) defining trace completeness formula, policy-flag rate calculation, resource efficiency normalisation, edge cases, and verification cases. P1 implements after spec is READY. | Completed spec → P1 delivers updated `ControllabilityMetrics` |
 
 **Acceptance Criteria**: `python run_evaluation.py --mode full` succeeds for all 4 patterns and outputs scores
 
@@ -113,8 +185,8 @@
 | Member | Task | Details | Deliverable |
 |--------|------|---------|-------------|
 | P1 | [Phase C1](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-c-behavioural-layer-completion-dimensions-3-4-5): Action–Decision Alignment (Dim3) | Extract plan string vs actual action from traces; implement string-level matching; verb–tool mapping (e.g. "search" → `tavily_search`); compute alignment score. Ref: [Proposal § 2.2.2 Dim3](../Group-1.pdf) | Alignment scoring logic |
-| P2 | [Phase D1](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-d-systemic-layer-enhancement-dimensions-6--7): Enhanced Robustness (Dim6) | Implement input perturbation (typos/paraphrases via nlpaug or simple character substitution); temperature sweep (0.0, 0.3, 0.7, 1.0); multi-run variance calculation; degradation Δ = \|S_clean − S_noisy\|. Ref: [Proposal § 2.2.3 Dim6](../Group-1.pdf) | Perturbation test pipeline + stability index |
-| P3 | [Phase C3](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-c-behavioural-layer-completion-dimensions-3-4-5): Behavioural Safety (Dim5) | Tool whitelist validation (check agents only call allowed tools); domain regex checks; violation rate statistics; blocked attempt logging. Ref: [Proposal § 2.2.2 Dim5](../Group-1.pdf) | Safety scoring module |
+| P2 | [Phase D1](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-d-systemic-layer-enhancement-dimensions-6--7): Enhanced Robustness (Dim6) | Write Implementation Spec (`docs/specs/week3-4_phase-d1_robustness.md`) defining perturbation strategy, temperature sweep parameters, variance calculation formula, degradation metric, and verification cases. P1 implements after spec is READY. Ref: [Proposal § 2.2.3 Dim6](../Group-1.pdf) | Completed spec → P1 delivers perturbation test pipeline + stability index |
+| P3 | [Phase C3](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-c-behavioural-layer-completion-dimensions-3-4-5): Behavioural Safety (Dim5) | Write Implementation Spec (`docs/specs/week3-4_phase-c3_behavioural-safety.md`) defining tool whitelist validation logic, domain regex rules, violation rate formula, and verification cases. P1 implements after spec is READY. Ref: [Proposal § 2.2.2 Dim5](../Group-1.pdf) | Completed spec → P1 delivers safety scoring module |
 
 **Acceptance Criteria**: Dim3, 4, 5 all produce numerical output; robustness perturbation tests operational
 
@@ -127,8 +199,8 @@
 | Member | Task | Details | Deliverable |
 |--------|------|---------|-------------|
 | P1 | [Phase B1](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-b-cognitive-layer-implementation-dimensions-1--2): Reasoning Quality (Dim1) | Use Judge-LLM for coherence scoring on reasoning traces (extract THINK steps, have external LLM score 1–5); self-consistency: run each task multiple times, compare final answer agreement. Ref: [Proposal § 2.2.1 Dim1](../Group-1.pdf) | Reasoning quality scoring pipeline |
-| P2 | [Phase F](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-f-statistical-rigor--reproducibility): Statistical Rigor | Implement multi-run pipeline (each pattern × task runs 3–5 times); compute mean ± 95% CI; compute effect size (Cohen's d); output statistical summary tables. Ref: [Proposal § 2.3 Table 2 C4](../Group-1.pdf) | Statistical analysis module |
-| P3 | [Phase B2](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-b-cognitive-layer-implementation-dimensions-1--2): Cognitive Safety (Dim2) | Hallucination detection: keyword-based anomaly detection (flag unverified claims in reasoning traces); toxicity screening (lightweight lexical filter); heuristic scoring as proxy. Ref: [Proposal § 2.2.1 Dim2](../Group-1.pdf) | Cognitive safety scoring module |
+| P2 | [Phase F](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-f-statistical-rigor--reproducibility): Statistical Rigor | Write Implementation Spec (`docs/specs/week5-6_phase-f_statistical-rigor.md`) defining multi-run pipeline parameters (N=3–5), mean/CI calculation formulas, effect size (Cohen's d) formula, output table schema, and verification cases. P1 implements after spec is READY. Ref: [Proposal § 2.3 Table 2 C4](../Group-1.pdf) | Completed spec → P1 delivers statistical analysis module |
+| P3 | [Phase B2](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-b-cognitive-layer-implementation-dimensions-1--2): Cognitive Safety (Dim2) | Write Implementation Spec (`docs/specs/week5-6_phase-b2_cognitive-safety.md`) defining toxicity keyword list, unsupported claim detection rules, constraint adherence checks, hallucination proxy formula, and verification cases. P1 implements after spec is READY. Ref: [Proposal § 2.2.1 Dim2](../Group-1.pdf) | Completed spec → P1 delivers cognitive safety scoring module |
 
 **Acceptance Criteria**: All 7 dimensions produce scores; multi-run and CI calculation supported
 

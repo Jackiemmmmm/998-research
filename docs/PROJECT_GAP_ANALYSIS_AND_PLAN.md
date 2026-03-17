@@ -6,15 +6,18 @@
 
 ## Phase Implementation Status
 
-| Phase | Description | Status | Implementation Doc |
-|-------|-------------|--------|-------------------|
-| **A** | Unified Telemetry & Adapter Layer | **COMPLETED** | [PHASE_A_UNIFIED_TELEMETRY.md](./PHASE_A_UNIFIED_TELEMETRY.md) |
-| **B** | Cognitive Layer (Dim 1 & 2) | NOT STARTED | [PHASE_B_COGNITIVE_LAYER_PLAN.md](./PHASE_B_COGNITIVE_LAYER_PLAN.md) |
-| **C** | Behavioural Layer (Dim 3, 4, 5) | NOT STARTED | — |
-| **D** | Systemic Layer (Dim 6 & 7) | NOT STARTED | — |
-| **E** | Normalization & Composite Scoring | NOT STARTED | — |
-| **F** | Statistical Rigor & Reproducibility | NOT STARTED | — |
-| **G** | Report & Visualization Polish | NOT STARTED | — |
+| Phase | Description | Status | Spec (P2/P3 → P1) | Implementation Doc (P1) |
+|-------|-------------|--------|-------------------|------------------------|
+| **A** | Unified Telemetry & Adapter Layer | **COMPLETED** | — | [PHASE_A_UNIFIED_TELEMETRY.md](./PHASE_A_UNIFIED_TELEMETRY.md) |
+| **B1** | Cognitive Layer — Reasoning Quality (Dim 1) | NOT STARTED | — (P1 self-drives, Week 5–6) | — |
+| **B2** | Cognitive Layer — Cognitive Safety (Dim 2) | NOT STARTED | [week5-6_phase-b2_cognitive-safety.md](./specs/week5-6_phase-b2_cognitive-safety.md) (P3, PENDING) | — |
+| **C1** | Action–Decision Alignment (Dim 3) | NOT STARTED | — (P1 self-drives, Week 3–4) | — |
+| **C3** | Behavioural Safety (Dim 5) | NOT STARTED | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) (P3, PENDING) | — |
+| **D1** | Enhanced Robustness (Dim 6) | NOT STARTED | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) (P2, PENDING) | — |
+| **D2** | Controllability & Transparency (Dim 7) | NOT STARTED | [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) (P3, DRAFT) | — |
+| **E** | Normalization & Composite Scoring | NOT STARTED | [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) (P2, DRAFT) | — |
+| **F** | Statistical Rigor & Reproducibility | NOT STARTED | [week5-6_phase-f_statistical-rigor.md](./specs/week5-6_phase-f_statistical-rigor.md) (P2, PENDING) | — |
+| **G** | Report & Visualization Polish | NOT STARTED | — | — |
 
 ---
 
