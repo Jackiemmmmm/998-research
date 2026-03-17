@@ -1,382 +1,233 @@
 # Phase B Cognitive Layer Execution Guide
 
-> Status: Draft for Implementation
-> Scope: Dimension 1 and Dimension 2
-> Based on: `Group-1.pdf`, `PROJECT_GAP_ANALYSIS_AND_PLAN.md`, `PHASE_A_UNIFIED_TELEMETRY.md`
+> Status: Execution Handbook
+> Scope: Dimension 1 and Dimension 2 only
+> Companion docs:
+> - [PHASE_B_COGNITIVE_LAYER_PLAN.md](./PHASE_B_COGNITIVE_LAYER_PLAN.md)
+> - [PHASE_A_UNIFIED_TELEMETRY.md](./PHASE_A_UNIFIED_TELEMETRY.md)
 
 ---
 
-## 1. Document Purpose
+## 1. How to Use This Document
 
-This document provides the detailed execution procedure for implementing the Cognitive Layer defined in the proposal:
+This document is not the high-level plan for Phase B.
 
-1. Dimension 1: Reasoning Quality
-2. Dimension 2: Cognitive Safety and Constraint Adherence
+That role already belongs to [PHASE_B_COGNITIVE_LAYER_PLAN.md](./PHASE_B_COGNITIVE_LAYER_PLAN.md).
 
-Unlike the high-level planning document, this guide is implementation-facing. It is written to be used directly while editing the current codebase and running experiments.
+This document is the practical execution handbook for implementing and running the Cognitive Layer experiment. It focuses on:
 
-The guide assumes the current repository already has:
+- which files to touch
+- what order to implement in
+- how to run the experiment
+- what to inspect manually
+- how to decide whether Stage 1 is complete
 
-- unified trace extraction
-- evaluation runner
-- task suite
-- baseline pattern implementations
+If you need rationale, metric definitions, or project-level justification, read the plan document first. If you need to actually execute the work, use this guide.
 
-These prerequisites already exist in the current code:
+---
+
+## 2. Execution Goal
+
+The goal of this work is to make the current evaluation pipeline produce two new per-task and per-pattern outputs:
+
+1. `reasoning_quality_score`
+2. `cognitive_safety_score`
+
+These two outputs should be generated from the existing telemetry pipeline rather than from ad hoc post-processing.
+
+---
+
+## 3. Current Files You Will Work With
+
+Do not create a separate evaluation pipeline. Reuse the current project structure.
+
+Core existing files:
 
 - `src/evaluation/trace.py`
 - `src/evaluation/evaluator.py`
 - `src/evaluation/metrics.py`
 - `src/evaluation/judge.py`
+- `src/evaluation/report_generator.py`
 - `src/evaluation/test_suite.py`
 - `run_evaluation.py`
 
----
-
-## 2. Proposal Requirements Translated into Code Tasks
-
-According to the proposal, the Cognitive Layer must evaluate:
-
-### 2.1 Dimension 1: Reasoning Quality
-
-Required by proposal:
-
-- extract reasoning traces from structured logs
-- judge logical coherence
-- run self-consistency analysis across repeated runs
-- compare step structure when gold intermediate steps exist
-- fall back to final-answer agreement or majority consistency when gold steps do not exist
-
-### 2.2 Dimension 2: Cognitive Safety and Constraint Adherence
-
-Required by proposal:
-
-- detect harmful bias, factual inconsistency, or ethical issues in reasoning
-- screen for toxicity and unsupported claims
-- apply stronger verification for high-risk cases
-- use heuristic and keyword-based proxy indicators in Stage 1
-- estimate hallucination frequency as unsupported or contradictory reasoning content
-
-This means the Cognitive Layer implementation must produce both:
-
-- per-task analysis results
-- pattern-level aggregated metrics
-
----
-
-## 3. Current Codebase Baseline
-
-Before implementation, the project already provides the following execution path:
-
-1. `run_evaluation.py`
-   - defines the set of patterns to evaluate
-2. `src/evaluation/evaluator.py`
-   - runs tasks and collects task-level results
-3. `src/evaluation/trace.py`
-   - converts LangGraph outputs into `AgentTrace`
-4. `src/evaluation/metrics.py`
-   - aggregates pattern-level metrics
-5. `src/evaluation/report_generator.py`
-   - exports reports
-
-This means the cleanest way to implement Phase B is:
-
-- add new cognitive analysis modules
-- call them from `evaluator.py`
-- aggregate them in `metrics.py`
-- export them through the existing reporting path
-
-Do not build a parallel evaluation pipeline. That would make the results harder to compare and would break the proposal's emphasis on a unified protocol.
-
----
-
-## 4. Pattern Instruction Setup
-
-Before running Cognitive Layer experiments, the 4 core patterns should use a consistent instruction strategy:
-
-- shared core instruction for fairness
-- minimal pattern-specific instruction for behavior fidelity
-
-This has now been wired into:
-
-- `src/agent/pattern_reflex.py`
-- `src/agent/pattern_react.py`
-- `src/agent/pattern_sequential.py`
-- `src/agent/pattern_tree_of_thoughts.py`
-- shared helper: `src/agent/pattern_instructions.py`
-
-This matters for Cognitive Layer experiments because:
-
-- `Reasoning Quality` depends on pattern traces being intentional rather than accidental
-- `Cognitive Safety` depends on common baseline constraints such as "do not fabricate facts"
-
-Without a shared instruction baseline, reasoning quality and safety scores may reflect prompt design bias more than pattern behavior.
-
----
-
-## 5. Execution Architecture for the Cognitive Layer
-
-The recommended execution architecture is:
-
-```text
-Task Prompt
-  -> Pattern Graph
-  -> LangGraph Response
-  -> TraceExtractor
-  -> AgentTrace
-  -> Cognitive Analysis Modules
-       - Reasoning Quality Evaluator
-       - Cognitive Safety Screener
-  -> TaskResult
-  -> PatternMetrics
-  -> ReportGenerator
-```
-
-Recommended new files:
+New files to add during implementation:
 
 - `src/evaluation/reasoning_quality.py`
 - `src/evaluation/cognitive_safety.py`
 
-Recommended modified files:
+Recommended tests to add:
 
-- `src/evaluation/evaluator.py`
-- `src/evaluation/metrics.py`
-- `src/evaluation/report_generator.py`
-- `src/evaluation/__init__.py`
+- `tests/unit_tests/test_reasoning_quality.py`
+- `tests/unit_tests/test_cognitive_safety.py`
+- `tests/unit_tests/test_cognitive_metrics.py`
 
 ---
 
-## 6. Dimension 1 Detailed Execution Plan
+## 4. Preconditions Before You Start
+
+Before implementing the Cognitive Layer, make sure these conditions hold:
+
+1. Phase A telemetry is already available and working.
+2. `TraceExtractor` is producing usable `THINK`, `ACT`, `OBSERVE`, and `OUTPUT` steps.
+3. Pattern prompts or instructions are frozen for the current round of evaluation.
+4. The test suite is not being changed at the same time as the metric logic.
+
+Why this matters:
+
+- if telemetry is unstable, cognitive metrics will be unreliable
+- if prompts are still moving, reasoning quality changes may reflect prompt drift instead of pattern behavior
+
+---
+
+## 5. Implementation Order
+
+Use this order. It minimizes debugging risk.
+
+1. Build reasoning extraction and scoring logic in `reasoning_quality.py`
+2. Build safety screening logic in `cognitive_safety.py`
+3. Extend `metrics.py` with a cognitive metric group
+4. Wire both modules into `evaluator.py`
+5. Extend `report_generator.py`
+6. Add unit tests
+7. Run pilot experiments
+
+Do not start with report generation or full-run experiments. First make task-level outputs correct.
+
+---
+
+## 6. Dimension 1 Implementation Workflow
 
 ## 6.1 Objective
 
-Dimension 1 should measure whether a pattern produces reasoning that is:
+Dimension 1 should answer four questions for each run:
 
-- present
-- coherent
-- aligned with the final answer
-- stable across repeated runs
+1. Did the pattern expose usable reasoning?
+2. Was the reasoning coherent?
+3. Did the final answer agree with the reasoning?
+4. If repeated runs exist, was the result stable?
 
-This dimension must operate from the trace layer, not from only the final output.
+## 6.2 Data Input
 
----
+Use:
 
-## 6.2 Data Source
+- `trace.steps` from `AgentTrace`
+- the original task prompt
+- the final output
+- the task ground truth when available
 
-Primary source:
+Main trace subset:
 
-- `AgentTrace.steps` from `src/evaluation/trace.py`
+- all `THINK` steps
 
-Relevant fields:
+## 6.3 File to Create
 
-- `step_type`
-- `content`
-- `tool_calls`
-- `stage_label`
+Create:
 
-For Dimension 1, the main input is:
+- `src/evaluation/reasoning_quality.py`
 
-- all steps where `step_type == THINK`
-
-Secondary sources:
-
-- original task prompt
-- final output
-- ground truth answer from `TestTask`
-
----
-
-## 6.3 New Module Design
-
-Create `src/evaluation/reasoning_quality.py`.
-
-Recommended contents:
+Recommended main structures:
 
 ```python
-from dataclasses import dataclass
-from typing import Any, Optional
-
-from .trace import AgentTrace
-
-
-@dataclass
-class ReasoningQualityResult:
-    trace_coverage: float
-    coherence_score: float
-    final_answer_agreement: float
-    self_consistency_score: Optional[float]
-    reasoning_quality_score: float
-    think_step_count: int
-    missing_reasoning_trace: bool
-    judge_explanation: str = ""
-    scoring_mode: str = "stage1_proxy"
+ReasoningQualityResult
+ReasoningExtractor
+ReasoningJudge
+SelfConsistencyAnalyzer
+ReasoningQualityEvaluator
 ```
 
-Recommended classes:
+## 6.4 Build Sequence
 
-- `ReasoningExtractor`
-- `ReasoningJudge`
-- `SelfConsistencyAnalyzer`
-- `ReasoningQualityEvaluator`
+### Step 1: Extract reasoning steps
 
----
+Input:
 
-## 6.4 Step-by-Step Implementation
+- `AgentTrace`
 
-### Step D1-1: Extract reasoning steps
+Rule:
 
-Implementation target:
+- keep only non-empty `THINK` steps
+- remove trivial placeholders
+- preserve order
 
-- `ReasoningExtractor.extract_reasoning_steps(trace: AgentTrace) -> list[str]`
-
-Execution logic:
-
-1. Iterate through `trace.steps`
-2. Keep only `THINK` steps
-3. Strip whitespace
-4. Drop empty strings
-5. Drop trivial placeholders
-
-Recommended placeholder filter examples:
-
-- `"let me think"`
-- `"thinking..."`
-- very short generic filler with no task content
-
-Output:
+Expected output:
 
 - `reasoning_steps`
 - `think_step_count`
 - `missing_reasoning_trace`
 
-### Step D1-2: Compute trace coverage
+### Step 2: Compute trace coverage
 
-Purpose:
-
-- avoid giving high reasoning scores to runs that barely expose any reasoning
-
-Suggested formula:
+Use a simple Stage 1 proxy:
 
 ```text
 trace_coverage = min(1.0, think_step_count / expected_min_think_steps)
 ```
 
-Recommended Stage 1 default:
+Recommended default:
 
 - `expected_min_think_steps = 2`
 
-Interpretation:
+### Step 3: Add coherence scoring
 
-- `0.0` means no usable reasoning
-- `0.5` means minimal reasoning
-- `1.0` means enough exposed reasoning for evaluation
+Use a dedicated reasoning judge wrapper rather than the generic output judge.
 
-### Step D1-3: Judge coherence
+Judge input:
 
-Implementation target:
+- task prompt
+- ordered reasoning steps
+- final answer
 
-- `ReasoningJudge.evaluate_coherence(query, reasoning_steps, final_output)`
+Judge output:
 
-Do not overload the current generic `LLMJudge.evaluate()` directly. Instead, create a dedicated wrapper that uses the same underlying LLM but a different prompt and parsing schema.
+- `logical_progression`
+- `internal_consistency`
+- `coherence_score`
+- `explanation`
 
-Recommended prompt requirements:
+Fallback rule:
 
-- score logical progression from 0 to 1
-- score internal consistency from 0 to 1
-- return explanation
-- avoid judging formatting or writing style
+- if judge call fails, return a conservative rule-based score
+- never fail the whole task because of judge failure
 
-Recommended output schema:
+### Step 4: Add final-answer agreement
 
-```json
-{
-  "logical_progression": 0.82,
-  "internal_consistency": 0.76,
-  "coherence_score": 0.79,
-  "explanation": "The reasoning mostly follows a clear progression..."
-}
-```
+Compare:
 
-Fallback rule if LLM judge fails:
+- last meaningful reasoning step
+- final output
 
-- do not fail the task run
-- compute a conservative proxy score using:
-  - number of reasoning steps
-  - repetition rate
-  - contradiction keyword hints
-
-Recommended fallback behavior:
-
-```text
-if no reasoning:
-    coherence_score = 0.0
-elif only one reasoning step:
-    coherence_score = 0.5
-else:
-    coherence_score = 0.6 to 0.75 depending on repetition / contradiction signals
-```
-
-### Step D1-4: Compute final-answer agreement
-
-Implementation target:
-
-- `ReasoningQualityEvaluator._compute_final_answer_agreement(...)`
-
-Purpose:
-
-- determine whether the conclusion implied by reasoning matches the final output
-
-Stage 1 approach:
-
-1. Take the last meaningful `THINK` step
-2. Compare it with the final output
-3. Use rule-based heuristics
-
-Comparison rules:
+Stage 1 matching methods:
 
 - exact match
-- numeric equivalence
+- numeric match
 - extracted-answer match
 - keyword overlap
 
-Suggested score mapping:
+Recommended mapping:
 
 - strong agreement: `1.0`
 - partial agreement: `0.5`
-- mismatch: `0.0`
-- insufficient signal: `0.5` plus flag
+- disagreement: `0.0`
 
-### Step D1-5: Define self-consistency interface
+### Step 5: Define self-consistency interface
 
-Proposal requires self-consistency, but the current evaluator is primarily single-run.
+Even if full multi-run support is not complete yet, define the interface now.
 
-Therefore, Stage 1 implementation should:
-
-- define the API now
-- allow `None` when repeated runs are unavailable
-
-Recommended interface:
-
-```python
-class SelfConsistencyAnalyzer:
-    @staticmethod
-    def answer_agreement(outputs: list[str]) -> float: ...
-```
-
-Stage 1 formula:
+Stage 1 rule:
 
 ```text
 self_consistency_score = majority_answer_count / total_runs
 ```
 
-If only one run is available:
+If only one run exists:
 
 - store `None`
-- renormalize weights during final aggregation
+- do not force a zero
 
-### Step D1-6: Aggregate Dimension 1 score
+### Step 6: Aggregate Dimension 1
 
-Recommended formula:
+Recommended Stage 1 formula:
 
 ```text
 reasoning_quality_score =
@@ -386,220 +237,123 @@ reasoning_quality_score =
 0.25 * self_consistency_score
 ```
 
-If self-consistency is unavailable:
+If self-consistency is missing:
 
-- redistribute the 0.25 weight over the other available metrics
-
----
-
-## 6.5 Integration into Evaluator
-
-Edit `src/evaluation/evaluator.py`.
-
-Recommended insertion point:
-
-- after trace extraction is complete in `_run_single_task()`
-- before task result is finalized
-
-Execution flow per task:
-
-1. invoke graph
-2. extract trace
-3. compute success metrics
-4. compute reasoning quality
-5. compute cognitive safety
-6. store both in `TaskResult`
-
-Recommended `TaskResult` additions:
-
-```python
-reasoning_quality: Optional[Dict[str, Any]] = None
-cognitive_safety: Optional[Dict[str, Any]] = None
-```
+- renormalize over available fields
 
 ---
 
-## 7. Dimension 2 Detailed Execution Plan
+## 7. Dimension 2 Implementation Workflow
 
 ## 7.1 Objective
 
-Dimension 2 should measure whether reasoning and final answers are:
+Dimension 2 should answer:
 
-- safe
-- grounded
-- constraint-following
-- low risk for hallucination
+1. Is the reasoning unsafe or problematic?
+2. Are there unsupported claims?
+3. Are task constraints respected?
+4. Is there evidence of hallucination risk?
 
-This dimension should analyze both:
+## 7.2 Data Input
 
-- reasoning trace
-- final output
-
----
-
-## 7.2 Data Source
-
-Primary sources:
-
-- `trace.steps`
-- final output text
-- task prompt
-
-Secondary sources:
-
-- tool observation text from `OBSERVE` steps
-- `TestTask.policy`
-- `TestTask.judge`
-- `TestTask.schema`
-- optional ground truth
-
-The main Stage 1 principle is:
-
-- high-confidence proxy detection first
-- stronger verification later
-
----
-
-## 7.3 New Module Design
-
-Create `src/evaluation/cognitive_safety.py`.
-
-Recommended structure:
-
-```python
-from dataclasses import dataclass, field
-from typing import Any
-
-from .trace import AgentTrace
-
-
-@dataclass
-class CognitiveSafetyResult:
-    toxicity_risk_score: float
-    unsupported_claim_risk_score: float
-    constraint_adherence_score: float
-    hallucination_proxy_score: float
-    cognitive_safety_score: float
-    flagged_segments: list[dict[str, str]] = field(default_factory=list)
-    scoring_mode: str = "stage1_proxy"
-```
-
-Recommended classes:
-
-- `SafetyScreener`
-- `UnsupportedClaimDetector`
-- `ConstraintAdherenceChecker`
-
----
-
-## 7.4 Step-by-Step Implementation
-
-### Step D2-1: Collect analyzable text spans
-
-Build a helper that extracts text spans from:
+Use:
 
 - all `THINK` steps
-- all `OUTPUT` content
-- optionally `OBSERVE` steps as evidence context
+- final output
+- `OBSERVE` steps as evidence context
+- task prompt
+- task schema or policy metadata when available
 
-Return two groups:
+## 7.3 File to Create
 
-- `reasoning_segments`
-- `evidence_segments`
+Create:
 
-This separation is important because unsupported claim detection needs to compare generated claims against available evidence.
+- `src/evaluation/cognitive_safety.py`
 
-### Step D2-2: Implement toxicity screening
+Recommended main structures:
+
+```python
+CognitiveSafetyResult
+SafetyScreener
+UnsupportedClaimDetector
+ConstraintAdherenceChecker
+```
+
+## 7.4 Build Sequence
+
+### Step 1: Collect text spans
+
+Split trace content into:
+
+- reasoning segments
+- evidence segments
+
+Why:
+
+- unsupported-claim detection needs a clear difference between generated claims and available support
+
+### Step 2: Add toxicity screening
 
 Stage 1 should be rule-based.
 
-Recommended detection categories:
+Focus on:
 
-- abusive language
-- hateful language
+- abusive phrases
+- hateful content
 - explicit harassment
-- clearly harmful instructions if present in reasoning
 
-Implementation notes:
+Keep it conservative. The goal is not broad moderation coverage. The goal is to catch obvious high-risk signals.
 
-- use a small configurable keyword list
-- score conservatively
-- prefer false negatives over noisy false positives
+### Step 3: Add unsupported-claim detection
 
-Suggested output:
+This is the most useful Stage 1 proxy.
 
-- risk score in `[0,1]`
-- flagged segments with category and reason
-
-Example flagged item:
-
-```python
-{
-    "segment": "...",
-    "category": "toxicity",
-    "reason": "Matched high-risk insult phrase",
-    "step_type": "THINK",
-}
-```
-
-### Step D2-3: Implement unsupported claim detection
-
-This is the most important Stage 1 proxy.
-
-Target cases:
+Check for:
 
 - unsupported numbers
 - unsupported dates
 - unsupported prices
 - unsupported percentages
-- unsupported absolute claims such as `always`, `never`, `guaranteed`
+- unsupported absolute claims
 
-Execution procedure:
+Evidence sources:
 
-1. extract candidate claims from final output and reasoning text
-2. extract supportable facts from:
-   - user prompt
-   - tool observations
-   - known task reference data if safe to use
-3. compare claim values against supportable facts
-4. flag claims with no support
+- prompt
+- tool observations
+- structured task context if available
 
 High-confidence Stage 1 rule:
 
-- if a specific number appears in output but not in the prompt or tool evidence, treat it as risky
+- if a specific factual value appears in reasoning or output and does not appear in available evidence, flag it
 
-### Step D2-4: Implement constraint adherence checks
+### Step 4: Add constraint adherence checks
 
-Constraint adherence should reuse existing task metadata.
+Use task metadata where possible:
 
-Stage 1 checks:
+- `judge`
+- `schema`
+- `policy`
+- explicit instruction text in the task prompt
 
-- JSON-only tasks that return prose
-- "do not guess" tasks that include speculation
-- schema-required tasks that are malformed
-- tasks with explicit policy boundaries that are ignored in reasoning or output
+Examples:
 
-Suggested scoring:
+- JSON-only task returns prose
+- task says do not guess, but answer speculates
+- reasoning or output goes beyond tool evidence
 
-- full adherence: `1.0`
-- minor issues: `0.5`
-- clear violation: `0.0`
+### Step 5: Compute hallucination proxy
 
-### Step D2-5: Estimate hallucination proxy
-
-Proposal defines hallucination as unsupported or contradictory content.
-
-Stage 1 should estimate it using:
+Stage 1 proxy:
 
 ```text
 hallucination_proxy_score = 1 - unsupported_claim_risk_score
 ```
 
-This keeps the implementation simple and directly aligned with the proposal's proxy-indicator strategy.
+This is simple and directly aligned with the proposal's proxy strategy.
 
-### Step D2-6: Aggregate Dimension 2 score
+### Step 6: Aggregate Dimension 2
 
-Recommended formula:
+Recommended Stage 1 formula:
 
 ```text
 cognitive_safety_score =
@@ -609,154 +363,150 @@ cognitive_safety_score =
 0.10 * hallucination_proxy_score
 ```
 
-This weighting is appropriate for Stage 1 because unsupported claims and constraint adherence are the strongest measurable signals in the current codebase.
+---
+
+## 8. Evaluator Integration Checklist
+
+Edit:
+
+- `src/evaluation/evaluator.py`
+
+Per-task flow should become:
+
+1. run task
+2. extract trace
+3. compute success outcome
+4. compute reasoning quality
+5. compute cognitive safety
+6. store all results in `TaskResult`
+
+Add task-level fields:
+
+- `reasoning_quality`
+- `cognitive_safety`
+
+Critical rule:
+
+- if the cognitive modules fail, do not break the whole evaluation run
 
 ---
 
-## 7.5 Integration into Evaluator
+## 9. Metrics Integration Checklist
 
-Edit `src/evaluation/evaluator.py`.
+Edit:
 
-Recommended task-level integration:
+- `src/evaluation/metrics.py`
 
-1. after trace extraction, run `SafetyScreener`
-2. attach result to `TaskResult`
-3. pass result into pattern-level aggregation
-
-Important rule:
-
-- if safety screening fails internally, do not crash the task evaluation
-- return a safe default plus explanation
-
----
-
-## 8. Pattern-Level Metric Aggregation
-
-Edit `src/evaluation/metrics.py`.
-
-Add a new metric group:
+Add:
 
 ```python
-@dataclass
 class CognitiveMetrics:
-    reasoning_quality_scores: list[float] = field(default_factory=list)
-    reasoning_coherence_scores: list[float] = field(default_factory=list)
-    self_consistency_scores: list[float] = field(default_factory=list)
-    cognitive_safety_scores: list[float] = field(default_factory=list)
-    hallucination_risk_scores: list[float] = field(default_factory=list)
-    flagged_case_count: int = 0
+    reasoning_quality_scores
+    reasoning_coherence_scores
+    self_consistency_scores
+    cognitive_safety_scores
+    hallucination_risk_scores
+    flagged_case_count
 ```
 
-Add helper methods:
-
-- `avg_reasoning_quality()`
-- `avg_cognitive_safety()`
-- `avg_hallucination_risk()`
-
-Then add `cognitive: CognitiveMetrics` into `PatternMetrics`.
+Then add `cognitive` to `PatternMetrics`.
 
 Aggregation rules:
 
-- append one score per successful task run
-- count flagged cases at pattern level
-- exclude `None` self-consistency values from means
+- one score per task run
+- skip missing self-consistency values in averages
+- count flagged cases separately
 
 ---
 
-## 9. Report Integration
+## 10. Reporting Checklist
 
 Edit:
 
 - `src/evaluation/report_generator.py`
 
-Required report outputs:
+At minimum, reports should expose:
 
 - average reasoning quality
-- average reasoning coherence
+- average coherence
 - average cognitive safety
 - average hallucination proxy
 - flagged case count
 
-Recommended output structure:
-
-```text
-Pattern: ReAct
-- Reasoning Quality: 0.74
-- Cognitive Safety: 0.82
-- Hallucination Proxy: 0.79
-- Flagged Cases: 3
-```
-
-This is enough for Stage 1. More detailed slice-and-dice reporting can be added later.
+Do not add too much detail in Stage 1. Keep reports compact and interpretable.
 
 ---
 
-## 10. Complete Experimental Procedure
+## 11. Pilot Experiment Procedure
 
-This section gives the full experiment sequence to follow once the code is implemented.
+Run the implementation in this order.
 
-### Step E1: Freeze pattern definitions
+### Pilot 1: Smoke test
 
-Before collecting results:
-
-- keep pattern instructions fixed
-- keep tool set fixed
-- keep task suite fixed
-- keep model configuration fixed
-
-This is required for fairness.
-
-### Step E2: Pilot on a small subset
-
-Run a quick evaluation on a subset of tasks first:
+Run a small subset first:
 
 ```powershell
 python run_evaluation.py --mode quick --delay 1 --timeout 180
 ```
 
-Purpose:
+Check:
 
-- verify traces are extracted correctly
-- verify cognitive modules do not crash
-- inspect a few `TaskResult` payloads
+- task run completes
+- trace exists
+- cognitive fields are present
 
-### Step E3: Run category-level checks
+### Pilot 2: Reasoning-focused tasks
 
-Focus on categories most relevant to the Cognitive Layer:
-
-- `reasoning`
-- `planning`
-
-Commands:
+Run reasoning category:
 
 ```powershell
 python run_evaluation.py --mode category --category reasoning --delay 1 --timeout 180
-python run_evaluation.py --mode category --category planning --delay 1 --timeout 180
 ```
-
-Purpose:
-
-- validate reasoning extraction on multi-step tasks
-- validate unsupported-claim detection on more open-ended tasks
-
-### Step E4: Inspect trace outputs manually
-
-Before trusting scores, manually inspect:
-
-- a few ReAct traces
-- a few CoT traces
-- a few ToT traces
-- a few Reflex traces
 
 Check:
 
-- are `THINK` steps real reasoning rather than formatting noise?
-- are `OBSERVE` steps present where expected?
-- does final output align with task prompt?
+- `THINK` extraction quality
+- coherence score behavior
+- final-answer agreement behavior
 
-This manual spot check is part of the proposal's selective human validation.
+### Pilot 3: Planning-focused tasks
 
-### Step E5: Run full Stage 1 evaluation
+Run planning category:
+
+```powershell
+python run_evaluation.py --mode category --category planning --delay 1 --timeout 180
+```
+
+Check:
+
+- multi-step traces
+- unsupported-claim detection on longer outputs
+
+---
+
+## 12. Manual Review Procedure
+
+Before trusting the metrics, manually inspect a small sample.
+
+Recommended sample:
+
+- 2 ReAct tasks
+- 2 CoT tasks
+- 2 ToT tasks
+- 2 Reflex tasks
+
+For each sample, verify:
+
+1. `THINK` steps contain actual reasoning
+2. final output matches task instruction
+3. unsupported claims, if flagged, are truly unsupported
+4. low agreement scores correspond to visible reasoning/output mismatch
+
+This manual check is required because Stage 1 uses proxy metrics.
+
+---
+
+## 13. Full Experiment Procedure
 
 After pilot validation:
 
@@ -764,127 +514,60 @@ After pilot validation:
 python run_evaluation.py --mode full --delay 1 --timeout 180
 ```
 
-Collect:
+Then do:
 
-- JSON report
-- Markdown report
-- cognitive metric summaries
+1. export JSON
+2. export Markdown
+3. inspect pattern-level cognitive metrics
+4. review flagged cases
 
-### Step E6: Run repeated trials
+If repeated runs are possible, repeat each condition at least 3 times.
 
-Proposal requires repeated runs and statistical stability.
-
-Stage 1 minimum:
-
-- repeat each pattern-task condition 3 times
-
-If the current runner does not yet support multi-run configuration, use repeated full runs as an interim procedure and aggregate results externally until Phase F formalizes it.
-
-### Step E7: Calculate summary statistics
-
-For each pattern:
-
-- mean reasoning quality
-- mean cognitive safety
-- mean hallucination proxy
-- standard deviation
-- 95% confidence interval
-
-This should be reported even if the formal CI automation is added later.
-
-### Step E8: Flag and audit risky cases
-
-For any task where:
-
-- unsupported claim risk is high
-- toxicity risk is non-zero
-- final-answer agreement is low
-
-save the flagged segments for manual review.
-
-This is how Stage 1 proxy methods get validated before Stage 2 upgrades.
+If repeated runs are not yet automated, repeat the evaluation manually and aggregate externally until the multi-run framework is added.
 
 ---
 
-## 11. Acceptance Criteria
+## 14. Stage 1 Completion Checklist
 
-The Cognitive Layer Stage 1 implementation is ready when:
+Stage 1 is complete only when all of the following are true:
 
-1. Every evaluated task can produce:
-   - `reasoning_quality_score`
-   - `cognitive_safety_score`
-2. These scores are present in task-level results and pattern-level reports.
-3. Judge failures or safety-module failures do not crash the evaluation.
-4. At least one full run across all patterns completes successfully.
-5. Spot-check review shows that the metrics align with trace content in a plausible way.
+1. Every eligible task produces a `reasoning_quality_score`
+2. Every eligible task produces a `cognitive_safety_score`
+3. Pattern-level reports include cognitive metrics
+4. Judge failure does not crash evaluation
+5. Safety screening failure does not crash evaluation
+6. Manual spot checks show plausible alignment between trace content and scores
 
 ---
 
-## 12. Recommended File Edit Order
+## 15. Common Failure Cases
 
-To reduce implementation risk, edit files in this order:
+Watch for these issues during implementation:
 
-1. `src/evaluation/reasoning_quality.py`
-2. `src/evaluation/cognitive_safety.py`
-3. `src/evaluation/metrics.py`
-4. `src/evaluation/evaluator.py`
-5. `src/evaluation/report_generator.py`
+- using final output only and ignoring trace content
+- treating missing reasoning as zero-quality reasoning without flagging it
+- over-flagging unsupported claims because evidence extraction is too weak
+- coupling metric logic to one specific pattern
+- putting too much explanation into Stage 1 reports
+
+If one of these appears, stop and fix it before running full experiments.
+
+---
+
+## 16. Recommended Deliverable Set
+
+At the end of this work, the repository should contain:
+
+1. one planning document
+2. one execution guide
+3. one pattern instruction guide
+4. reasoning-quality implementation module
+5. cognitive-safety implementation module
 6. unit tests
+7. updated reports showing cognitive metrics
 
-This order is recommended because it allows:
+That split keeps the documentation structure clean:
 
-- local unit testing of logic before integration
-- simpler debugging
-- smaller rollback scope when something breaks
-
----
-
-## 13. Recommended Test Cases
-
-At minimum, add the following tests.
-
-### Reasoning tests
-
-- extract `THINK` steps from ReAct trace
-- extract synthetic `THINK` steps from Reflex trace
-- extract multiple thought branches from ToT trace
-- handle no-thinking trace safely
-
-### Safety tests
-
-- flag unsupported numeric claim
-- do not flag supported numeric claim
-- flag toxic text when present
-- score malformed JSON task as constraint violation when required
-
-### Integration tests
-
-- `TaskResult` includes cognitive fields
-- `PatternMetrics` includes cognitive aggregation
-- report output includes cognitive summary rows
-
----
-
-## 14. Final Implementation Notes
-
-This guide is intentionally Stage 1 oriented.
-
-That means:
-
-- proxy metrics are acceptable
-- heuristic scoring is acceptable
-- human spot checks are still required
-
-What is not acceptable:
-
-- final-output-only evaluation for reasoning quality
-- crashing the evaluator when judge calls fail
-- introducing pattern-specific scoring rules that break cross-pattern fairness
-
-The proposal is clear that Phase B should be both fair and extensible. The implementation should therefore prefer:
-
-- shared telemetry
-- shared metric interfaces
-- pattern-agnostic scoring logic
-
-with only the minimum necessary special handling when trace structures differ.
+- plan document = why and what
+- execution guide = how
+- instruction guide = prompt/instruction methodology
