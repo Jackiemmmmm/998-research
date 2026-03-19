@@ -94,6 +94,7 @@ class LLMConfig:
                     model=model_name,
                     base_url=base_url,
                     temperature=0,
+                    num_ctx=49152,
                 )
             except ImportError:
                 # Fallback to init_chat_model

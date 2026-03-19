@@ -179,8 +179,8 @@ def main():
     parser.add_argument(
         "--concurrency",
         type=int,
-        default=2,
-        help="Max number of patterns to run concurrently in parallel mode (default: 2). "
+        default=1,
+        help="Max number of patterns to run concurrently in parallel mode (default: 1). "
              "Lower values reduce Ollama resource contention but increase total time."
     )
 
