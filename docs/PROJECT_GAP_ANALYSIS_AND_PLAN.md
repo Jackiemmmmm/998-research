@@ -436,3 +436,31 @@ Given the project timeline (Figure 1 in proposal: Stage 3 Full Evaluation is ~Ma
 | Token budget for multi-run experiments | Cost increase ~3-5x | Start with N=3, use cheaper models (Groq) for repeat runs |
 | Some proxy indicators may not correlate with proposal's intended measures | Academic rigor concern | Document assumptions clearly, cross-validate with human samples |
 | Scope creep from implementing all 7 dimensions fully | Timeline risk | Strict phase boundaries, implement Stage 1 proxies first |
+
+---
+
+## Part 6: Supplementary Spec Notes
+
+This supplementary section is appended for coordination purposes only. It does not replace the original phase-status table above.
+
+### 6.1 P2 Supplementary Specifications
+
+The following supplementary documents have been prepared from the P2 perspective in support of later implementation:
+
+| Phase | Scope | Supplementary Document | Current Status |
+|------|-------|------------------------|----------------|
+| **E** | Normalization & Composite Scoring | [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) | READY |
+| **D1** | Robustness & Scalability | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) | READY |
+| **F** | Statistical Rigor & Reproducibility | [week5-6_phase-f_statistical-rigor.md](./specs/week5-6_phase-f_statistical-rigor.md) | READY |
+
+### 6.2 Interpretation
+
+These supplementary specification documents should be interpreted as pre-implementation methodological artefacts. Their function is to support the proposal's requirements for:
+
+- 0-1 normalisation of sub-indicators
+- dimension-level and composite aggregation
+- robustness and scalability measurement
+- repeated trials with mean +/- 95% confidence intervals
+- sensitivity-analysis readiness
+
+The existence of a supplementary specification does not imply that the corresponding phase has already been implemented in code. Implementation status should continue to be determined by the main phase-status table and subsequent implementation documents.

@@ -313,3 +313,42 @@ Focus on the following to present effective results to the supervisor:
 - **End of Week 2, 4, 6**: Hard checkpoint reviews (against milestone acceptance criteria)
 - **Shared board**: Use GitHub Issues/Projects to track each Phase's status
 - **Code standards**: All code merged to main via PR review only
+
+---
+
+## 8. Supplementary Notes for P2
+
+This supplementary section is appended for clarification only. It does not alter the original weekly plan, role allocation, or milestone structure given above.
+
+### 8.1 P2 Working Principle
+
+From the P2 perspective, the immediate responsibility is not direct code implementation but the production of academically defensible **implementation specifications** that can be handed to P1 for execution. This division of labour is consistent with the plan's assignment of P2 to evaluation metric development, data analysis, and statistical methodology.
+
+Accordingly, P2's documentary contribution should satisfy four requirements:
+
+1. It must translate the proposal into technically executable formulas and interfaces.
+2. It must preserve comparability across patterns rather than optimise for any single agent design.
+3. It must define edge-case behaviour explicitly so that implementation decisions do not drift.
+4. It must support later reporting, statistical analysis, and appendix-level justification.
+
+### 8.2 P2 Supplementary Specification Documents
+
+The following documents serve as formal supplements to this 10-week plan:
+
+| Document | Role in the Project |
+|----------|---------------------|
+| [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) | Specifies the normalisation and composite scoring logic promised in the proposal |
+| [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) | Specifies the robustness and scalability metrics for the systemic layer |
+| [week5-6_phase-f_statistical-rigor.md](./specs/week5-6_phase-f_statistical-rigor.md) | Specifies repeated-run protocol, confidence intervals, and effect-size calculations |
+
+These documents should be read as supplementary methodological notes aligned with the weekly schedule, rather than as replacements for any task row in the original plan.
+
+### 8.3 Recommended Reading Order for P1
+
+To support efficient implementation handoff, the suggested review order is:
+
+1. Phase E specification
+2. Phase D1 specification
+3. Phase F specification
+
+This ordering reflects the fact that scoring logic provides the aggregation framework, robustness extends one major systemic dimension, and statistical rigor formalises the repeated-run evidence layer needed for final analysis.
