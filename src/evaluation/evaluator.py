@@ -19,6 +19,11 @@ from .metrics import (
 )
 from .trace import AgentTrace, TraceExtractor
 from .test_suite import TEST_SUITE, TestTask
+from .controllability import (
+    compute_controllability_result,
+    compute_resource_efficiency,
+)
+from .scoring import compute_all_scores, NormalizedDimensionScores, CompositeScore
 
 
 @dataclass
@@ -157,6 +162,26 @@ class PatternEvaluator:
         else:
             pass
 
+
+        # Phase D2: Pre-compute controllability data (without resource_efficiency,
+        # which requires cross-pattern normalisation done in evaluate_multiple_patterns)
+        from .controllability import compute_trace_completeness, compute_policy_violations
+        traces = [r.trace for r in original_results if r.trace is not None and r.success]
+        avg_tc, total_tao, total_steps = compute_trace_completeness(traces)
+        flag_rate, total_violations, tasks_with_v = compute_policy_violations(
+            original_results, test_tasks
+        )
+        from .controllability import ControllabilityResult
+        metrics._controllability_result_data = ControllabilityResult(
+            pattern_name=pattern_name,
+            trace_completeness=avg_tc,
+            tao_cycles=total_tao,
+            total_steps=total_steps,
+            policy_flag_rate=flag_rate,
+            total_violations=total_violations,
+            tasks_with_violations=tasks_with_v,
+            resource_efficiency=0.0,  # Placeholder, set in evaluate_multiple_patterns
+        )
 
         return metrics
 
@@ -472,11 +497,34 @@ class PatternEvaluator:
                 if result.schema_compliant:
                     controllability_metrics.schema_compliant_tasks += 1
 
-        # Tool policy compliance (simplified - would need actual tool tracking)
-        tool_tasks = [t for t in tasks if t.plan is not None]
+        # Tool policy compliance — actual violation detection via trace data
+        tool_tasks = [t for t in tasks if t.policy and "tool_whitelist" in t.policy]
         controllability_metrics.total_tool_tasks = len(tool_tasks)
-        # Assume compliant unless we detect violations (would need instrumentation)
-        controllability_metrics.tool_policy_compliant_tasks = len(tool_tasks)
+
+        # Build task lookup for whitelist checking
+        task_lookup = {t.id: t for t in tasks}
+        compliant_count = 0
+        total_unauthorized = 0
+
+        for task_def in tool_tasks:
+            whitelist = set(task_def.policy["tool_whitelist"])
+            result = next((r for r in results if r.task_id == task_def.id), None)
+            if result is None or result.trace is None:
+                compliant_count += 1  # No trace = no evidence of violation
+                continue
+
+            task_violated = False
+            for step in result.trace.steps:
+                for tc in step.tool_calls:
+                    if tc.tool_name not in whitelist:
+                        total_unauthorized += 1
+                        task_violated = True
+
+            if not task_violated:
+                compliant_count += 1
+
+        controllability_metrics.tool_policy_compliant_tasks = compliant_count
+        controllability_metrics.unauthorized_tool_uses = total_unauthorized
 
         # Format compliance
         successful_results = [r for r in results if r.success]
@@ -545,5 +593,39 @@ async def evaluate_multiple_patterns(
 
     # Print comparison
     MetricsAggregator.compare_patterns(results)
+
+    # --- Phase D2: Compute controllability results (cross-pattern) ---
+    # Collect avg tokens per pattern for resource efficiency normalisation
+    all_pattern_tokens = {
+        name: metrics.efficiency.avg_total_tokens()
+        for name, metrics in results.items()
+    }
+    resource_efficiencies = compute_resource_efficiency(all_pattern_tokens)
+
+    # Compute ControllabilityResult for each pattern
+    # We need TaskResult lists — re-evaluate from stored evaluator data
+    # Since evaluators are local, we compute from PatternMetrics + stored results
+    # For now, compute from the metrics we have; trace-based metrics require
+    # the evaluator to store results, which we handle via a callback approach.
+    controllability_results = {}
+    for name, metrics in results.items():
+        re_val = resource_efficiencies.get(name, 1.0)
+        # Trace completeness and policy violations are collected per-evaluator
+        # and stored on PatternMetrics via the evaluator callback below
+        cr = getattr(metrics, '_controllability_result_data', None)
+        if cr is not None:
+            cr.resource_efficiency = re_val
+            controllability_results[name] = cr
+            metrics.controllability_result = cr
+
+    # --- Phase E: Compute normalised scores and composite scores ---
+    normalised_scores, composite_scores = compute_all_scores(
+        results, controllability_results
+    )
+
+    # Attach to results for downstream report generation
+    for name in results:
+        results[name]._normalised_scores = normalised_scores.get(name)
+        results[name]._composite_score = composite_scores.get(name)
 
     return results

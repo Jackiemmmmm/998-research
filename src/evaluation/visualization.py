@@ -68,6 +68,14 @@ class EvaluationVisualizer:
         path = self.plot_success_by_category(pattern_metrics)
         generated_files.append(path)
 
+        # 7. Normalised dimension heatmap (Phase E)
+        has_normalised = any(
+            getattr(m, '_normalised_scores', None) is not None
+            for m in pattern_metrics.values()
+        )
+        if has_normalised:
+            path = self.plot_normalised_heatmap(pattern_metrics)
+            generated_files.append(path)
 
         return generated_files
 
@@ -243,30 +251,67 @@ class EvaluationVisualizer:
         self,
         pattern_metrics: Dict[str, PatternMetrics],
     ) -> str:
-        """Plot radar chart comparing all dimensions."""
+        """Plot radar chart comparing all dimensions.
+
+        Uses Phase E normalised dimension scores if available (7-dim capable),
+        otherwise falls back to raw 4-dimension comparison.
+        """
         patterns = list(pattern_metrics.keys())
 
-        # Prepare data (normalize to 0-100 scale)
-        categories = ['Success', 'Efficiency\n(inverse latency)', 'Robustness', 'Controllability']
-        N = len(categories)
+        # Try Phase E normalised scores first
+        has_normalised = any(
+            getattr(m, '_normalised_scores', None) is not None
+            for m in pattern_metrics.values()
+        )
 
-        data = []
-        for metrics in pattern_metrics.values():
-            # Success: 0-100
-            success = metrics.success.success_rate() * 100
+        if has_normalised:
+            # 7-dimension radar (show available dims)
+            dim_labels = {
+                'dim1_reasoning_quality': 'Dim1\nReasoning',
+                'dim2_cognitive_safety': 'Dim2\nCog Safety',
+                'dim3_action_decision_alignment': 'Dim3\nAlignment',
+                'dim4_success_efficiency': 'Dim4\nSuccess',
+                'dim5_behavioural_safety': 'Dim5\nBeh Safety',
+                'dim6_robustness_scalability': 'Dim6\nRobustness',
+                'dim7_controllability': 'Dim7\nControl',
+            }
 
-            # Efficiency: inverse of latency, normalized (higher is better)
-            # Assume max latency is 10s for normalization
-            latency = metrics.efficiency.avg_latency()
-            efficiency = max(0, (10 - latency) / 10 * 100)
+            # Determine which dims have data across any pattern
+            active_dims = []
+            for dim_key in dim_labels:
+                for metrics in pattern_metrics.values():
+                    ns = getattr(metrics, '_normalised_scores', None)
+                    if ns and getattr(ns, dim_key, None) is not None:
+                        active_dims.append(dim_key)
+                        break
 
-            # Robustness: 100 - degradation percentage
-            robustness = 100 - metrics.robustness.degradation_percentage
+            if not active_dims:
+                active_dims = ['dim4_success_efficiency', 'dim6_robustness_scalability', 'dim7_controllability']
 
-            # Controllability: 0-100
-            controllability = metrics.controllability.overall_controllability() * 100
+            categories = [dim_labels[d] for d in active_dims]
+            N = len(categories)
 
-            data.append([success, efficiency, robustness, controllability])
+            data = []
+            for metrics in pattern_metrics.values():
+                ns = getattr(metrics, '_normalised_scores', None)
+                row = []
+                for dim_key in active_dims:
+                    val = getattr(ns, dim_key, None) if ns else None
+                    row.append((val or 0.0) * 100)
+                data.append(row)
+        else:
+            # Fallback: raw 4-dimension
+            categories = ['Success', 'Efficiency\n(inverse latency)', 'Robustness', 'Controllability']
+            N = len(categories)
+
+            data = []
+            for metrics in pattern_metrics.values():
+                success = metrics.success.success_rate() * 100
+                latency = metrics.efficiency.avg_latency()
+                efficiency = max(0, (10 - latency) / 10 * 100)
+                robustness = 100 - metrics.robustness.degradation_percentage
+                controllability = metrics.controllability.overall_controllability() * 100
+                data.append([success, efficiency, robustness, controllability])
 
         # Radar chart
         angles = [n / float(N) * 2 * np.pi for n in range(N)]
@@ -293,6 +338,59 @@ class EvaluationVisualizer:
 
         plt.tight_layout()
         output_path = self.output_dir / "radar_comparison.png"
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+
+        return str(output_path)
+
+    def plot_normalised_heatmap(
+        self,
+        pattern_metrics: Dict[str, PatternMetrics],
+    ) -> str:
+        """Plot normalised dimension scores as a heatmap."""
+        patterns = list(pattern_metrics.keys())
+
+        dim_keys = [
+            ('dim4_success_efficiency', 'Dim 4\nSuccess'),
+            ('dim6_robustness_scalability', 'Dim 6\nRobustness'),
+            ('dim7_controllability', 'Dim 7\nControl'),
+        ]
+
+        # Build data matrix
+        data = []
+        for metrics in pattern_metrics.values():
+            ns = getattr(metrics, '_normalised_scores', None)
+            row = []
+            for key, _ in dim_keys:
+                val = getattr(ns, key, None) if ns else None
+                row.append(val if val is not None else 0.0)
+            data.append(row)
+
+        data_np = np.array(data)
+        dim_labels = [label for _, label in dim_keys]
+
+        fig, ax = plt.subplots(figsize=(10, max(4, len(patterns) * 0.8)))
+
+        im = ax.imshow(data_np, cmap='RdYlGn', aspect='auto', vmin=0, vmax=1)
+
+        # Annotations
+        for i in range(len(patterns)):
+            for j in range(len(dim_labels)):
+                val = data_np[i, j]
+                text_color = 'white' if val < 0.3 or val > 0.85 else 'black'
+                ax.text(j, i, f'{val:.3f}', ha='center', va='center',
+                        fontsize=11, fontweight='bold', color=text_color)
+
+        ax.set_xticks(np.arange(len(dim_labels)))
+        ax.set_xticklabels(dim_labels, fontsize=10)
+        ax.set_yticks(np.arange(len(patterns)))
+        ax.set_yticklabels(patterns, fontsize=10)
+        ax.set_title('Normalised Dimension Scores', fontsize=14, fontweight='bold')
+
+        fig.colorbar(im, ax=ax, label='Score (0–1)', shrink=0.8)
+
+        plt.tight_layout()
+        output_path = self.output_dir / "normalised_heatmap.png"
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
 

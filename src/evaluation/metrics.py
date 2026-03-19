@@ -245,19 +245,25 @@ class PatternMetrics:
     robustness: RobustnessMetrics = field(default_factory=RobustnessMetrics)
     controllability: ControllabilityMetrics = field(default_factory=ControllabilityMetrics)
 
+    # Phase D2: extended controllability result (set after cross-pattern computation)
+    controllability_result: Any = None  # Optional[ControllabilityResult], avoid circular import
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
-        return {
+        d = {
             "pattern_name": self.pattern_name,
             "success": self.success.to_dict(),
             "efficiency": self.efficiency.to_dict(),
             "robustness": self.robustness.to_dict(),
             "controllability": self.controllability.to_dict(),
         }
+        if self.controllability_result is not None:
+            d["controllability_extended"] = self.controllability_result.to_dict()
+        return d
 
     def summary(self) -> Dict[str, Any]:
         """Get summary metrics."""
-        return {
+        s = {
             "pattern": self.pattern_name,
             "success_rate_strict": round(self.success.success_rate(), 3),
             "success_rate_lenient": round(self.success.lenient_success_rate(), 3),
@@ -267,6 +273,11 @@ class PatternMetrics:
             "degradation_pct": round(self.robustness.degradation_percentage, 2),
             "controllability": round(self.controllability.overall_controllability(), 3),
         }
+        if self.controllability_result is not None:
+            s["trace_completeness"] = round(self.controllability_result.trace_completeness, 3)
+            s["policy_flag_rate"] = round(self.controllability_result.policy_flag_rate, 3)
+            s["resource_efficiency"] = round(self.controllability_result.resource_efficiency, 3)
+        return s
 
 
 class MetricsAggregator:

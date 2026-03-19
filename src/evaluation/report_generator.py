@@ -39,6 +39,27 @@ class ReportGenerator:
             "comparison": MetricsAggregator.compare_patterns(pattern_metrics),
         }
 
+        # Phase E: Add normalised scores and composite scores if available
+        normalised = {}
+        composites = {}
+        for name, metrics in pattern_metrics.items():
+            ns = getattr(metrics, '_normalised_scores', None)
+            cs = getattr(metrics, '_composite_score', None)
+            if ns is not None:
+                normalised[name] = ns.to_dict()
+            if cs is not None:
+                composites[name] = cs.to_dict()
+        if normalised:
+            report["normalised_dimension_scores"] = normalised
+        if composites:
+            report["composite_scores"] = composites
+            # Add ranking
+            ranked = sorted(composites.items(), key=lambda x: x[1]["composite"], reverse=True)
+            report["composite_ranking"] = [
+                {"rank": i + 1, "pattern": name, "composite": data["composite"]}
+                for i, (name, data) in enumerate(ranked)
+            ]
+
         # Save to file if path provided
         if output_path:
             Path(output_path).parent.mkdir(parents=True, exist_ok=True)
@@ -160,7 +181,62 @@ class ReportGenerator:
             lines.append(f"  - Schema Compliance: {ctrl['schema_compliance_rate']:.1%}")
             lines.append(f"  - Tool Policy Compliance: {ctrl['tool_policy_compliance_rate']:.1%}")
             lines.append(f"  - Format Compliance: {ctrl['format_compliance_rate']:.1%}")
+            lines.append(f"  - Unauthorized Tool Uses: {ctrl['unauthorized_tool_uses']}")
+            # Phase D2 extended metrics
+            cr = getattr(metrics, 'controllability_result', None)
+            if cr is not None:
+                lines.append(f"  - Trace Completeness: {cr.trace_completeness:.3f}")
+                lines.append(f"  - Policy Flag Rate: {cr.policy_flag_rate:.3f}")
+                lines.append(f"  - Resource Efficiency: {cr.resource_efficiency:.3f}")
             lines.append("")
+
+        # Phase E: Normalised Dimension Scores
+        has_normalised = any(
+            getattr(m, '_normalised_scores', None) is not None
+            for m in pattern_metrics.values()
+        )
+        if has_normalised:
+            lines.append("## 5. Normalised Dimension Scores")
+            lines.append("")
+            lines.append("| Pattern | Dim 4 (Success) | Dim 6 (Robust) | Dim 7 (Control) | Composite |")
+            lines.append("|---------|----------------|----------------|-----------------|-----------|")
+            for name, metrics in pattern_metrics.items():
+                ns = getattr(metrics, '_normalised_scores', None)
+                cs = getattr(metrics, '_composite_score', None)
+                d4 = f"{ns.dim4_success_efficiency:.3f}" if ns and ns.dim4_success_efficiency is not None else "N/A"
+                d6 = f"{ns.dim6_robustness_scalability:.3f}" if ns and ns.dim6_robustness_scalability is not None else "N/A"
+                d7 = f"{ns.dim7_controllability:.3f}" if ns and ns.dim7_controllability is not None else "N/A"
+                comp = f"{cs.composite:.3f}" if cs else "N/A"
+                lines.append(f"| {name:12s} | {d4:14s} | {d4:14s} | {d7:15s} | {comp:9s} |")
+            lines.append("")
+
+            # Reserve indicators
+            lines.append("### Reserve Indicators (★)")
+            lines.append("")
+            lines.append("| Pattern | Norm Steps | Norm Tool Calls | Norm TAO Cycles |")
+            lines.append("|---------|-----------|-----------------|-----------------|")
+            for name, metrics in pattern_metrics.items():
+                ns = getattr(metrics, '_normalised_scores', None)
+                if ns:
+                    s = f"{ns.norm_avg_steps:.3f}" if ns.norm_avg_steps is not None else "N/A"
+                    tc = f"{ns.norm_avg_tool_calls:.3f}" if ns.norm_avg_tool_calls is not None else "N/A"
+                    tao = f"{ns.norm_tao_cycles:.3f}" if ns.norm_tao_cycles is not None else "N/A"
+                    lines.append(f"| {name:12s} | {s:9s} | {tc:15s} | {tao:15s} |")
+            lines.append("")
+
+            # Composite ranking
+            composites = []
+            for name, metrics in pattern_metrics.items():
+                cs = getattr(metrics, '_composite_score', None)
+                if cs:
+                    composites.append((name, cs.composite))
+            if composites:
+                composites.sort(key=lambda x: x[1], reverse=True)
+                lines.append("### Composite Score Ranking")
+                lines.append("")
+                for rank, (name, score) in enumerate(composites, 1):
+                    lines.append(f"{rank}. **{name}**: {score:.4f}")
+                lines.append("")
 
         # Recommendations
         lines.append("## 5. Recommendations")
@@ -208,11 +284,16 @@ class ReportGenerator:
 
         # Build CSV
         lines = []
-        lines.append("Pattern,Success Rate (Strict),Success Rate (Lenient),Controllability Gap,Avg Latency (s),Avg Tokens,Degradation (%),Controllability")
+        header = "Pattern,Success Rate (Strict),Success Rate (Lenient),Controllability Gap,Avg Latency (s),Avg Tokens,Degradation (%),Controllability"
+        # D2 + E columns
+        header += ",Trace Completeness,Policy Flag Rate,Resource Efficiency,Dim4,Dim6,Dim7,Composite"
+        lines.append(header)
 
         for row in comparison["summary_table"]:
-            lines.append(
-                f"{row['pattern']},"
+            pname = row['pattern']
+            metrics = pattern_metrics.get(pname)
+            line = (
+                f"{pname},"
                 f"{row['success_rate_strict']:.3f},"
                 f"{row['success_rate_lenient']:.3f},"
                 f"{row['controllability_gap']:.3f},"
@@ -221,6 +302,21 @@ class ReportGenerator:
                 f"{row['degradation_pct']:.2f},"
                 f"{row['controllability']:.3f}"
             )
+            # D2 sub-indicators
+            cr = getattr(metrics, 'controllability_result', None) if metrics else None
+            if cr:
+                line += f",{cr.trace_completeness:.4f},{cr.policy_flag_rate:.4f},{cr.resource_efficiency:.4f}"
+            else:
+                line += ",,,"
+            # E normalised scores
+            ns = getattr(metrics, '_normalised_scores', None) if metrics else None
+            cs = getattr(metrics, '_composite_score', None) if metrics else None
+            d4 = f"{ns.dim4_success_efficiency:.4f}" if ns and ns.dim4_success_efficiency is not None else ""
+            d6 = f"{ns.dim6_robustness_scalability:.4f}" if ns and ns.dim6_robustness_scalability is not None else ""
+            d7 = f"{ns.dim7_controllability:.4f}" if ns and ns.dim7_controllability is not None else ""
+            comp = f"{cs.composite:.4f}" if cs else ""
+            line += f",{d4},{d6},{d7},{comp}"
+            lines.append(line)
 
         csv = "\n".join(lines)
 

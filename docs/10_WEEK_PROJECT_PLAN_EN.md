@@ -133,8 +133,8 @@ Update the `Status` field in the spec header as it progresses.
 
 | Spec | Owner | Phase | Status |
 |------|-------|-------|--------|
-| [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) | P2 | Phase E | DRAFT |
-| [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) | P3 | Phase D2 | DRAFT |
+| [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) | P2 | Phase E | READY FOR IMPLEMENTATION |
+| [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) | P3 | Phase D2 | READY FOR IMPLEMENTATION |
 
 ---
 
@@ -148,7 +148,7 @@ Update the `Status` field in the spec header as it progresses.
 |--------|------|---------|-------------|
 | P1 | Agent end-to-end stabilisation | Fix all 4 agents to run successfully under `run_evaluation.py`; ensure every pattern passes all 16 tasks; unify error handling | Run logs showing all 4 patterns passing |
 | P2 | [Phase E](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-e-normalization-aggregation--composite-scoring): Normalisation + Composite Scoring | Write [Implementation Spec](./specs/week1-2_phase-e_normalisation.md) defining normalisation formula, dimension-to-sub-indicator mapping, composite scoring formula, edge cases, and verification cases. P1 implements after spec is READY. | Completed spec → P1 delivers new modules in `src/evaluation/scoring.py` |
-| P3 | [Phase D2](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-d-systemic-layer-enhancement-dimensions-6--7): Controllability Completion | Write [Implementation Spec](./specs/week1-2_phase-d2_controllability.md) defining trace completeness formula, policy-flag rate calculation, resource efficiency normalisation, edge cases, and verification cases. P1 implements after spec is READY. | Completed spec → P1 delivers updated `ControllabilityMetrics` |
+| P3 | [Phase D2](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-d-systemic-layer-enhancement-dimensions-6--7): Controllability Completion | Write [Implementation Spec](./specs/week1-2_phase-d2_controllability.md) defining trace completeness formula, policy-flag rate calculation, resource efficiency normalisation, edge cases, and verification cases. P1 implements after spec is READY. | Completed spec → P1 delivers new `ControllabilityResult` in `src/evaluation/controllability.py`; fixes stubbed policy check in `evaluator.py`; Dim 7 aggregation owned by Phase E |
 
 **Acceptance Criteria**: `python run_evaluation.py --mode full` succeeds for all 4 patterns and outputs scores
 

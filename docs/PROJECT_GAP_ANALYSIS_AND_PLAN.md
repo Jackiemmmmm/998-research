@@ -14,8 +14,8 @@
 | **C1** | Action–Decision Alignment (Dim 3) | NOT STARTED | — (P1 self-drives, Week 3–4) | — |
 | **C3** | Behavioural Safety (Dim 5) | NOT STARTED | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) (P3, PENDING) | — |
 | **D1** | Enhanced Robustness (Dim 6) | NOT STARTED | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) (P2, PENDING) | — |
-| **D2** | Controllability & Transparency (Dim 7) | NOT STARTED | [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) (P3, DRAFT) | — |
-| **E** | Normalization & Composite Scoring | NOT STARTED | [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) (P2, DRAFT) | — |
+| **D2** | Controllability & Transparency (Dim 7) | NOT STARTED | [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) (P3, READY FOR IMPLEMENTATION) | — |
+| **E** | Normalization & Composite Scoring | NOT STARTED | [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) (P2, READY FOR IMPLEMENTATION) | — |
 | **F** | Statistical Rigor & Reproducibility | NOT STARTED | [week5-6_phase-f_statistical-rigor.md](./specs/week5-6_phase-f_statistical-rigor.md) (P2, PENDING) | — |
 | **G** | Report & Visualization Polish | NOT STARTED | — | — |
 
@@ -314,32 +314,48 @@ Adopted a **post-hoc message parsing** strategy instead of modifying pattern int
   - Compute mean, std, 95% CI for all metrics
 
 **D2. Complete Controllability, Transparency & Resource Efficiency (Dimension 7)**
-- Transparency: compute trace completeness
-  - `trace_completeness = steps_with_full_TAO / total_steps` (TAO = think-act-observe)
-- Resource Efficiency: normalize token/time costs to 0-1
+
+> **Spec**: [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) — READY FOR IMPLEMENTATION
+
+- Transparency: compute trace completeness via TAO cycle proportion
+  - `trace_completeness = (tao_cycles * 3) / len(steps)` — measures proportion of steps in complete THINK→ACT→OBSERVE sequences
+- Policy compliance: replace stubbed tool policy check (currently hardcoded to 100%) with actual `ToolCallRecord.tool_name` vs `TestTask.policy.tool_whitelist` comparison
+  - `policy_flag_rate = tasks_with_violations / total_tool_tasks`
+- Resource Efficiency: `resource_efficiency = 1 - norm(total_tokens)` where norm = min-max across patterns
+- D2 produces sub-indicators only; **Dim 7 aggregation is owned by Phase E** using unified 5-indicator formula
 - (Optional Stage 2) Add runtime override test: measure stop/redo success rate
 - (Optional Stage 2) Add judge-LLM clarity assessment for trace readability
 
 **Files to create/modify:**
-- `src/evaluation/evaluator.py` (MODIFY - add multi-run, temperature sweep)
-- `src/evaluation/metrics.py` (MODIFY - add transparency metrics, normalization)
-- `src/evaluation/robustness.py` (NEW - perturbation generation, scaling tests)
+- `src/evaluation/controllability.py` (NEW — `ControllabilityResult` dataclass, trace completeness, policy violation detection, resource efficiency)
+- `src/evaluation/evaluator.py` (MODIFY — replace stubbed policy check at line 479 with actual tool whitelist enforcement)
+- `src/evaluation/metrics.py` (MODIFY — add `ControllabilityResult` reference to `PatternMetrics`; fix `unauthorized_tool_uses` and `tool_policy_compliant_tasks`)
+- `src/evaluation/report_generator.py` (MODIFY — add trace completeness, policy flag rate, resource efficiency to output)
 
 ---
 
 ### Phase E: Normalization, Aggregation & Composite Scoring
 
+> **Spec**: [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) — READY FOR IMPLEMENTATION
+
 **E1. Implement 0-1 normalization for all sub-indicators**
-- Min-max normalization across patterns for each sub-indicator
-- Handle edge cases (all same value, missing data)
+- Hybrid strategy: Option B (use directly) for indicators already in [0, 1]; Option A (min-max) for unbounded indicators (latency, tokens, steps)
+- Inversion (`1 - normalised`) for lower-is-better metrics (latency, tokens, degradation)
+- Normalisation scope: per single run only, not across historical runs
+- Handle edge cases: all same value → 1.0; single pattern → 1.0; x_max == x_min → 1.0; missing → None
 
 **E2. Implement dimension-level scoring**
-- Average sub-indicators within each dimension
-- 7 dimension scores, each in [0, 1]
+- Sub-indicator weights default to uniform (1/N), to be refined after first complete data run
+- Dim 4 (Success & Efficiency): `(1/3) * success_rate + (1/3) * norm_latency + (1/3) * norm_tokens`
+- Dim 6 (Robustness): `(1/3) * norm_degradation + (1/3) * recovery_rate + (1/3) * robustness_score`
+- Dim 7 (Controllability): unified 5-indicator formula combining Phase D2 outputs with existing metrics:
+  `(1/5) * trace_completeness + (1/5) * policy_compliance + (1/5) * resource_efficiency + (1/5) * schema_compliance + (1/5) * format_compliance`
+- Dim 1, 2, 3, 5: output None until implemented in future phases
+- Missing sub-indicators excluded from aggregation; dimension score computed from remaining indicators
 
 **E3. Implement composite scoring**
-- Uniform weighting (default): `composite = mean(7 dimension scores)`
-- Weighted option: configurable weights per dimension
+- Uniform weighting (default): `composite = mean(available dimension scores)` — currently 1/3 across Dim 4/6/7; automatically becomes 1/7 when all dimensions are implemented
+- Custom weights supported via config (`Dict[str, float]`) to override defaults
 - Sensitivity analysis: vary weights and observe rank stability
 
 **E4. Update report generation**
@@ -349,9 +365,10 @@ Adopted a **post-hoc message parsing** strategy instead of modifying pattern int
 - Add sensitivity analysis results
 
 **Files to create/modify:**
-- `src/evaluation/scoring.py` (NEW - normalization, aggregation, composite)
-- `src/evaluation/report_generator.py` (MODIFY)
-- `src/evaluation/visualization.py` (MODIFY - add 7-dimension radar, heatmap)
+- `src/evaluation/scoring.py` (NEW — normalization, dimension aggregation, composite scoring, custom weight support)
+- `src/evaluation/report_generator.py` (MODIFY — add normalised score tables, dimension comparison, composite ranking)
+- `src/evaluation/visualization.py` (MODIFY — add 7-dimension radar chart, normalised heatmap)
+- `src/evaluation/evaluator.py` (MODIFY — call `scoring.py` before `evaluate_multiple_patterns()` returns)
 
 ---
 
