@@ -1,0 +1,904 @@
+{
+  "metadata": {
+    "generated_at": "2026-03-22T18:03:03.122963",
+    "patterns_evaluated": [
+      "Baseline",
+      "ReAct",
+      "ReAct_Enhanced",
+      "CoT",
+      "Reflex",
+      "ToT"
+    ],
+    "total_patterns": 6
+  },
+  "individual_metrics": {
+    "Baseline": {
+      "pattern_name": "Baseline",
+      "success": {
+        "total_tasks": 16,
+        "successful_tasks_strict": 13,
+        "successful_tasks_lenient": 13,
+        "failed_tasks": 3,
+        "partial_success_tasks": 0,
+        "success_rate_strict": 0.812,
+        "success_rate_lenient": 0.812,
+        "controllability_gap": 0.0,
+        "failure_rate": 0.188,
+        "success_by_category": {
+          "baseline": 1.0,
+          "reasoning": 1.0,
+          "tool": 0.25,
+          "planning": 1.0
+        },
+        "success_by_complexity": {
+          "medium": 0.625,
+          "simple": 1.0,
+          "complex": 1.0
+        }
+      },
+      "efficiency": {
+        "avg_latency_sec": 3.04,
+        "median_latency_sec": 1.35,
+        "min_latency_sec": 0.49,
+        "max_latency_sec": 14.36,
+        "avg_total_tokens": 195.5,
+        "total_input_tokens": 2592,
+        "total_output_tokens": 536,
+        "avg_steps": 2,
+        "avg_tool_calls": 0,
+        "total_tasks": 16
+      },
+      "robustness": {
+        "original_success_rate": 0.812,
+        "perturbed_success_rate": 0.562,
+        "degradation_percentage": 30.77,
+        "tool_failure_recovery_rate": 0.0,
+        "tool_failure_graceful_degradation": 0.0,
+        "avg_robustness_score": 0.688,
+        "task_robustness_scores": {
+          "A1": 1.0,
+          "A2": 0.5,
+          "A3": 1.0,
+          "A4": 1.0,
+          "B1": 1.0,
+          "B2": 0.5,
+          "B3": 1.0,
+          "B4": 1.0,
+          "C1": 0.0,
+          "C2": 0.0,
+          "C3": 1.0,
+          "C4": 0.0,
+          "D1": 1.0,
+          "D2": 1.0,
+          "D3": 0.5,
+          "D4": 0.5
+        }
+      },
+      "controllability": {
+        "schema_compliance_rate": 0.625,
+        "tool_policy_compliance_rate": 1.0,
+        "format_compliance_rate": 0.812,
+        "avg_interpretability_score": 0.0,
+        "overall_controllability": 0.812,
+        "total_json_tasks": 8,
+        "schema_compliant_tasks": 5,
+        "total_tool_tasks": 4,
+        "tool_policy_compliant_tasks": 4,
+        "unauthorized_tool_uses": 0
+      },
+      "controllability_extended": {
+        "pattern_name": "Baseline",
+        "trace_completeness": 0.0,
+        "tao_cycles": 0,
+        "total_steps": 32,
+        "policy_flag_rate": 0.0,
+        "total_violations": 0,
+        "tasks_with_violations": 0,
+        "resource_efficiency": 1.0
+      }
+    },
+    "ReAct": {
+      "pattern_name": "ReAct",
+      "success": {
+        "total_tasks": 16,
+        "successful_tasks_strict": 10,
+        "successful_tasks_lenient": 10,
+        "failed_tasks": 6,
+        "partial_success_tasks": 0,
+        "success_rate_strict": 0.625,
+        "success_rate_lenient": 0.625,
+        "controllability_gap": 0.0,
+        "failure_rate": 0.375,
+        "success_by_category": {
+          "baseline": 0.5,
+          "reasoning": 0.75,
+          "tool": 0.5,
+          "planning": 0.75
+        },
+        "success_by_complexity": {
+          "medium": 0.625,
+          "simple": 0.5,
+          "complex": 0.75
+        }
+      },
+      "efficiency": {
+        "avg_latency_sec": 7.46,
+        "median_latency_sec": 5.47,
+        "min_latency_sec": 4.18,
+        "max_latency_sec": 20.09,
+        "avg_total_tokens": 1027.2,
+        "total_input_tokens": 14056,
+        "total_output_tokens": 2379,
+        "avg_steps": 4.9,
+        "avg_tool_calls": 1,
+        "total_tasks": 16
+      },
+      "robustness": {
+        "original_success_rate": 0.625,
+        "perturbed_success_rate": 0.5,
+        "degradation_percentage": 20.0,
+        "tool_failure_recovery_rate": 0.0,
+        "tool_failure_graceful_degradation": 0.0,
+        "avg_robustness_score": 0.562,
+        "task_robustness_scores": {
+          "A1": 1.0,
+          "A2": 0.0,
+          "A3": 1.0,
+          "A4": 0.0,
+          "B1": 1.0,
+          "B2": 0.0,
+          "B3": 1.0,
+          "B4": 1.0,
+          "C1": 0.5,
+          "C2": 0.0,
+          "C3": 1.0,
+          "C4": 0.0,
+          "D1": 1.0,
+          "D2": 1.0,
+          "D3": 0.0,
+          "D4": 0.5
+        }
+      },
+      "controllability": {
+        "schema_compliance_rate": 0.5,
+        "tool_policy_compliance_rate": 1.0,
+        "format_compliance_rate": 0.625,
+        "avg_interpretability_score": 0.0,
+        "overall_controllability": 0.708,
+        "total_json_tasks": 8,
+        "schema_compliant_tasks": 4,
+        "total_tool_tasks": 4,
+        "tool_policy_compliant_tasks": 4,
+        "unauthorized_tool_uses": 0
+      },
+      "controllability_extended": {
+        "pattern_name": "ReAct",
+        "trace_completeness": 0.5563,
+        "tao_cycles": 15,
+        "total_steps": 78,
+        "policy_flag_rate": 0.0,
+        "total_violations": 0,
+        "tasks_with_violations": 0,
+        "resource_efficiency": 0.6555
+      }
+    },
+    "ReAct_Enhanced": {
+      "pattern_name": "ReAct_Enhanced",
+      "success": {
+        "total_tasks": 16,
+        "successful_tasks_strict": 12,
+        "successful_tasks_lenient": 14,
+        "failed_tasks": 4,
+        "partial_success_tasks": 0,
+        "success_rate_strict": 0.75,
+        "success_rate_lenient": 0.875,
+        "controllability_gap": 0.125,
+        "failure_rate": 0.25,
+        "success_by_category": {
+          "baseline": 0.5,
+          "reasoning": 1.0,
+          "tool": 0.75,
+          "planning": 0.75
+        },
+        "success_by_complexity": {
+          "medium": 0.875,
+          "simple": 0.5,
+          "complex": 0.75
+        }
+      },
+      "efficiency": {
+        "avg_latency_sec": 18.04,
+        "median_latency_sec": 5.9,
+        "min_latency_sec": 4.35,
+        "max_latency_sec": 135.32,
+        "avg_total_tokens": 2609.7,
+        "total_input_tokens": 33452,
+        "total_output_tokens": 5694,
+        "avg_steps": 6.4,
+        "avg_tool_calls": 3.4,
+        "total_tasks": 15
+      },
+      "robustness": {
+        "original_success_rate": 0.75,
+        "perturbed_success_rate": 0.438,
+        "degradation_percentage": 41.67,
+        "tool_failure_recovery_rate": 0.0,
+        "tool_failure_graceful_degradation": 0.0,
+        "avg_robustness_score": 0.562,
+        "task_robustness_scores": {
+          "A1": 0.0,
+          "A2": 0.5,
+          "A3": 0.0,
+          "A4": 1.0,
+          "B1": 1.0,
+          "B2": 0.5,
+          "B3": 0.5,
+          "B4": 1.0,
+          "C1": 1.0,
+          "C2": 0.5,
+          "C3": 1.0,
+          "C4": 0.0,
+          "D1": 1.0,
+          "D2": 0.5,
+          "D3": 0.5,
+          "D4": 0.0
+        }
+      },
+      "controllability": {
+        "schema_compliance_rate": 0.875,
+        "tool_policy_compliance_rate": 1.0,
+        "format_compliance_rate": 0.8,
+        "avg_interpretability_score": 0.0,
+        "overall_controllability": 0.892,
+        "total_json_tasks": 8,
+        "schema_compliant_tasks": 7,
+        "total_tool_tasks": 4,
+        "tool_policy_compliant_tasks": 4,
+        "unauthorized_tool_uses": 0
+      },
+      "controllability_extended": {
+        "pattern_name": "ReAct_Enhanced",
+        "trace_completeness": 0.0,
+        "tao_cycles": 0,
+        "total_steps": 96,
+        "policy_flag_rate": 0.0,
+        "total_violations": 0,
+        "tasks_with_violations": 0,
+        "resource_efficiency": 0.0
+      }
+    },
+    "CoT": {
+      "pattern_name": "CoT",
+      "success": {
+        "total_tasks": 16,
+        "successful_tasks_strict": 9,
+        "successful_tasks_lenient": 9,
+        "failed_tasks": 7,
+        "partial_success_tasks": 0,
+        "success_rate_strict": 0.562,
+        "success_rate_lenient": 0.562,
+        "controllability_gap": 0.0,
+        "failure_rate": 0.438,
+        "success_by_category": {
+          "baseline": 0.75,
+          "reasoning": 0.75,
+          "tool": 0.25,
+          "planning": 0.5
+        },
+        "success_by_complexity": {
+          "medium": 0.5,
+          "simple": 0.75,
+          "complex": 0.5
+        }
+      },
+      "efficiency": {
+        "avg_latency_sec": 43.59,
+        "median_latency_sec": 31.14,
+        "min_latency_sec": 13.9,
+        "max_latency_sec": 150.28,
+        "avg_total_tokens": 1703.9,
+        "total_input_tokens": 16222,
+        "total_output_tokens": 11040,
+        "avg_steps": 4,
+        "avg_tool_calls": 2.2,
+        "total_tasks": 16
+      },
+      "robustness": {
+        "original_success_rate": 0.562,
+        "perturbed_success_rate": 0.438,
+        "degradation_percentage": 22.22,
+        "tool_failure_recovery_rate": 0.0,
+        "tool_failure_graceful_degradation": 0.0,
+        "avg_robustness_score": 0.469,
+        "task_robustness_scores": {
+          "A1": 1.0,
+          "A2": 0.5,
+          "A3": 1.0,
+          "A4": 0.0,
+          "B1": 1.0,
+          "B2": 0.0,
+          "B3": 1.0,
+          "B4": 1.0,
+          "C1": 0.0,
+          "C2": 0.0,
+          "C3": 1.0,
+          "C4": 0.0,
+          "D1": 0.5,
+          "D2": 0.0,
+          "D3": 0.0,
+          "D4": 0.5
+        }
+      },
+      "controllability": {
+        "schema_compliance_rate": 0.375,
+        "tool_policy_compliance_rate": 0.75,
+        "format_compliance_rate": 0.562,
+        "avg_interpretability_score": 0.0,
+        "overall_controllability": 0.562,
+        "total_json_tasks": 8,
+        "schema_compliant_tasks": 3,
+        "total_tool_tasks": 4,
+        "tool_policy_compliant_tasks": 3,
+        "unauthorized_tool_uses": 3
+      },
+      "controllability_extended": {
+        "pattern_name": "CoT",
+        "trace_completeness": 0.0,
+        "tao_cycles": 0,
+        "total_steps": 64,
+        "policy_flag_rate": 0.25,
+        "total_violations": 3,
+        "tasks_with_violations": 1,
+        "resource_efficiency": 0.3752
+      }
+    },
+    "Reflex": {
+      "pattern_name": "Reflex",
+      "success": {
+        "total_tasks": 16,
+        "successful_tasks_strict": 12,
+        "successful_tasks_lenient": 12,
+        "failed_tasks": 4,
+        "partial_success_tasks": 0,
+        "success_rate_strict": 0.75,
+        "success_rate_lenient": 0.75,
+        "controllability_gap": 0.0,
+        "failure_rate": 0.25,
+        "success_by_category": {
+          "baseline": 0.75,
+          "reasoning": 0.75,
+          "tool": 0.5,
+          "planning": 1.0
+        },
+        "success_by_complexity": {
+          "medium": 0.625,
+          "simple": 0.75,
+          "complex": 1.0
+        }
+      },
+      "efficiency": {
+        "avg_latency_sec": 4.41,
+        "median_latency_sec": 1.19,
+        "min_latency_sec": 0.56,
+        "max_latency_sec": 22.62,
+        "avg_total_tokens": 300.2,
+        "total_input_tokens": 3606,
+        "total_output_tokens": 1198,
+        "avg_steps": 3,
+        "avg_tool_calls": 0,
+        "total_tasks": 16
+      },
+      "robustness": {
+        "original_success_rate": 0.75,
+        "perturbed_success_rate": 0.625,
+        "degradation_percentage": 16.67,
+        "tool_failure_recovery_rate": 0.0,
+        "tool_failure_graceful_degradation": 0.0,
+        "avg_robustness_score": 0.625,
+        "task_robustness_scores": {
+          "A1": 1.0,
+          "A2": 0.5,
+          "A3": 1.0,
+          "A4": 0.0,
+          "B1": 1.0,
+          "B2": 0.0,
+          "B3": 1.0,
+          "B4": 1.0,
+          "C1": 1.0,
+          "C2": 0.0,
+          "C3": 1.0,
+          "C4": 0.0,
+          "D1": 0.5,
+          "D2": 1.0,
+          "D3": 0.5,
+          "D4": 0.5
+        }
+      },
+      "controllability": {
+        "schema_compliance_rate": 0.75,
+        "tool_policy_compliance_rate": 1.0,
+        "format_compliance_rate": 0.75,
+        "avg_interpretability_score": 0.0,
+        "overall_controllability": 0.833,
+        "total_json_tasks": 8,
+        "schema_compliant_tasks": 6,
+        "total_tool_tasks": 4,
+        "tool_policy_compliant_tasks": 4,
+        "unauthorized_tool_uses": 0
+      },
+      "controllability_extended": {
+        "pattern_name": "Reflex",
+        "trace_completeness": 0.0,
+        "tao_cycles": 0,
+        "total_steps": 48,
+        "policy_flag_rate": 0.0,
+        "total_violations": 0,
+        "tasks_with_violations": 0,
+        "resource_efficiency": 0.9566
+      }
+    },
+    "ToT": {
+      "pattern_name": "ToT",
+      "success": {
+        "total_tasks": 16,
+        "successful_tasks_strict": 13,
+        "successful_tasks_lenient": 13,
+        "failed_tasks": 3,
+        "partial_success_tasks": 0,
+        "success_rate_strict": 0.812,
+        "success_rate_lenient": 0.812,
+        "controllability_gap": 0.0,
+        "failure_rate": 0.188,
+        "success_by_category": {
+          "baseline": 0.75,
+          "reasoning": 0.75,
+          "tool": 1.0,
+          "planning": 0.75
+        },
+        "success_by_complexity": {
+          "medium": 0.875,
+          "simple": 0.75,
+          "complex": 0.75
+        }
+      },
+      "efficiency": {
+        "avg_latency_sec": 61.85,
+        "median_latency_sec": 40.62,
+        "min_latency_sec": 26.99,
+        "max_latency_sec": 141.38,
+        "avg_total_tokens": 289.2,
+        "total_input_tokens": 1062,
+        "total_output_tokens": 3565,
+        "avg_steps": 5,
+        "avg_tool_calls": 0,
+        "total_tasks": 16
+      },
+      "robustness": {
+        "original_success_rate": 0.812,
+        "perturbed_success_rate": 0.688,
+        "degradation_percentage": 15.38,
+        "tool_failure_recovery_rate": 0.0,
+        "tool_failure_graceful_degradation": 0.0,
+        "avg_robustness_score": 0.719,
+        "task_robustness_scores": {
+          "A1": 1.0,
+          "A2": 0.5,
+          "A3": 0.0,
+          "A4": 1.0,
+          "B1": 1.0,
+          "B2": 0.0,
+          "B3": 1.0,
+          "B4": 1.0,
+          "C1": 1.0,
+          "C2": 0.5,
+          "C3": 1.0,
+          "C4": 1.0,
+          "D1": 1.0,
+          "D2": 1.0,
+          "D3": 0.0,
+          "D4": 0.5
+        }
+      },
+      "controllability": {
+        "schema_compliance_rate": 0.875,
+        "tool_policy_compliance_rate": 1.0,
+        "format_compliance_rate": 0.812,
+        "avg_interpretability_score": 0.0,
+        "overall_controllability": 0.896,
+        "total_json_tasks": 8,
+        "schema_compliant_tasks": 7,
+        "total_tool_tasks": 4,
+        "tool_policy_compliant_tasks": 4,
+        "unauthorized_tool_uses": 0
+      },
+      "controllability_extended": {
+        "pattern_name": "ToT",
+        "trace_completeness": 0.0,
+        "tao_cycles": 0,
+        "total_steps": 80,
+        "policy_flag_rate": 0.0,
+        "total_violations": 0,
+        "tasks_with_violations": 0,
+        "resource_efficiency": 0.9612
+      }
+    }
+  },
+  "comparison": {
+    "patterns": [
+      "Baseline",
+      "ReAct",
+      "ReAct_Enhanced",
+      "CoT",
+      "Reflex",
+      "ToT"
+    ],
+    "success_dimension": {
+      "metric": "success_rate",
+      "rates": {
+        "Baseline": 0.812,
+        "ReAct": 0.625,
+        "ReAct_Enhanced": 0.75,
+        "CoT": 0.562,
+        "Reflex": 0.75,
+        "ToT": 0.812
+      },
+      "best_pattern": "Baseline",
+      "best_score": 0.812,
+      "worst_pattern": "CoT",
+      "worst_score": 0.562
+    },
+    "efficiency_dimension": {
+      "metric": "avg_latency_sec",
+      "latencies": {
+        "Baseline": 3.04,
+        "ReAct": 7.46,
+        "ReAct_Enhanced": 18.04,
+        "CoT": 43.59,
+        "Reflex": 4.41,
+        "ToT": 61.85
+      },
+      "fastest_pattern": "Baseline",
+      "fastest_latency": 3.04,
+      "slowest_pattern": "ToT",
+      "slowest_latency": 61.85
+    },
+    "robustness_dimension": {
+      "metric": "degradation_percentage",
+      "degradations": {
+        "Baseline": 30.77,
+        "ReAct": 20.0,
+        "ReAct_Enhanced": 41.67,
+        "CoT": 22.22,
+        "Reflex": 16.67,
+        "ToT": 15.38
+      },
+      "most_robust_pattern": "ToT",
+      "lowest_degradation": 15.38,
+      "least_robust_pattern": "ReAct_Enhanced",
+      "highest_degradation": 41.67
+    },
+    "controllability_dimension": {
+      "metric": "overall_controllability",
+      "scores": {
+        "Baseline": 0.812,
+        "ReAct": 0.708,
+        "ReAct_Enhanced": 0.892,
+        "CoT": 0.562,
+        "Reflex": 0.833,
+        "ToT": 0.896
+      },
+      "most_controllable_pattern": "ToT",
+      "best_score": 0.896,
+      "least_controllable_pattern": "CoT",
+      "worst_score": 0.562
+    },
+    "summary_table": [
+      {
+        "pattern": "Baseline",
+        "success_rate_strict": 0.812,
+        "success_rate_lenient": 0.812,
+        "controllability_gap": 0.0,
+        "avg_latency_sec": 3.04,
+        "avg_tokens": 195.5,
+        "degradation_pct": 30.77,
+        "controllability": 0.812,
+        "trace_completeness": 0.0,
+        "policy_flag_rate": 0.0,
+        "resource_efficiency": 1.0
+      },
+      {
+        "pattern": "ReAct",
+        "success_rate_strict": 0.625,
+        "success_rate_lenient": 0.625,
+        "controllability_gap": 0.0,
+        "avg_latency_sec": 7.46,
+        "avg_tokens": 1027.2,
+        "degradation_pct": 20.0,
+        "controllability": 0.708,
+        "trace_completeness": 0.556,
+        "policy_flag_rate": 0.0,
+        "resource_efficiency": 0.656
+      },
+      {
+        "pattern": "ReAct_Enhanced",
+        "success_rate_strict": 0.75,
+        "success_rate_lenient": 0.875,
+        "controllability_gap": 0.125,
+        "avg_latency_sec": 18.04,
+        "avg_tokens": 2609.7,
+        "degradation_pct": 41.67,
+        "controllability": 0.892,
+        "trace_completeness": 0.0,
+        "policy_flag_rate": 0.0,
+        "resource_efficiency": 0.0
+      },
+      {
+        "pattern": "CoT",
+        "success_rate_strict": 0.562,
+        "success_rate_lenient": 0.562,
+        "controllability_gap": 0.0,
+        "avg_latency_sec": 43.59,
+        "avg_tokens": 1703.9,
+        "degradation_pct": 22.22,
+        "controllability": 0.562,
+        "trace_completeness": 0.0,
+        "policy_flag_rate": 0.25,
+        "resource_efficiency": 0.375
+      },
+      {
+        "pattern": "Reflex",
+        "success_rate_strict": 0.75,
+        "success_rate_lenient": 0.75,
+        "controllability_gap": 0.0,
+        "avg_latency_sec": 4.41,
+        "avg_tokens": 300.2,
+        "degradation_pct": 16.67,
+        "controllability": 0.833,
+        "trace_completeness": 0.0,
+        "policy_flag_rate": 0.0,
+        "resource_efficiency": 0.957
+      },
+      {
+        "pattern": "ToT",
+        "success_rate_strict": 0.812,
+        "success_rate_lenient": 0.812,
+        "controllability_gap": 0.0,
+        "avg_latency_sec": 61.85,
+        "avg_tokens": 289.2,
+        "degradation_pct": 15.38,
+        "controllability": 0.896,
+        "trace_completeness": 0.0,
+        "policy_flag_rate": 0.0,
+        "resource_efficiency": 0.961
+      }
+    ]
+  },
+  "normalised_dimension_scores": {
+    "Baseline": {
+      "pattern_name": "Baseline",
+      "dimensions": {
+        "dim1_reasoning_quality": null,
+        "dim2_cognitive_safety": null,
+        "dim3_action_decision_alignment": null,
+        "dim4_success_efficiency": 0.9375,
+        "dim5_behavioural_safety": null,
+        "dim6_robustness_scalability": 0.4599,
+        "dim7_controllability": 0.6875
+      },
+      "reserve_indicators": {
+        "norm_avg_steps": 1.0,
+        "norm_avg_tool_calls": null,
+        "norm_tao_cycles": 0.0
+      }
+    },
+    "ReAct": {
+      "pattern_name": "ReAct",
+      "dimensions": {
+        "dim1_reasoning_quality": null,
+        "dim2_cognitive_safety": null,
+        "dim3_action_decision_alignment": null,
+        "dim4_success_efficiency": 0.7351,
+        "dim5_behavioural_safety": null,
+        "dim6_robustness_scalability": 0.4542,
+        "dim7_controllability": 0.6674
+      },
+      "reserve_indicators": {
+        "norm_avg_steps": 0.3466,
+        "norm_avg_tool_calls": 1.0,
+        "norm_tao_cycles": 1.0
+      }
+    },
+    "ReAct_Enhanced": {
+      "pattern_name": "ReAct_Enhanced",
+      "dimensions": {
+        "dim1_reasoning_quality": null,
+        "dim2_cognitive_safety": null,
+        "dim3_action_decision_alignment": null,
+        "dim4_success_efficiency": 0.4983,
+        "dim5_behavioural_safety": null,
+        "dim6_robustness_scalability": 0.3819,
+        "dim7_controllability": 0.535
+      },
+      "reserve_indicators": {
+        "norm_avg_steps": 0.0,
+        "norm_avg_tool_calls": 0.0,
+        "norm_tao_cycles": 0.0
+      }
+    },
+    "CoT": {
+      "pattern_name": "CoT",
+      "dimensions": {
+        "dim1_reasoning_quality": null,
+        "dim2_cognitive_safety": null,
+        "dim3_action_decision_alignment": null,
+        "dim4_success_efficiency": 0.416,
+        "dim5_behavioural_safety": null,
+        "dim6_robustness_scalability": 0.4155,
+        "dim7_controllability": 0.4125
+      },
+      "reserve_indicators": {
+        "norm_avg_steps": 0.5455,
+        "norm_avg_tool_calls": 0.4792,
+        "norm_tao_cycles": 0.0
+      }
+    },
+    "Reflex": {
+      "pattern_name": "Reflex",
+      "dimensions": {
+        "dim1_reasoning_quality": null,
+        "dim2_cognitive_safety": null,
+        "dim3_action_decision_alignment": null,
+        "dim4_success_efficiency": 0.8944,
+        "dim5_behavioural_safety": null,
+        "dim6_robustness_scalability": 0.4861,
+        "dim7_controllability": 0.6913
+      },
+      "reserve_indicators": {
+        "norm_avg_steps": 0.7727,
+        "norm_avg_tool_calls": null,
+        "norm_tao_cycles": 0.0
+      }
+    },
+    "ToT": {
+      "pattern_name": "ToT",
+      "dimensions": {
+        "dim1_reasoning_quality": null,
+        "dim2_cognitive_safety": null,
+        "dim3_action_decision_alignment": null,
+        "dim4_success_efficiency": 0.5912,
+        "dim5_behavioural_safety": null,
+        "dim6_robustness_scalability": 0.5216,
+        "dim7_controllability": 0.7297
+      },
+      "reserve_indicators": {
+        "norm_avg_steps": 0.3182,
+        "norm_avg_tool_calls": null,
+        "norm_tao_cycles": 0.0
+      }
+    }
+  },
+  "composite_scores": {
+    "Baseline": {
+      "pattern_name": "Baseline",
+      "dimension_scores": {
+        "dim4_success_efficiency": 0.9375,
+        "dim6_robustness_scalability": 0.4599,
+        "dim7_controllability": 0.6875
+      },
+      "weights": {
+        "dim4_success_efficiency": 1.0,
+        "dim6_robustness_scalability": 1.0,
+        "dim7_controllability": 1.0
+      },
+      "composite": 0.695,
+      "available_dimensions": 3
+    },
+    "ReAct": {
+      "pattern_name": "ReAct",
+      "dimension_scores": {
+        "dim4_success_efficiency": 0.7351,
+        "dim6_robustness_scalability": 0.4542,
+        "dim7_controllability": 0.6674
+      },
+      "weights": {
+        "dim4_success_efficiency": 1.0,
+        "dim6_robustness_scalability": 1.0,
+        "dim7_controllability": 1.0
+      },
+      "composite": 0.6189,
+      "available_dimensions": 3
+    },
+    "ReAct_Enhanced": {
+      "pattern_name": "ReAct_Enhanced",
+      "dimension_scores": {
+        "dim4_success_efficiency": 0.4983,
+        "dim6_robustness_scalability": 0.3819,
+        "dim7_controllability": 0.535
+      },
+      "weights": {
+        "dim4_success_efficiency": 1.0,
+        "dim6_robustness_scalability": 1.0,
+        "dim7_controllability": 1.0
+      },
+      "composite": 0.4717,
+      "available_dimensions": 3
+    },
+    "CoT": {
+      "pattern_name": "CoT",
+      "dimension_scores": {
+        "dim4_success_efficiency": 0.416,
+        "dim6_robustness_scalability": 0.4155,
+        "dim7_controllability": 0.4125
+      },
+      "weights": {
+        "dim4_success_efficiency": 1.0,
+        "dim6_robustness_scalability": 1.0,
+        "dim7_controllability": 1.0
+      },
+      "composite": 0.4147,
+      "available_dimensions": 3
+    },
+    "Reflex": {
+      "pattern_name": "Reflex",
+      "dimension_scores": {
+        "dim4_success_efficiency": 0.8944,
+        "dim6_robustness_scalability": 0.4861,
+        "dim7_controllability": 0.6913
+      },
+      "weights": {
+        "dim4_success_efficiency": 1.0,
+        "dim6_robustness_scalability": 1.0,
+        "dim7_controllability": 1.0
+      },
+      "composite": 0.6906,
+      "available_dimensions": 3
+    },
+    "ToT": {
+      "pattern_name": "ToT",
+      "dimension_scores": {
+        "dim4_success_efficiency": 0.5912,
+        "dim6_robustness_scalability": 0.5216,
+        "dim7_controllability": 0.7297
+      },
+      "weights": {
+        "dim4_success_efficiency": 1.0,
+        "dim6_robustness_scalability": 1.0,
+        "dim7_controllability": 1.0
+      },
+      "composite": 0.6142,
+      "available_dimensions": 3
+    }
+  },
+  "composite_ranking": [
+    {
+      "rank": 1,
+      "pattern": "Baseline",
+      "composite": 0.695
+    },
+    {
+      "rank": 2,
+      "pattern": "Reflex",
+      "composite": 0.6906
+    },
+    {
+      "rank": 3,
+      "pattern": "ReAct",
+      "composite": 0.6189
+    },
+    {
+      "rank": 4,
+      "pattern": "ToT",
+      "composite": 0.6142
+    },
+    {
+      "rank": 5,
+      "pattern": "ReAct_Enhanced",
+      "composite": 0.4717
+    },
+    {
+      "rank": 6,
+      "pattern": "CoT",
+      "composite": 0.4147
+    }
+  ]
+}

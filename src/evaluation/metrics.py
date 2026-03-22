@@ -337,8 +337,14 @@ class MetricsAggregator:
             for name, metrics in pattern_metrics.items()
         }
 
-        fastest_pattern = min(latencies, key=lambda x: latencies[x])
-        slowest_pattern = max(latencies, key=lambda x: latencies[x])
+        # Exclude patterns with 0 latency (no successful tasks) from best/worst
+        valid_latencies = {k: v for k, v in latencies.items() if v > 0}
+        if valid_latencies:
+            fastest_pattern = min(valid_latencies, key=lambda x: valid_latencies[x])
+            slowest_pattern = max(valid_latencies, key=lambda x: valid_latencies[x])
+        else:
+            fastest_pattern = list(latencies.keys())[0]
+            slowest_pattern = fastest_pattern
 
         return {
             "metric": "avg_latency_sec",
@@ -359,7 +365,16 @@ class MetricsAggregator:
             for name, metrics in pattern_metrics.items()
         }
 
-        most_robust = min(degradations, key=lambda x: degradations[x])
+        # Exclude patterns with 0 original success from "most robust"
+        # (degradation=0% is misleading when original_success_rate=0)
+        valid_degradations = {
+            k: v for k, v in degradations.items()
+            if pattern_metrics[k].robustness.original_success_rate > 0
+        }
+        if valid_degradations:
+            most_robust = min(valid_degradations, key=lambda x: valid_degradations[x])
+        else:
+            most_robust = min(degradations, key=lambda x: degradations[x])
         least_robust = max(degradations, key=lambda x: degradations[x])
 
         return {

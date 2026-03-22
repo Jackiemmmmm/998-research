@@ -138,26 +138,41 @@ def compute_policy_violations(
 
 def compute_resource_efficiency(
     all_pattern_tokens: Dict[str, float],
-) -> Dict[str, float]:
+) -> Dict[str, Optional[float]]:
     """Compute resource efficiency via min-max normalisation + inversion.
 
     Formula: resource_efficiency = 1 - (x - x_min) / (x_max - x_min)
+
+    Patterns with 0 tokens (no successful tasks) are excluded from min-max
+    normalisation and get resource_efficiency = None.
 
     Args:
         all_pattern_tokens: Dict of {pattern_name: avg_total_tokens}
 
     Returns:
-        Dict of {pattern_name: resource_efficiency} in [0, 1]
+        Dict of {pattern_name: resource_efficiency} in [0, 1] or None.
     """
     if not all_pattern_tokens:
         return {}
 
-    values = list(all_pattern_tokens.values())
+    # Separate patterns with actual data from those with no data (0 tokens)
+    valid_tokens = {k: v for k, v in all_pattern_tokens.items() if v > 0}
+    no_data_patterns = {k for k, v in all_pattern_tokens.items() if v <= 0}
+
+    result: Dict[str, Optional[float]] = {}
+
+    # Patterns with no successful tasks get None
+    for pattern in no_data_patterns:
+        result[pattern] = None
+
+    if not valid_tokens:
+        return result
+
+    values = list(valid_tokens.values())
     x_min = min(values)
     x_max = max(values)
 
-    result = {}
-    for pattern, tokens in all_pattern_tokens.items():
+    for pattern, tokens in valid_tokens.items():
         if x_max == x_min:
             # All same value or single pattern → 1.0
             result[pattern] = 1.0

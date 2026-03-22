@@ -120,6 +120,13 @@ def compute_dim6_scores(
     for pname in patterns:
         rm = pattern_metrics[pname].robustness
 
+        # If original_success_rate is 0, degradation is not meaningful
+        # (degradation formula divides by original, clamped to 0 — misleading).
+        # Treat the entire Dim 6 score as unreliable for such patterns.
+        if rm.original_success_rate == 0:
+            result[pname] = 0.0  # No original successes → worst robustness
+            continue
+
         # norm_degradation: Option B (÷100, inverted)
         norm_degradation = 1.0 - (rm.degradation_percentage / 100.0)
         norm_degradation = max(0.0, min(1.0, norm_degradation))
@@ -135,9 +142,6 @@ def compute_dim6_scores(
         # Handle None-like values: if robustness has no task scores, treat as None
         if not rm.task_robustness_scores:
             sub_indicators[2] = None
-        if recovery == 0.0 and rm.tool_failure_recovery_rate == 0.0:
-            # Could be genuinely 0 or missing; keep as-is (0.0 is valid)
-            pass
 
         score = _safe_mean(sub_indicators)
         result[pname] = score

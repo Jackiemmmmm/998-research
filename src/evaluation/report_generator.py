@@ -198,6 +198,136 @@ class ReportGenerator:
         if has_normalised:
             lines.append("## 5. Normalised Dimension Scores")
             lines.append("")
+            lines.append("### Methodology")
+            lines.append("")
+            lines.append("All sub-indicators are normalised to [0, 1] following the procedure defined in")
+            lines.append("the Proposal (§ 2.2): *(1) each sub-indicator is normalised to the 0–1 range;")
+            lines.append("(2) dimension-level scores are obtained by averaging the sub-indicators;")
+            lines.append("(3) composite results are computed using uniform weighting.*")
+            lines.append("")
+            lines.append("**Cross-pattern min-max normalisation** is used for latency and token metrics")
+            lines.append("(lower is better → inverted): `norm = 1 − (x − x_min) / (x_max − x_min)`.")
+            lines.append("When all patterns share the same value or only one pattern has data, the")
+            lines.append("normalised score defaults to 1.0.")
+            lines.append("")
+            lines.append("#### Dim 4 — Success & Efficiency")
+            lines.append("")
+            lines.append("```")
+            lines.append("Dim4 = mean(success_rate, norm_latency, norm_tokens)")
+            lines.append("```")
+            lines.append("")
+            lines.append("| Sub-indicator | Source | Normalisation |")
+            lines.append("|---------------|--------|---------------|")
+            lines.append("| `success_rate` | strict judge pass rate | Already in [0, 1] |")
+            lines.append("| `norm_latency` | avg latency (s) | Min-max, inverted (lower = better) |")
+            lines.append("| `norm_tokens` | avg total tokens | Min-max, inverted (lower = better) |")
+            lines.append("")
+            # Build Dim4 detail table
+            # Compute norm_latency and norm_tokens inline for the detail table
+            from .scoring import normalize_min_max
+            all_latencies = [m.efficiency.avg_latency() for m in pattern_metrics.values()]
+            all_tokens = [m.efficiency.avg_total_tokens() for m in pattern_metrics.values()]
+            lat_opt = [v if v > 0 else None for v in all_latencies]
+            tok_opt = [v if v > 0 else None for v in all_tokens]
+            norm_lat_list = normalize_min_max(lat_opt, invert=True)
+            norm_tok_list = normalize_min_max(tok_opt, invert=True)
+
+            lines.append("**Dim 4 computation detail:**")
+            lines.append("")
+            lines.append("| Pattern | success_rate | avg_latency (s) | norm_latency | avg_tokens | norm_tokens | Dim 4 |")
+            lines.append("|---------|-------------|-----------------|-------------|-----------|------------|-------|")
+            for i, (name, m) in enumerate(pattern_metrics.items()):
+                sr = m.success.success_rate()
+                lat = m.efficiency.avg_latency()
+                tok = m.efficiency.avg_total_tokens()
+                ns = getattr(m, '_normalised_scores', None)
+                d4 = ns.dim4_success_efficiency if ns and ns.dim4_success_efficiency is not None else 0.0
+                nl_str = f"{norm_lat_list[i]:.3f}" if norm_lat_list[i] is not None else "N/A"
+                nt_str = f"{norm_tok_list[i]:.3f}" if norm_tok_list[i] is not None else "N/A"
+                lines.append(
+                    f"| {name:12s} | {sr:.3f}       | {lat:15.2f} | {nl_str:>12s} | {tok:9.0f} | {nt_str:>10s} | {d4:.3f} |"
+                )
+            lines.append("")
+            valid_lat = [v for v in all_latencies if v > 0]
+            valid_tok = [v for v in all_tokens if v > 0]
+            if valid_lat:
+                lines.append(f"- Latency range: min = {min(valid_lat):.2f}s, max = {max(valid_lat):.2f}s")
+            if valid_tok:
+                lines.append(f"- Token range: min = {min(valid_tok):.0f}, max = {max(valid_tok):.0f}")
+            lines.append("")
+
+            lines.append("#### Dim 6 — Robustness & Scalability")
+            lines.append("")
+            lines.append("```")
+            lines.append("Dim6 = mean(norm_degradation, recovery_rate, robustness_score)")
+            lines.append("```")
+            lines.append("")
+            lines.append("| Sub-indicator | Source | Normalisation |")
+            lines.append("|---------------|--------|---------------|")
+            lines.append("| `norm_degradation` | degradation % | `1 − (degradation / 100)`, clamped to [0, 1] |")
+            lines.append("| `recovery_rate` | tool failure recovery | Already in [0, 1] |")
+            lines.append("| `robustness_score` | per-task original vs perturbed agreement | Already in [0, 1]; None if no perturbation data |")
+            lines.append("")
+            lines.append("**Dim 6 computation detail:**")
+            lines.append("")
+            lines.append("| Pattern | degradation % | norm_degradation | recovery_rate | robustness_score | Dim 6 |")
+            lines.append("|---------|--------------|-----------------|--------------|-----------------|-------|")
+            for name, m in pattern_metrics.items():
+                rm = m.robustness
+                ns = getattr(m, '_normalised_scores', None)
+                d6 = ns.dim6_robustness_scalability if ns and ns.dim6_robustness_scalability is not None else 0.0
+                nd = max(0.0, min(1.0, 1.0 - rm.degradation_percentage / 100.0))
+                rec = rm.tool_failure_recovery_rate
+                rob = rm.avg_robustness_score()
+                rob_str = f"{rob:.3f}" if rm.task_robustness_scores else "N/A"
+                lines.append(
+                    f"| {name:12s} | {rm.degradation_percentage:12.1f} | {nd:15.3f} | {rec:12.3f} | {rob_str:>15s} | {d6:.3f} |"
+                )
+            lines.append("")
+
+            lines.append("#### Dim 7 — Controllability, Transparency & Resource Efficiency")
+            lines.append("")
+            lines.append("```")
+            lines.append("Dim7 = mean(trace_completeness, 1 − policy_flag_rate, resource_efficiency,")
+            lines.append("            schema_compliance, format_compliance)")
+            lines.append("```")
+            lines.append("")
+            lines.append("| Sub-indicator | Source | Normalisation |")
+            lines.append("|---------------|--------|---------------|")
+            lines.append("| `trace_completeness` | (TAO_cycles × 3) / total_steps | Already in [0, 1] |")
+            lines.append("| `policy_compliance` | 1 − policy_flag_rate | Already in [0, 1] |")
+            lines.append("| `resource_efficiency` | avg tokens, cross-pattern min-max inverted | Min-max, inverted |")
+            lines.append("| `schema_compliance` | JSON schema pass rate | Already in [0, 1]; None if no JSON tasks |")
+            lines.append("| `format_compliance` | judge pass / successful tasks | Already in [0, 1] |")
+            lines.append("")
+            lines.append("**Dim 7 computation detail:**")
+            lines.append("")
+            lines.append("| Pattern | trace_comp | policy_comp | resource_eff | schema_comp | format_comp | Dim 7 |")
+            lines.append("|---------|-----------|------------|-------------|------------|------------|-------|")
+            for name, m in pattern_metrics.items():
+                cm = m.controllability
+                cr = getattr(m, 'controllability_result', None)
+                ns = getattr(m, '_normalised_scores', None)
+                d7 = ns.dim7_controllability if ns and ns.dim7_controllability is not None else 0.0
+                tc = f"{cr.trace_completeness:.3f}" if cr else "N/A"
+                pc = f"{1.0 - cr.policy_flag_rate:.3f}" if cr else "N/A"
+                re = f"{cr.resource_efficiency:.3f}" if cr else "N/A"
+                sc = f"{cm.schema_compliance_rate():.3f}" if cm.total_json_tasks > 0 else "N/A"
+                fc = f"{cm.format_compliance_rate:.3f}" if cm.format_compliance_rate > 0 else "N/A"
+                lines.append(
+                    f"| {name:12s} | {tc:>9s} | {pc:>10s} | {re:>11s} | {sc:>10s} | {fc:>10s} | {d7:.3f} |"
+                )
+            lines.append("")
+
+            lines.append("#### Composite Score")
+            lines.append("")
+            lines.append("```")
+            lines.append("Composite = mean(Dim4, Dim6, Dim7)    [uniform weights, 1/N for N available dimensions]")
+            lines.append("```")
+            lines.append("")
+
+            lines.append("### Dimension Score Summary")
+            lines.append("")
             lines.append("| Pattern | Dim 4 (Success) | Dim 6 (Robust) | Dim 7 (Control) | Composite |")
             lines.append("|---------|----------------|----------------|-----------------|-----------|")
             for name, metrics in pattern_metrics.items():
@@ -207,7 +337,7 @@ class ReportGenerator:
                 d6 = f"{ns.dim6_robustness_scalability:.3f}" if ns and ns.dim6_robustness_scalability is not None else "N/A"
                 d7 = f"{ns.dim7_controllability:.3f}" if ns and ns.dim7_controllability is not None else "N/A"
                 comp = f"{cs.composite:.3f}" if cs else "N/A"
-                lines.append(f"| {name:12s} | {d4:14s} | {d4:14s} | {d7:15s} | {comp:9s} |")
+                lines.append(f"| {name:12s} | {d4:14s} | {d6:14s} | {d7:15s} | {comp:9s} |")
             lines.append("")
 
             # Reserve indicators
@@ -239,16 +369,26 @@ class ReportGenerator:
                 lines.append("")
 
         # Recommendations
-        lines.append("## 5. Recommendations")
+        lines.append("## 6. Recommendations")
         lines.append("")
         lines.append("### Scenario-Based Pattern Selection")
         lines.append("")
 
         # Find best for each scenario
         best_success = max(pattern_metrics.items(), key=lambda x: x[1].success.success_rate())
-        best_speed = min(pattern_metrics.items(), key=lambda x: x[1].efficiency.avg_latency())
+        best_speed = min(
+            ((k, v) for k, v in pattern_metrics.items() if v.efficiency.avg_latency() > 0),
+            key=lambda x: x[1].efficiency.avg_latency(),
+            default=best_success,
+        )
         best_robust = min(pattern_metrics.items(), key=lambda x: x[1].robustness.degradation_percentage)
-        best_control = max(pattern_metrics.items(), key=lambda x: x[1].controllability.overall_controllability())
+        # Use Dim 7 normalised score if available, fall back to overall_controllability
+        def _dim7_score(item):
+            ns = getattr(item[1], '_normalised_scores', None)
+            if ns and ns.dim7_controllability is not None:
+                return ns.dim7_controllability
+            return item[1].controllability.overall_controllability()
+        best_control = max(pattern_metrics.items(), key=_dim7_score)
 
         lines.append(f"- **Complex Reasoning Tasks:** {best_success[0]} (highest success rate)")
         lines.append(f"- **Real-time/Low-latency Scenarios:** {best_speed[0]} (fastest response)")

@@ -4,6 +4,7 @@ Runs test tasks on patterns and collects metrics.
 """
 
 import asyncio
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
@@ -264,23 +265,35 @@ class PatternEvaluator:
         )
 
         try:
-            # Execute task with timeout
+            # Execute task with timeout using a daemon thread.
+            # daemon=True ensures the thread won't block process exit if it's
+            # still running after an asyncio timeout (the underlying
+            # graph.invoke / LLM HTTP call cannot be forcibly cancelled from
+            # Python, so a non-daemon thread would keep the process alive).
             start_time = time.time()
 
-            try:
-                # Invoke graph with evaluation_mode enabled
-                # This tells patterns (Reflex, ToT) to output clean results without decorative formatting
-                response = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        graph.invoke,
+            response_holder: List[Any] = []  # [response] on success
+            error_holder: List[Exception] = []  # [exception] on failure
+
+            def _invoke():
+                try:
+                    resp = graph.invoke(
                         {
                             "messages": [{"role": "user", "content": prompt}],
                             "evaluation_mode": True  # Clean output for evaluation
                         }
-                    ),
-                    timeout=self.task_timeout,
-                )
-            except asyncio.TimeoutError:
+                    )
+                    response_holder.append(resp)
+                except Exception as exc:
+                    error_holder.append(exc)
+
+            worker = threading.Thread(target=_invoke, daemon=True)
+            worker.start()
+            worker.join(timeout=self.task_timeout)
+
+            if worker.is_alive():
+                # Thread still running — treat as timeout.
+                # The daemon thread will be killed when the process exits.
                 end_time = time.time()
                 result.start_time = start_time
                 result.end_time = end_time
@@ -293,6 +306,12 @@ class PatternEvaluator:
                 result.lenient_judge_success = False
                 result.lenient_judge_message = f"Timeout: task did not complete within {self.task_timeout/60:.0f} minutes"
                 return result
+
+            # Thread finished — check for errors raised inside the thread
+            if error_holder:
+                raise error_holder[0]
+
+            response = response_holder[0]
 
             end_time = time.time()
 
@@ -609,7 +628,9 @@ async def evaluate_multiple_patterns(
     # the evaluator to store results, which we handle via a callback approach.
     controllability_results = {}
     for name, metrics in results.items():
-        re_val = resource_efficiencies.get(name, 1.0)
+        re_val = resource_efficiencies.get(name)
+        if re_val is None:
+            re_val = 0.0  # No data; will be reflected in Dim 7 via trace_completeness=0
         # Trace completeness and policy violations are collected per-evaluator
         # and stored on PatternMetrics via the evaluator callback below
         cr = getattr(metrics, '_controllability_result_data', None)

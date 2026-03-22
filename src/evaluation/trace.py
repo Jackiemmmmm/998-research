@@ -402,21 +402,23 @@ class TraceExtractor:
             elif msg_type == "ai":
                 if cls._has_tool_calls(msg):
                     # THINK step: the reasoning content
-                    if content:
-                        trace.steps.append(StepRecord(
-                            step_index=step_idx,
-                            step_type=StepType.THINK,
-                            content=content,
-                            input_tokens=input_t,
-                            output_tokens=output_t,
-                            total_tokens=total_t,
-                            tokens_estimated=estimated,
-                            message_type="ai",
-                            stage_label="react_reasoning",
-                        ))
-                        step_idx += 1
-                        # Reset tokens for ACT step (avoid double counting)
-                        input_t, output_t, total_t = 0, 0, 0
+                    # Always create a THINK step to preserve TAO cycle structure.
+                    # If the LLM produced no explicit reasoning, use synthetic content.
+                    think_content = content if content else "[implicit reasoning]"
+                    trace.steps.append(StepRecord(
+                        step_index=step_idx,
+                        step_type=StepType.THINK,
+                        content=think_content,
+                        input_tokens=input_t,
+                        output_tokens=output_t,
+                        total_tokens=total_t,
+                        tokens_estimated=estimated,
+                        message_type="ai" if content else "synthetic",
+                        stage_label="react_reasoning",
+                    ))
+                    step_idx += 1
+                    # Reset tokens for ACT step (avoid double counting)
+                    input_t, output_t, total_t = 0, 0, 0
 
                     # ACT step: the tool calls
                     tool_records = cls._get_tool_calls(msg)
