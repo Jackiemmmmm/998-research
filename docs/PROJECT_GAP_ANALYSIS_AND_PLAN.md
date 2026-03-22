@@ -13,7 +13,7 @@
 | **B2** | Cognitive Layer — Cognitive Safety (Dim 2) | NOT STARTED | [week5-6_phase-b2_cognitive-safety.md](./specs/week5-6_phase-b2_cognitive-safety.md) (P3, PENDING) | — |
 | **C1** | Action–Decision Alignment (Dim 3) | NOT STARTED | — (P1 self-drives, Week 3–4) | — |
 | **C3** | Behavioural Safety (Dim 5) | NOT STARTED | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) (P3, PENDING) | — |
-| **D1** | Enhanced Robustness (Dim 6) | NOT STARTED | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) (P2, PENDING) | — |
+| **D1** | Enhanced Robustness (Dim 6) | SPEC READY, IMPLEMENTATION PENDING | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) (P2, READY FOR IMPLEMENTATION) | — |
 | **D2** | Controllability & Transparency (Dim 7) | NOT STARTED | [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) (P3, READY FOR IMPLEMENTATION) | — |
 | **E** | Normalization & Composite Scoring | NOT STARTED | [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) (P2, READY FOR IMPLEMENTATION) | — |
 | **F** | Statistical Rigor & Reproducibility | NOT STARTED | [week5-6_phase-f_statistical-rigor.md](./specs/week5-6_phase-f_statistical-rigor.md) (P2, PENDING) | — |
