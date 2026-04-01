@@ -190,6 +190,37 @@ class ReportGenerator:
                 lines.append(f"  - Resource Efficiency: {cr.resource_efficiency:.3f}")
             lines.append("")
 
+        # Alignment dimension (Dim3)
+        has_alignment = any(
+            m.alignment.total_plan_tasks > 0 for m in pattern_metrics.values()
+        )
+        if has_alignment:
+            lines.append("## 4b. Action-Decision Alignment (Dim 3)")
+            lines.append("")
+            lines.append("| Pattern | Plan Tasks | Aligned | Adherence | Coverage | Precision | Seq Match | Overall |")
+            lines.append("|---------|-----------|---------|-----------|----------|-----------|-----------|---------|")
+            for name, metrics in pattern_metrics.items():
+                am = metrics.alignment
+                if am.total_plan_tasks > 0:
+                    lines.append(
+                        f"| {name:12s} | {am.total_plan_tasks:9d} | {am.total_aligned_tasks:7d} | "
+                        f"{am.plan_adherence_rate:9.1%} | {am.avg_tool_coverage:8.1%} | "
+                        f"{am.avg_tool_precision:9.1%} | {am.avg_sequence_match:9.3f} | "
+                        f"{am.overall_alignment():7.3f} |"
+                    )
+                else:
+                    lines.append(f"| {name:12s} | {'N/A':>9s} | {'N/A':>7s} | {'N/A':>9s} | {'N/A':>8s} | {'N/A':>9s} | {'N/A':>9s} | {'N/A':>7s} |")
+            lines.append("")
+
+            # Per-task alignment details
+            for name, metrics in pattern_metrics.items():
+                am = metrics.alignment
+                if am.task_alignment_scores:
+                    lines.append(f"#### {name} - Per-Task Alignment")
+                    for task_id, score in sorted(am.task_alignment_scores.items()):
+                        lines.append(f"  - {task_id}: {score:.3f}")
+                    lines.append("")
+
         # Phase E: Normalised Dimension Scores
         has_normalised = any(
             getattr(m, '_normalised_scores', None) is not None
@@ -326,18 +357,49 @@ class ReportGenerator:
             lines.append("```")
             lines.append("")
 
+            lines.append("#### Dim 3 -- Action-Decision Alignment")
+            lines.append("")
+            lines.append("```")
+            lines.append("Dim3 = mean(plan_adherence_rate, avg_tool_coverage, avg_tool_precision)")
+            lines.append("```")
+            lines.append("")
+            lines.append("| Sub-indicator | Source | Normalisation |")
+            lines.append("|---------------|--------|---------------|")
+            lines.append("| `plan_adherence_rate` | tasks with alignment >= 0.5 / total plan tasks | Already in [0, 1] |")
+            lines.append("| `avg_tool_coverage` | mean(|planned ∩ actual| / |planned|) | Already in [0, 1] |")
+            lines.append("| `avg_tool_precision` | mean(|planned ∩ actual| / |actual|) | Already in [0, 1] |")
+            lines.append("")
+            lines.append("**Dim 3 computation detail:**")
+            lines.append("")
+            lines.append("| Pattern | Plan Tasks | Adherence | Coverage | Precision | Dim 3 |")
+            lines.append("|---------|-----------|-----------|----------|-----------|-------|")
+            for name, m in pattern_metrics.items():
+                am = m.alignment
+                ns = getattr(m, '_normalised_scores', None)
+                d3 = ns.dim3_action_decision_alignment if ns and ns.dim3_action_decision_alignment is not None else None
+                if am.total_plan_tasks > 0:
+                    d3_str = f"{d3:.3f}" if d3 is not None else "N/A"
+                    lines.append(
+                        f"| {name:12s} | {am.total_plan_tasks:9d} | {am.plan_adherence_rate:9.3f} | "
+                        f"{am.avg_tool_coverage:8.3f} | {am.avg_tool_precision:9.3f} | {d3_str:>5s} |"
+                    )
+                else:
+                    lines.append(f"| {name:12s} | {'N/A':>9s} | {'N/A':>9s} | {'N/A':>8s} | {'N/A':>9s} | {'N/A':>5s} |")
+            lines.append("")
+
             lines.append("### Dimension Score Summary")
             lines.append("")
-            lines.append("| Pattern | Dim 4 (Success) | Dim 6 (Robust) | Dim 7 (Control) | Composite |")
-            lines.append("|---------|----------------|----------------|-----------------|-----------|")
+            lines.append("| Pattern | Dim 3 (Align) | Dim 4 (Success) | Dim 6 (Robust) | Dim 7 (Control) | Composite |")
+            lines.append("|---------|--------------|----------------|----------------|-----------------|-----------|")
             for name, metrics in pattern_metrics.items():
                 ns = getattr(metrics, '_normalised_scores', None)
                 cs = getattr(metrics, '_composite_score', None)
+                d3 = f"{ns.dim3_action_decision_alignment:.3f}" if ns and ns.dim3_action_decision_alignment is not None else "N/A"
                 d4 = f"{ns.dim4_success_efficiency:.3f}" if ns and ns.dim4_success_efficiency is not None else "N/A"
                 d6 = f"{ns.dim6_robustness_scalability:.3f}" if ns and ns.dim6_robustness_scalability is not None else "N/A"
                 d7 = f"{ns.dim7_controllability:.3f}" if ns and ns.dim7_controllability is not None else "N/A"
                 comp = f"{cs.composite:.3f}" if cs else "N/A"
-                lines.append(f"| {name:12s} | {d4:14s} | {d6:14s} | {d7:15s} | {comp:9s} |")
+                lines.append(f"| {name:12s} | {d3:12s} | {d4:14s} | {d6:14s} | {d7:15s} | {comp:9s} |")
             lines.append("")
 
             # Reserve indicators
@@ -424,9 +486,9 @@ class ReportGenerator:
 
         # Build CSV
         lines = []
-        header = "Pattern,Success Rate (Strict),Success Rate (Lenient),Controllability Gap,Avg Latency (s),Avg Tokens,Degradation (%),Controllability"
+        header = "Pattern,Success Rate (Strict),Success Rate (Lenient),Controllability Gap,Avg Latency (s),Avg Tokens,Degradation (%),Controllability,Alignment"
         # D2 + E columns
-        header += ",Trace Completeness,Policy Flag Rate,Resource Efficiency,Dim4,Dim6,Dim7,Composite"
+        header += ",Trace Completeness,Policy Flag Rate,Resource Efficiency,Dim3,Dim4,Dim6,Dim7,Composite"
         lines.append(header)
 
         for row in comparison["summary_table"]:
@@ -440,7 +502,8 @@ class ReportGenerator:
                 f"{row['avg_latency_sec']:.2f},"
                 f"{row['avg_tokens']:.0f},"
                 f"{row['degradation_pct']:.2f},"
-                f"{row['controllability']:.3f}"
+                f"{row['controllability']:.3f},"
+                f"{row['alignment']:.3f}"
             )
             # D2 sub-indicators
             cr = getattr(metrics, 'controllability_result', None) if metrics else None
@@ -451,11 +514,12 @@ class ReportGenerator:
             # E normalised scores
             ns = getattr(metrics, '_normalised_scores', None) if metrics else None
             cs = getattr(metrics, '_composite_score', None) if metrics else None
+            d3 = f"{ns.dim3_action_decision_alignment:.4f}" if ns and ns.dim3_action_decision_alignment is not None else ""
             d4 = f"{ns.dim4_success_efficiency:.4f}" if ns and ns.dim4_success_efficiency is not None else ""
             d6 = f"{ns.dim6_robustness_scalability:.4f}" if ns and ns.dim6_robustness_scalability is not None else ""
             d7 = f"{ns.dim7_controllability:.4f}" if ns and ns.dim7_controllability is not None else ""
             comp = f"{cs.composite:.4f}" if cs else ""
-            line += f",{d4},{d6},{d7},{comp}"
+            line += f",{d3},{d4},{d6},{d7},{comp}"
             lines.append(line)
 
         csv = "\n".join(lines)

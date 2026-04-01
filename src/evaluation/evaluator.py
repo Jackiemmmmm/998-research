@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from .judge import Judge, LLMJudge
 from .metrics import (
+    AlignmentMetrics,
     ControllabilityMetrics,
     EfficiencyMetrics,
     MetricsAggregator,
@@ -146,6 +147,7 @@ class PatternEvaluator:
         self._collect_success_metrics(metrics.success, original_results, test_tasks)
         self._collect_efficiency_metrics(metrics.efficiency, original_results)
         self._collect_controllability_metrics(metrics.controllability, original_results, test_tasks)
+        self._collect_alignment_metrics(metrics.alignment, original_results, test_tasks)
 
         # Calculate original success rate for robustness
         metrics.robustness.original_success_rate = metrics.success.success_rate()
@@ -550,6 +552,152 @@ class PatternEvaluator:
         if successful_results:
             controllability_metrics.format_compliance_rate = (
                 sum(1 for r in successful_results if r.judge_success) / len(successful_results)
+            )
+
+
+    # Verb-tool mapping: maps natural-language verbs (as may appear in plans
+    # or agent THINK steps) to the concrete tool names registered in the
+    # evaluation harness.  When a planned item matches a verb key, it is
+    # expanded to the corresponding tool names before alignment scoring.
+    VERB_TOOL_MAP: Dict[str, List[str]] = {
+        "search": ["wiki_search", "shopping_search"],
+        "lookup": ["wiki_search"],
+        "query": ["wiki_search", "weather_api"],
+        "calculate": ["calculator"],
+        "compute": ["calculator"],
+        "convert": ["fx_api"],
+        "exchange": ["fx_api"],
+        "weather": ["weather_api"],
+        "forecast": ["weather_api"],
+        "shop": ["shopping_search"],
+        "buy": ["shopping_search"],
+        "find": ["wiki_search", "shopping_search"],
+    }
+
+    @staticmethod
+    def _expand_plan_with_verb_mapping(
+        planned_tools: List[str],
+        verb_map: Dict[str, List[str]],
+    ) -> List[str]:
+        """Expand plan entries using verb-tool mapping.
+
+        If a plan entry is an exact tool name, keep it as-is.
+        If it matches a verb key in the mapping, expand it to the
+        corresponding tool names.  This allows plans expressed as
+        high-level verbs (e.g. "search") to match concrete tool calls
+        (e.g. "wiki_search").
+        """
+        expanded: List[str] = []
+        for item in planned_tools:
+            item_lower = item.lower()
+            if item_lower in verb_map:
+                expanded.extend(verb_map[item_lower])
+            else:
+                expanded.append(item)
+        return expanded
+
+    @staticmethod
+    def _longest_common_subsequence(seq1: List[str], seq2: List[str]) -> int:
+        """Compute length of longest common subsequence."""
+        m, n = len(seq1), len(seq2)
+        dp = [[0] * (n + 1) for _ in range(m + 1)]
+        for i in range(1, m + 1):
+            for j in range(1, n + 1):
+                if seq1[i - 1] == seq2[j - 1]:
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                else:
+                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+        return dp[m][n]
+
+    def _collect_alignment_metrics(
+        self,
+        alignment_metrics: AlignmentMetrics,
+        results: List[TaskResult],
+        tasks: List[TestTask],
+    ):
+        """Collect Dim3 Action-Decision Alignment metrics.
+
+        For each task that has a plan defined, compare the planned tool
+        sequence against the actual tools called in the trace.
+        """
+        task_lookup = {t.id: t for t in tasks}
+
+        coverage_scores: List[float] = []
+        precision_scores: List[float] = []
+        sequence_scores: List[float] = []
+        aligned_count = 0
+
+        for result in results:
+            task = task_lookup.get(result.task_id)
+            if task is None:
+                continue
+
+            # Skip tasks without a plan or with an empty plan
+            if not task.plan:
+                continue
+
+            # Skip tasks without a trace
+            if result.trace is None:
+                continue
+
+            # Expand plan verbs to concrete tool names via verb-tool mapping
+            planned_tools = self._expand_plan_with_verb_mapping(
+                task.plan, self.VERB_TOOL_MAP
+            )
+            # Extract actual tools from trace
+            actual_tools = [
+                tc.tool_name
+                for step in result.trace.steps
+                for tc in step.tool_calls
+            ]
+
+            # Compute tool_coverage (recall): |planned ∩ actual| / |planned|
+            planned_set = set(planned_tools)
+            actual_set = set(actual_tools)
+            intersection = planned_set & actual_set
+            tool_coverage = len(intersection) / len(planned_set)
+
+            # Compute tool_precision: |planned ∩ actual| / |actual|
+            if len(actual_set) > 0:
+                tool_precision = len(intersection) / len(actual_set)
+            else:
+                tool_precision = 0.0
+
+            # Compute sequence_match via LCS ratio
+            max_len = max(len(planned_tools), len(actual_tools))
+            if max_len > 0:
+                lcs_len = self._longest_common_subsequence(planned_tools, actual_tools)
+                sequence_match = lcs_len / max_len
+            else:
+                sequence_match = 0.0
+
+            # Per-task alignment score
+            task_alignment_score = (tool_coverage + tool_precision + sequence_match) / 3.0
+            alignment_metrics.task_alignment_scores[result.task_id] = task_alignment_score
+
+            coverage_scores.append(tool_coverage)
+            precision_scores.append(tool_precision)
+            sequence_scores.append(sequence_match)
+
+            if task_alignment_score >= 0.5:
+                aligned_count += 1
+
+        # Aggregate
+        alignment_metrics.total_plan_tasks = len(coverage_scores)
+        alignment_metrics.total_aligned_tasks = aligned_count
+
+        if alignment_metrics.total_plan_tasks > 0:
+            alignment_metrics.plan_adherence_rate = (
+                aligned_count / alignment_metrics.total_plan_tasks
+            )
+            alignment_metrics.avg_tool_coverage = (
+                sum(coverage_scores) / len(coverage_scores)
+            )
+            alignment_metrics.avg_tool_precision = (
+                sum(precision_scores) / len(precision_scores)
+            )
+            alignment_metrics.avg_sequence_match = (
+                sum(sequence_scores) / len(sequence_scores)
             )
 
 

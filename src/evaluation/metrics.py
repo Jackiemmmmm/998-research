@@ -236,6 +236,43 @@ class ControllabilityMetrics:
 
 
 @dataclass
+class AlignmentMetrics:
+    """Dim3: Action-Decision Alignment metrics.
+
+    Compares an agent's stated plan (expected tool sequence) against its
+    actual actions (tools actually called) to measure how well agents
+    follow their intended plan.
+    """
+
+    total_plan_tasks: int = 0          # tasks that have a plan defined
+    total_aligned_tasks: int = 0       # tasks where actual actions match plan
+    plan_adherence_rate: float = 0.0   # total_aligned_tasks / total_plan_tasks
+    avg_sequence_match: float = 0.0    # average sequence-level match score
+    avg_tool_coverage: float = 0.0     # average: (matched tools / planned tools)
+    avg_tool_precision: float = 0.0    # average: (matched tools / actual tools called)
+    task_alignment_scores: Dict[str, float] = field(default_factory=dict)  # per-task scores
+
+    def overall_alignment(self) -> float:
+        """Composite alignment score for Dim3."""
+        if self.total_plan_tasks == 0:
+            return 0.0
+        return (self.plan_adherence_rate + self.avg_tool_coverage + self.avg_tool_precision) / 3.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "total_plan_tasks": self.total_plan_tasks,
+            "total_aligned_tasks": self.total_aligned_tasks,
+            "plan_adherence_rate": round(self.plan_adherence_rate, 3),
+            "avg_sequence_match": round(self.avg_sequence_match, 3),
+            "avg_tool_coverage": round(self.avg_tool_coverage, 3),
+            "avg_tool_precision": round(self.avg_tool_precision, 3),
+            "overall_alignment": round(self.overall_alignment(), 3),
+            "task_alignment_scores": {k: round(v, 3) for k, v in self.task_alignment_scores.items()},
+        }
+
+
+@dataclass
 class PatternMetrics:
     """Complete metrics for a pattern across all dimensions."""
 
@@ -244,6 +281,7 @@ class PatternMetrics:
     efficiency: EfficiencyMetrics = field(default_factory=EfficiencyMetrics)
     robustness: RobustnessMetrics = field(default_factory=RobustnessMetrics)
     controllability: ControllabilityMetrics = field(default_factory=ControllabilityMetrics)
+    alignment: AlignmentMetrics = field(default_factory=AlignmentMetrics)
 
     # Phase D2: extended controllability result (set after cross-pattern computation)
     controllability_result: Any = None  # Optional[ControllabilityResult], avoid circular import
@@ -256,6 +294,7 @@ class PatternMetrics:
             "efficiency": self.efficiency.to_dict(),
             "robustness": self.robustness.to_dict(),
             "controllability": self.controllability.to_dict(),
+            "alignment": self.alignment.to_dict(),
         }
         if self.controllability_result is not None:
             d["controllability_extended"] = self.controllability_result.to_dict()
@@ -272,6 +311,7 @@ class PatternMetrics:
             "avg_tokens": round(self.efficiency.avg_total_tokens(), 1),
             "degradation_pct": round(self.robustness.degradation_percentage, 2),
             "controllability": round(self.controllability.overall_controllability(), 3),
+            "alignment": round(self.alignment.overall_alignment(), 3),
         }
         if self.controllability_result is not None:
             s["trace_completeness"] = round(self.controllability_result.trace_completeness, 3)

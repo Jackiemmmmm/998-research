@@ -7,6 +7,7 @@ Controllability, Transparency & Resource Efficiency.
 
 from .evaluator import PatternEvaluator
 from .metrics import (
+    AlignmentMetrics,
     ControllabilityMetrics,
     EfficiencyMetrics,
     RobustnessMetrics,
@@ -26,6 +27,7 @@ __all__ = [
     "EfficiencyMetrics",
     "RobustnessMetrics",
     "ControllabilityMetrics",
+    "AlignmentMetrics",
     "ControllabilityResult",
     "NormalizedDimensionScores",
     "CompositeScore",

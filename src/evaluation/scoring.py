@@ -68,6 +68,25 @@ def _safe_mean(values: List[Optional[float]]) -> Optional[float]:
 # Dimension score computation
 # ---------------------------------------------------------------------------
 
+def compute_dim3_scores(
+    pattern_metrics: Dict[str, PatternMetrics],
+) -> Dict[str, Optional[float]]:
+    """Compute Dim 3 -- Action-Decision Alignment for each pattern.
+
+    Uses the composite alignment score from AlignmentMetrics:
+        overall_alignment = mean(plan_adherence_rate, avg_tool_coverage, avg_tool_precision)
+
+    Returns None for patterns with no plan-tasks.
+    """
+    result = {}
+    for name, metrics in pattern_metrics.items():
+        if metrics.alignment.total_plan_tasks == 0:
+            result[name] = None
+        else:
+            result[name] = metrics.alignment.overall_alignment()
+    return result
+
+
 def compute_dim4_scores(
     pattern_metrics: Dict[str, PatternMetrics],
 ) -> Dict[str, Optional[float]]:
@@ -386,6 +405,7 @@ def compute_all_scores(
         (normalised_scores, composite_scores) dicts keyed by pattern_name.
     """
     # Compute dimension scores across all patterns
+    dim3 = compute_dim3_scores(pattern_metrics)
     dim4 = compute_dim4_scores(pattern_metrics)
     dim6 = compute_dim6_scores(pattern_metrics)
     dim7 = compute_dim7_scores(pattern_metrics, controllability_results)
@@ -398,6 +418,7 @@ def compute_all_scores(
         reserve = reserves.get(pname, {})
         nds = NormalizedDimensionScores(
             pattern_name=pname,
+            dim3_action_decision_alignment=dim3.get(pname),
             dim4_success_efficiency=dim4.get(pname),
             dim6_robustness_scalability=dim6.get(pname),
             dim7_controllability=dim7.get(pname),
