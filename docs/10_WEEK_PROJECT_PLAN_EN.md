@@ -14,7 +14,7 @@
 
 ---
 
-## 1. Current Status (~44% Complete)
+## 1. Current Status (~52% Complete)
 
 > Completion assessment source: [PROJECT_GAP_ANALYSIS_AND_PLAN.md § Summary Table](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#part-1-current-completion-status-gap-analysis)
 
@@ -38,7 +38,7 @@
 | 2 | Cognitive Safety & Constraint Adherence | Cognitive | 0% | Not implemented | [Dim2 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-2-cognitive-safety--constraint-adherence-cognitive---0) |
 | 3 | Action–Decision Alignment | Behavioural | ~70% | **Phase C1 COMPLETED** (2026-04-01): AlignmentMetrics + verb-tool mapping + LCS sequence matching + Dim3 scoring | [Dim3 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-3-actiondecision-alignment-behavioural---0--10--70) |
 | 4 | Success & Efficiency | Behavioural | ~75% | Basic judge + metrics exist; missing normalised cost score | [Dim4 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-4-success--efficiency-behavioural---70--75) |
-| 5 | Behavioural Safety | Behavioural | ~15% | Implementation spec completed (2026-04-01); awaiting P1 implementation | [Dim5 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-5-behavioural-safety-behavioural---5--15) |
+| 5 | Behavioural Safety | Behavioural | ~70% | **Phase C3 COMPLETED** (2026-04-01): tool whitelist validation + domain safety regex + Dim5 scoring | [Dim5 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-5-behavioural-safety-behavioural---5--15--70) |
 | 6 | Robustness & Scalability | Systemic | ~75% | **Phase D1 COMPLETED** (2026-04-01): all perturbations, stability index, complexity scaling, D1-aligned Dim6 formula | [Dim6 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-6-robustness--scalability-systemic---40--75) |
 | 7 | Controllability, Transparency & Resource Efficiency | Systemic | ~45% | Trace completeness foundation exists; missing policy-flag / override tests | [Dim7 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-7-controllability-transparency--resource-efficiency-systemic---35--45) |
 
@@ -247,8 +247,21 @@ Update the `Status` field in the spec header as it progresses.
 - **scaling_score** = 1 - complexity_decline
 - **dim6_score** = mean(1 - degradation%/100, stability_index, scaling_score)
 
-**Remaining Week 3-4 Work:**
-- [ ] P1 implements Phase C3 (Behavioural Safety, Dim5) from P3's spec
+**Completed: Phase C3 — Behavioural Safety (Dim5)**
+
+| # | Component | Details | Modified Files |
+|---|-----------|---------|----------------|
+| 1 | `safety.py` module (NEW) | `UNSAFE_PATTERNS` (12 compiled regex across 5 categories: destructive shell, privilege escalation, code execution, SQL/XSS injection, PII exposure); `check_tool_compliance()`, `check_content_safety()`, `compute_task_safety()` | `src/evaluation/safety.py` |
+| 2 | `BehaviouralSafetyMetrics` dataclass | 10 fields: `total_tool_tasks`, `total_tool_calls`, `authorized_tool_calls`, `unauthorized_tool_calls`, `tool_violation_rate`, `tool_compliance_rate`, `tasks_with_violations`, `task_violation_rate`, `domain_safety_score`, `task_safety_scores` + `overall_safety()` | `src/evaluation/metrics.py` |
+| 3 | `_collect_safety_metrics()` | Per-task: tool whitelist validation via trace tool calls + content safety scanning on output and step content; aggregate: violation rates, compliance rates, domain safety score | `src/evaluation/evaluator.py` |
+| 4 | `compute_dim5_scores()` | Dim5 normalised scoring: `overall_safety() = mean(tool_compliance_rate, domain_safety_score)`; integrated into `compute_all_scores()` and `NormalizedDimensionScores` | `src/evaluation/scoring.py` |
+| 5 | Report & visualisation | Dim5 section in Markdown report; Dim5 in dimension summary table and CSV; Dim5 in normalised heatmap | `src/evaluation/report_generator.py`, `src/evaluation/visualization.py` |
+| 6 | Unit tests | 41 tests covering: tool compliance, content safety (all 5 regex categories), BehaviouralSafetyMetrics, compute_dim5_scores, edge cases, all 5 spec verification cases | `tests/unit_tests/test_safety.py` |
+
+**Week 3-4 Status: ALL TASKS COMPLETE** ✓
+- [x] P1: Phase C1 — Action-Decision Alignment (Dim3)
+- [x] P2: Phase D1 — Enhanced Robustness (Dim6)
+- [x] P3: Phase C3 — Behavioural Safety (Dim5)
 
 ---
 

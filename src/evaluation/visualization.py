@@ -389,6 +389,7 @@ class EvaluationVisualizer:
         dim_keys = [
             ('dim3_action_decision_alignment', 'Dim 3\nAlignment'),
             ('dim4_success_efficiency', 'Dim 4\nSuccess'),
+            ('dim5_behavioural_safety', 'Dim 5\nSafety'),
             ('dim6_robustness_scalability', 'Dim 6\nRobustness'),
             ('dim7_controllability', 'Dim 7\nControl'),
         ]

@@ -12,7 +12,7 @@
 | **B1** | Cognitive Layer — Reasoning Quality (Dim 1) | NOT STARTED | — (P1 self-drives, Week 5–6) | — |
 | **B2** | Cognitive Layer — Cognitive Safety (Dim 2) | NOT STARTED | [week5-6_phase-b2_cognitive-safety.md](./specs/week5-6_phase-b2_cognitive-safety.md) (P3, PENDING) | — |
 | **C1** | Action–Decision Alignment (Dim 3) | **COMPLETED** | — (P1 self-drives) | — (inline in evaluator.py, scoring.py) |
-| **C3** | Behavioural Safety (Dim 5) | SPEC READY, IMPLEMENTATION PENDING | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) (P3, **READY FOR IMPLEMENTATION**) | — |
+| **C3** | Behavioural Safety (Dim 5) | **COMPLETED** | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) (P3) | — (inline in safety.py, evaluator.py, scoring.py) |
 | **D1** | Enhanced Robustness (Dim 6) | **COMPLETED** | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) (P2) | — (inline in evaluator.py, metrics.py, scoring.py) |
 | **D2** | Controllability & Transparency (Dim 7) | NOT STARTED | [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) (P3, READY FOR IMPLEMENTATION) | — |
 | **E** | Normalization & Composite Scoring | NOT STARTED | [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) (P2, READY FOR IMPLEMENTATION) | — |
@@ -33,11 +33,11 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 | 2 | Cognitive Safety & Constraint Adherence | Cognitive | NOT IMPLEMENTED | 0% | Trace foundation ready |
 | 3 | Action-Decision Alignment | Behavioural | **COMPLETED** | ~70% | AlignmentMetrics + verb-tool mapping + LCS sequence matching (2026-04-01) |
 | 4 | Success & Efficiency | Behavioural | PARTIALLY DONE | ~75% | Token accuracy improved; Reflex token tracking fixed (2026-03-12) |
-| 5 | Behavioural Safety | Behavioural | SPEC READY | ~15% | Implementation spec completed (2026-04-01); ToolCallRecord enables enforcement; mock tools added for C1-C4 (2026-03-12) |
+| 5 | Behavioural Safety | Behavioural | **COMPLETED** | ~70% | Phase C3 completed (2026-04-01): tool whitelist validation + domain safety regex + Dim5 scoring |
 | 6 | Robustness & Scalability | Systemic | **D1 COMPLETED** | ~75% | Phase D1 completed (2026-04-01): all perturbations, stability index, complexity scaling |
 | 7 | Controllability, Transparency & Resource Efficiency | Systemic | PARTIALLY DONE | ~45% | TAO cycle tracking enabled |
 
-**Overall estimated completion: ~37% → ~44% of the 7-dimension framework** (Phase C1 Dim3 completed; Phase D1 Dim6 completed; Phase C3 Dim5 spec ready)
+**Overall estimated completion: ~44% → ~52% of the 7-dimension framework** (Phase C1 Dim3, Phase D1 Dim6, Phase C3 Dim5 all completed)
 
 ---
 
@@ -126,7 +126,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 
 ---
 
-#### Dimension 5: Behavioural Safety (Behavioural) - 5% → ~15%
+#### Dimension 5: Behavioural Safety (Behavioural) - 5% → ~15% → ~70%
 
 **Proposal requires:**
 - Tool invocation validated against whitelisted APIs
@@ -135,20 +135,23 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 - Violation rates, blocked attempts, sandbox logs
 - Static domain regex checks as Stage 1 proxy
 
-**Current status (SPEC READY — 2026-04-01):**
-- `TestTask` has a `policy` field with `tool_whitelist`, but it is **never enforced** in the evaluator — spec defines enforcement logic
-- `ControllabilityMetrics` has `unauthorized_tool_uses` field but is always 0 (never tracked) — spec defines replacement via `BehaviouralSafetyMetrics`
-- No sandbox or controlled execution environment
-- No violation tracking — spec defines per-call violation counting
-- **(2026-03-12)**: Mock tools implemented (`weather_api`, `fx_api`, `calculator`, `wiki_search`, `shopping_search`), providing prerequisites for subsequent tool whitelist enforcement validation
-- **(2026-04-01)**: Implementation Spec completed ([week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md)), defining:
-  - `BehaviouralSafetyMetrics` dataclass (11 fields)
-  - Tool whitelist validation logic (per-call granularity authorized/unauthorized tracking)
-  - Domain safety regex rules (5 categories, 11 regex patterns: shell danger commands, code execution, injection attacks, PII exposure)
-  - Per-task safety score formula: `mean(tool_compliance, content_safety)`
-  - Phase E interface: `dim5_score = mean(tool_compliance_rate, domain_safety_score)`
-  - 5 verification cases + 8 edge cases
-  - Integration points: CREATE `safety.py`, MODIFY `metrics.py`, `evaluator.py`, `scoring.py`, `report_generator.py`
+**Current status (DONE — Phase C3, 2026-04-01):**
+- ~~`TestTask` has a `policy` field with `tool_whitelist`, but it is **never enforced** in the evaluator~~ **RESOLVED**: `_collect_safety_metrics()` now validates tool calls against whitelist per task
+- ~~`ControllabilityMetrics` has `unauthorized_tool_uses` field but is always 0 (never tracked)~~ **RESOLVED**: `BehaviouralSafetyMetrics` tracks authorized/unauthorized counts at per-call granularity
+- ~~No violation tracking~~ **RESOLVED**: per-task and aggregate violation rates computed
+- **(2026-03-12)**: Mock tools implemented (`weather_api`, `fx_api`, `calculator`, `wiki_search`, `shopping_search`), providing prerequisites for tool whitelist enforcement
+- **(2026-04-01)**: Phase C3 implementation completed, including:
+  - `src/evaluation/safety.py` (NEW): `UNSAFE_PATTERNS` (12 regex patterns across 5 categories), `check_tool_compliance()`, `check_content_safety()`, `compute_task_safety()`
+  - `BehaviouralSafetyMetrics` dataclass (metrics.py): 10 fields + `overall_safety()` method
+  - `_collect_safety_metrics()` (evaluator.py): per-task tool whitelist validation + content safety scanning
+  - `compute_dim5_scores()` (scoring.py): integrated into `compute_all_scores()` and `NormalizedDimensionScores`
+  - Report & visualisation updated with Dim5 data
+  - 41 unit tests all passing (tests/unit_tests/test_safety.py)
+
+**Current status (REMAINING — Stage 2 future):**
+- No controlled execution environment / sandbox
+- Domain regex is a proxy — not a full safety classifier
+- No blocked-attempt enforcement (monitoring only, not blocking)
 
 ---
 
@@ -459,7 +462,7 @@ Given the project timeline (Figure 1 in proposal: Stage 3 Full Evaluation is ~Ma
 | **P2** | C2 | Complete Success & Efficiency | Low | NOT STARTED |
 | **P3** | D1 | Enhance Robustness | Medium | **COMPLETED** (2026-04-01) |
 | **P3** | D2 | Controllability & Transparency | Medium | NOT STARTED (prerequisite Phase A ready) |
-| **P3** | C3 | Behavioural Safety | Medium | SPEC READY (2026-04-01), IMPLEMENTATION PENDING |
+| **P3** | C3 | Behavioural Safety | Medium | **COMPLETED** (2026-04-01) |
 | **P4** | B2 | Cognitive Safety (proxy) | Medium | NOT STARTED |
 | **P5** | G | Report & Visualization Polish | Medium | NOT STARTED |
 
