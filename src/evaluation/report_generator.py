@@ -287,33 +287,42 @@ class ReportGenerator:
                 lines.append(f"- Token range: min = {min(valid_tok):.0f}, max = {max(valid_tok):.0f}")
             lines.append("")
 
-            lines.append("#### Dim 6 — Robustness & Scalability")
+            lines.append("#### Dim 6 — Robustness & Scalability (D1)")
             lines.append("")
             lines.append("```")
-            lines.append("Dim6 = mean(norm_degradation, recovery_rate, robustness_score)")
+            lines.append("Dim6 = mean(norm_degradation, stability_index, scaling_score)")
             lines.append("```")
             lines.append("")
             lines.append("| Sub-indicator | Source | Normalisation |")
             lines.append("|---------------|--------|---------------|")
             lines.append("| `norm_degradation` | degradation % | `1 − (degradation / 100)`, clamped to [0, 1] |")
-            lines.append("| `recovery_rate` | tool failure recovery | Already in [0, 1] |")
-            lines.append("| `robustness_score` | per-task original vs perturbed agreement | Already in [0, 1]; None if no perturbation data |")
+            lines.append("| `stability_index` | prompt-variant consistency | Already in [0, 1] |")
+            lines.append("| `scaling_score` | `1 − complexity_decline` | Already in [0, 1] |")
             lines.append("")
             lines.append("**Dim 6 computation detail:**")
             lines.append("")
-            lines.append("| Pattern | degradation % | norm_degradation | recovery_rate | robustness_score | Dim 6 |")
-            lines.append("|---------|--------------|-----------------|--------------|-----------------|-------|")
+            lines.append("| Pattern | degradation % | abs_degrad | norm_degrad | stability | scaling | variants | Dim 6 |")
+            lines.append("|---------|--------------|-----------|------------|----------|---------|----------|-------|")
             for name, m in pattern_metrics.items():
                 rm = m.robustness
                 ns = getattr(m, '_normalised_scores', None)
-                d6 = ns.dim6_robustness_scalability if ns and ns.dim6_robustness_scalability is not None else 0.0
+                d6 = ns.dim6_robustness_scalability if ns and ns.dim6_robustness_scalability is not None else None
                 nd = max(0.0, min(1.0, 1.0 - rm.degradation_percentage / 100.0))
-                rec = rm.tool_failure_recovery_rate
-                rob = rm.avg_robustness_score()
-                rob_str = f"{rob:.3f}" if rm.task_robustness_scores else "N/A"
+                d6_str = f"{d6:.3f}" if d6 is not None else "N/A"
                 lines.append(
-                    f"| {name:12s} | {rm.degradation_percentage:12.1f} | {nd:15.3f} | {rec:12.3f} | {rob_str:>15s} | {d6:.3f} |"
+                    f"| {name:12s} | {rm.degradation_percentage:12.1f} | {rm.absolute_degradation:9.3f} | "
+                    f"{nd:10.3f} | {rm.stability_index:8.3f} | {rm.scaling_score:7.3f} | "
+                    f"{rm.perturbation_variant_count:8d} | {d6_str:>5s} |"
                 )
+            lines.append("")
+            # Success by complexity breakdown
+            lines.append("**Success by complexity:**")
+            lines.append("")
+            for name, m in pattern_metrics.items():
+                rm = m.robustness
+                if rm.success_by_complexity:
+                    parts = ", ".join(f"{k}: {v:.3f}" for k, v in rm.success_by_complexity.items())
+                    lines.append(f"- **{name}**: {parts} (decline={rm.complexity_decline:.3f})")
             lines.append("")
 
             lines.append("#### Dim 7 — Controllability, Transparency & Resource Efficiency")
@@ -487,6 +496,8 @@ class ReportGenerator:
         # Build CSV
         lines = []
         header = "Pattern,Success Rate (Strict),Success Rate (Lenient),Controllability Gap,Avg Latency (s),Avg Tokens,Degradation (%),Controllability,Alignment"
+        # D1 columns
+        header += ",Abs Degradation,Perturbation Variants,Stability Index,Complexity Decline,Scaling Score"
         # D2 + E columns
         header += ",Trace Completeness,Policy Flag Rate,Resource Efficiency,Dim3,Dim4,Dim6,Dim7,Composite"
         lines.append(header)
@@ -505,6 +516,18 @@ class ReportGenerator:
                 f"{row['controllability']:.3f},"
                 f"{row['alignment']:.3f}"
             )
+            # D1 sub-indicators
+            if metrics:
+                rm = metrics.robustness
+                line += (
+                    f",{rm.absolute_degradation:.4f}"
+                    f",{rm.perturbation_variant_count}"
+                    f",{rm.stability_index:.4f}"
+                    f",{rm.complexity_decline:.4f}"
+                    f",{rm.scaling_score:.4f}"
+                )
+            else:
+                line += ",,,,,"
             # D2 sub-indicators
             cr = getattr(metrics, 'controllability_result', None) if metrics else None
             if cr:

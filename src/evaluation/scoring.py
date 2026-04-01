@@ -129,7 +129,10 @@ def compute_dim6_scores(
 ) -> Dict[str, Optional[float]]:
     """Compute Dim 6 — Robustness & Scalability for each pattern.
 
-    Formula: (1/3) * norm_degradation + (1/3) * recovery_rate + (1/3) * robustness_score
+    D1-aligned formula:
+        dim6 = mean(norm_degradation, stability_index, scaling_score)
+
+    Returns None when perturbation_variant_count == 0 (no perturbation data).
     """
     patterns = list(pattern_metrics.keys())
     if not patterns:
@@ -139,31 +142,19 @@ def compute_dim6_scores(
     for pname in patterns:
         rm = pattern_metrics[pname].robustness
 
-        # If original_success_rate is 0, degradation is not meaningful
-        # (degradation formula divides by original, clamped to 0 — misleading).
-        # Treat the entire Dim 6 score as unreliable for such patterns.
-        if rm.original_success_rate == 0:
-            result[pname] = 0.0  # No original successes → worst robustness
+        if rm.perturbation_variant_count == 0:
+            result[pname] = None
             continue
 
-        # norm_degradation: Option B (÷100, inverted)
         norm_degradation = 1.0 - (rm.degradation_percentage / 100.0)
         norm_degradation = max(0.0, min(1.0, norm_degradation))
 
-        # recovery_rate: Option B (use directly)
-        recovery = rm.tool_failure_recovery_rate
-
-        # robustness_score: Option B (use directly)
-        robustness = rm.avg_robustness_score()
-
-        sub_indicators: List[Optional[float]] = [norm_degradation, recovery, robustness]
-
-        # Handle None-like values: if robustness has no task scores, treat as None
-        if not rm.task_robustness_scores:
-            sub_indicators[2] = None
-
-        score = _safe_mean(sub_indicators)
-        result[pname] = score
+        sub_indicators = [
+            norm_degradation,
+            rm.stability_index,
+            rm.scaling_score,
+        ]
+        result[pname] = sum(sub_indicators) / len(sub_indicators)
 
     return result
 

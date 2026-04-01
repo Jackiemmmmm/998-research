@@ -160,37 +160,73 @@ class EvaluationVisualizer:
         self,
         pattern_metrics: Dict[str, PatternMetrics],
     ) -> str:
-        """Plot robustness metrics."""
+        """Plot robustness metrics with D1 stability and scaling indicators."""
         patterns = list(pattern_metrics.keys())
         original_rates = [metrics.robustness.original_success_rate * 100 for metrics in pattern_metrics.values()]
         perturbed_rates = [metrics.robustness.perturbed_success_rate * 100 for metrics in pattern_metrics.values()]
 
+        # Check if D1 data is available
+        has_d1 = any(
+            metrics.robustness.perturbation_variant_count > 0
+            for metrics in pattern_metrics.values()
+        )
+
+        if has_d1:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+        else:
+            fig, ax1 = plt.subplots(figsize=(10, 6))
+
         x = np.arange(len(patterns))
         width = 0.35
 
-        fig, ax = plt.subplots(figsize=(10, 6))
-
-        bars1 = ax.bar(x - width/2, original_rates, width, label='Original', color=self.colors[0])
-        bars2 = ax.bar(x + width/2, perturbed_rates, width, label='Perturbed', color=self.colors[1])
+        bars1 = ax1.bar(x - width/2, original_rates, width, label='Original', color=self.colors[0])
+        bars2 = ax1.bar(x + width/2, perturbed_rates, width, label='Perturbed', color=self.colors[1])
 
         # Add value labels
         for bars in [bars1, bars2]:
             for bar in bars:
                 height = bar.get_height()
-                ax.text(
+                ax1.text(
                     bar.get_x() + bar.get_width() / 2., height,
                     f'{height:.1f}%',
                     ha='center', va='bottom', fontsize=8
                 )
 
-        ax.set_ylabel('Success Rate (%)', fontsize=12, fontweight='bold')
-        ax.set_title('Robustness: Original vs Perturbed Performance', fontsize=14, fontweight='bold')
-        ax.set_xticks(x)
-        ax.set_xticklabels(patterns)
-        ax.legend(fontsize=10)
-        ax.set_ylim(0, 110)
-        ax.grid(axis='y', alpha=0.3)
+        ax1.set_ylabel('Success Rate (%)', fontsize=12, fontweight='bold')
+        ax1.set_title('Original vs Perturbed Performance', fontsize=12, fontweight='bold')
+        ax1.set_xticks(x)
+        ax1.set_xticklabels(patterns)
+        ax1.legend(fontsize=10)
+        ax1.set_ylim(0, 110)
+        ax1.grid(axis='y', alpha=0.3)
 
+        # D1 panel: stability index and scaling score
+        if has_d1:
+            stability = [metrics.robustness.stability_index * 100 for metrics in pattern_metrics.values()]
+            scaling = [metrics.robustness.scaling_score * 100 for metrics in pattern_metrics.values()]
+
+            bar_width = 0.35
+            bars3 = ax2.bar(x - bar_width/2, stability, bar_width, label='Stability Index', color=self.colors[2])
+            bars4 = ax2.bar(x + bar_width/2, scaling, bar_width, label='Scaling Score', color=self.colors[3])
+
+            for bars in [bars3, bars4]:
+                for bar in bars:
+                    height = bar.get_height()
+                    ax2.text(
+                        bar.get_x() + bar.get_width() / 2., height,
+                        f'{height:.1f}%',
+                        ha='center', va='bottom', fontsize=8
+                    )
+
+            ax2.set_ylabel('Score (%)', fontsize=12, fontweight='bold')
+            ax2.set_title('D1: Stability & Scaling', fontsize=12, fontweight='bold')
+            ax2.set_xticks(x)
+            ax2.set_xticklabels(patterns)
+            ax2.legend(fontsize=10)
+            ax2.set_ylim(0, 110)
+            ax2.grid(axis='y', alpha=0.3)
+
+        fig.suptitle('Robustness & Scalability (Dim 6)', fontsize=14, fontweight='bold', y=1.02)
         plt.tight_layout()
         output_path = self.output_dir / "robustness_comparison.png"
         plt.savefig(output_path, dpi=300, bbox_inches='tight')

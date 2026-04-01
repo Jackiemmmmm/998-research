@@ -14,7 +14,7 @@
 
 ---
 
-## 1. Current Status (~37% Complete)
+## 1. Current Status (~44% Complete)
 
 > Completion assessment source: [PROJECT_GAP_ANALYSIS_AND_PLAN.md § Summary Table](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#part-1-current-completion-status-gap-analysis)
 
@@ -39,7 +39,7 @@
 | 3 | Action–Decision Alignment | Behavioural | ~70% | **Phase C1 COMPLETED** (2026-04-01): AlignmentMetrics + verb-tool mapping + LCS sequence matching + Dim3 scoring | [Dim3 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-3-actiondecision-alignment-behavioural---0--10--70) |
 | 4 | Success & Efficiency | Behavioural | ~75% | Basic judge + metrics exist; missing normalised cost score | [Dim4 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-4-success--efficiency-behavioural---70--75) |
 | 5 | Behavioural Safety | Behavioural | ~15% | Implementation spec completed (2026-04-01); awaiting P1 implementation | [Dim5 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-5-behavioural-safety-behavioural---5--15) |
-| 6 | Robustness & Scalability | Systemic | ~40% | Perturbation framework exists; missing temperature sweep / multi-run variance | [Dim6 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-6-robustness--scalability-systemic---40) |
+| 6 | Robustness & Scalability | Systemic | ~75% | **Phase D1 COMPLETED** (2026-04-01): all perturbations, stability index, complexity scaling, D1-aligned Dim6 formula | [Dim6 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-6-robustness--scalability-systemic---40--75) |
 | 7 | Controllability, Transparency & Resource Efficiency | Systemic | ~45% | Trace completeness foundation exists; missing policy-flag / override tests | [Dim7 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-7-controllability-transparency--resource-efficiency-systemic---35--45) |
 
 ### 1.3 Missing Key Modules
@@ -225,9 +225,30 @@ Update the `Status` field in the spec header as it progresses.
 | 5 | Verification cases | 5 concrete test cases with expected numerical outputs |
 | 6 | Integration points | CREATE `safety.py`, MODIFY `metrics.py`, `evaluator.py`, `scoring.py`, `report_generator.py` |
 
+**Completed: Phase D1 — Enhanced Robustness & Scalability (Dim6)**
+
+| # | Component | Details | Modified Files |
+|---|-----------|---------|----------------|
+| 1 | `RobustnessMetrics` D1 extension | 6 new fields: `perturbation_variant_count`, `absolute_degradation`, `stability_index`, `success_by_complexity`, `complexity_decline`, `scaling_score`; updated `calculate_degradation()` and `to_dict()` | `src/evaluation/metrics.py` |
+| 2 | `_run_robustness_tests()` upgrade | Now iterates over ALL perturbation variants per task (previously only used the first) | `src/evaluation/evaluator.py` |
+| 3 | `_collect_robustness_metrics()` D1 logic | Per-task robustness scoring (1.0/0.5/0.0); stability index via variance proxy; success-by-complexity grouping; complexity decline & scaling score | `src/evaluation/evaluator.py` |
+| 4 | `_compute_success_by_complexity()` helper | Groups original results by complexity level (simple/medium/complex) and computes per-band success rate | `src/evaluation/evaluator.py` |
+| 5 | `_compute_complexity_decline()` helper | `max(0, success_simple - success_complex)`; returns 0.0 if either level is missing | `src/evaluation/evaluator.py` |
+| 6 | `compute_dim6_scores()` D1-aligned | New formula: `dim6 = mean(norm_degradation, stability_index, scaling_score)`; returns None when no perturbations | `src/evaluation/scoring.py` |
+| 7 | Report & visualisation | D1 sub-indicators in Markdown/CSV; extended robustness plot with stability & scaling panels | `src/evaluation/report_generator.py`, `src/evaluation/visualization.py` |
+| 8 | Unit tests | 29 tests covering all 6 spec verification cases + edge cases (no perturbations, S_clean==0, single variant, missing complexity levels, all same result) | `tests/unit_tests/test_robustness_d1.py` |
+
+**D1 Scoring Formulas:**
+- **absolute_degradation** = |S_clean - S_noisy|
+- **degradation_percentage** = 100 × (S_clean - S_noisy) / S_clean (clamped to [0, 100])
+- **per-task robustness** = mean(1.0 if both succeed, 0.5 if original succeeds & perturbed fails, 0.0 otherwise)
+- **stability_index** = mean(1 - min(p×(1-p)/0.25, 1.0)) over tasks with ≥2 variants
+- **complexity_decline** = max(0, success_simple - success_complex)
+- **scaling_score** = 1 - complexity_decline
+- **dim6_score** = mean(1 - degradation%/100, stability_index, scaling_score)
+
 **Remaining Week 3-4 Work:**
-- [ ] P1 implements Phase D1 (Robustness, Dim6) from P2's spec
-- [ ] P1 implements Phase C3 (Behavioural Safety, Dim5) from P3's spec above
+- [ ] P1 implements Phase C3 (Behavioural Safety, Dim5) from P3's spec
 
 ---
 

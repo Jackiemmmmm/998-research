@@ -399,20 +399,25 @@ class PatternEvaluator:
         graph,
         tasks: List[TestTask],
     ) -> List[TaskResult]:
-        """Run robustness tests with perturbations."""
-        perturbed_tasks = []
+        """Run robustness tests with ALL perturbations for each task."""
+        perturbed_results: List[TaskResult] = []
 
-        # Collect tasks with perturbations
         for task in tasks:
-            if task.get_perturbations():
-                perturbed_tasks.append(task)
+            perturbations = task.get_perturbations()
+            if not perturbations:
+                continue
 
-        if not perturbed_tasks:
-            return []
+            for prompt_variant in perturbations:
+                wrapped_prompt = self._wrap_prompt_for_evaluation(prompt_variant, task)
+                result = await self._run_single_task(
+                    pattern_name, graph, task, wrapped_prompt
+                )
+                perturbed_results.append(result)
 
-        return await self._run_tasks(
-            pattern_name, graph, perturbed_tasks, variant="perturbed"
-        )
+                if self.delay_between_tasks > 0:
+                    await asyncio.sleep(self.delay_between_tasks)
+
+        return perturbed_results
 
     def _collect_success_metrics(
         self,
@@ -466,40 +471,68 @@ class PatternEvaluator:
         original_results: List[TaskResult],
         perturbed_results: List[TaskResult],
     ):
-        """Collect robustness dimension metrics."""
+        """Collect robustness dimension metrics (D1-enhanced)."""
         if not perturbed_results:
+            robustness_metrics.perturbation_variant_count = 0
+            robustness_metrics.success_by_complexity = _compute_success_by_complexity(
+                original_results
+            )
+            robustness_metrics.complexity_decline = _compute_complexity_decline(
+                robustness_metrics.success_by_complexity
+            )
+            robustness_metrics.scaling_score = 1.0 - robustness_metrics.complexity_decline
             return
 
-        # Calculate perturbed success rate
-        perturbed_success = sum(1 for r in perturbed_results if r.judge_success)
-        robustness_metrics.perturbed_success_rate = perturbed_success / len(perturbed_results)
-
-        # Calculate degradation
+        robustness_metrics.perturbation_variant_count = len(perturbed_results)
+        robustness_metrics.perturbed_success_rate = (
+            sum(1 for r in perturbed_results if r.judge_success) / len(perturbed_results)
+        )
         robustness_metrics.calculate_degradation()
 
-        # Per-task robustness
-        task_pairs = {}
-        for orig in original_results:
-            task_pairs[orig.task_id] = {"original": orig}
+        original_by_task = {r.task_id: r for r in original_results}
+        perturbed_by_task: Dict[str, List[TaskResult]] = {}
+        for result in perturbed_results:
+            perturbed_by_task.setdefault(result.task_id, []).append(result)
 
-        for pert in perturbed_results:
-            if pert.task_id in task_pairs:
-                task_pairs[pert.task_id]["perturbed"] = pert
+        stability_scores: List[float] = []
 
-        for task_id, pair in task_pairs.items():
-            if "original" in pair and "perturbed" in pair:
-                orig = pair["original"]
-                pert = pair["perturbed"]
+        for task_id, original in original_by_task.items():
+            variants = perturbed_by_task.get(task_id, [])
+            if not variants:
+                continue
 
-                # Robustness score: 1.0 if both succeed, 0.5 if only original succeeds, 0.0 otherwise
-                if orig.judge_success and pert.judge_success:
-                    score = 1.0
-                elif orig.judge_success and not pert.judge_success:
-                    score = 0.5
+            per_variant_scores: List[float] = []
+            success_vector = [1.0 if original.judge_success else 0.0]
+
+            for variant in variants:
+                success_vector.append(1.0 if variant.judge_success else 0.0)
+
+                if original.judge_success and variant.judge_success:
+                    per_variant_scores.append(1.0)
+                elif original.judge_success and not variant.judge_success:
+                    per_variant_scores.append(0.5)
                 else:
-                    score = 0.0
+                    per_variant_scores.append(0.0)
 
-                robustness_metrics.task_robustness_scores[task_id] = score
+            robustness_metrics.task_robustness_scores[task_id] = (
+                sum(per_variant_scores) / len(per_variant_scores)
+            )
+
+            if len(success_vector) > 2:
+                p = sum(success_vector) / len(success_vector)
+                variance = p * (1.0 - p)
+                stability_scores.append(1.0 - min(variance / 0.25, 1.0))
+
+        robustness_metrics.stability_index = (
+            sum(stability_scores) / len(stability_scores) if stability_scores else 0.0
+        )
+        robustness_metrics.success_by_complexity = _compute_success_by_complexity(
+            original_results
+        )
+        robustness_metrics.complexity_decline = _compute_complexity_decline(
+            robustness_metrics.success_by_complexity
+        )
+        robustness_metrics.scaling_score = 1.0 - robustness_metrics.complexity_decline
 
     def _collect_controllability_metrics(
         self,
@@ -699,6 +732,31 @@ class PatternEvaluator:
             alignment_metrics.avg_sequence_match = (
                 sum(sequence_scores) / len(sequence_scores)
             )
+
+
+def _compute_success_by_complexity(
+    original_results: List[TaskResult],
+) -> Dict[str, float]:
+    """Compute success rate grouped by task complexity level."""
+    result: Dict[str, float] = {}
+
+    for level in ("simple", "medium", "complex"):
+        subset = [r for r in original_results if r.task_complexity == level]
+        if subset:
+            result[level] = sum(1 for r in subset if r.judge_success) / len(subset)
+
+    return result
+
+
+def _compute_complexity_decline(success_by_complexity: Dict[str, float]) -> float:
+    """Compute performance decline from simple to complex tasks."""
+    success_simple = success_by_complexity.get("simple")
+    success_complex = success_by_complexity.get("complex")
+
+    if success_simple is None or success_complex is None:
+        return 0.0
+
+    return max(0.0, success_simple - success_complex)
 
 
 async def evaluate_multiple_patterns(

@@ -13,7 +13,7 @@
 | **B2** | Cognitive Layer — Cognitive Safety (Dim 2) | NOT STARTED | [week5-6_phase-b2_cognitive-safety.md](./specs/week5-6_phase-b2_cognitive-safety.md) (P3, PENDING) | — |
 | **C1** | Action–Decision Alignment (Dim 3) | **COMPLETED** | — (P1 self-drives) | — (inline in evaluator.py, scoring.py) |
 | **C3** | Behavioural Safety (Dim 5) | SPEC READY, IMPLEMENTATION PENDING | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) (P3, **READY FOR IMPLEMENTATION**) | — |
-| **D1** | Enhanced Robustness (Dim 6) | SPEC READY, IMPLEMENTATION PENDING | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) (P2, READY FOR IMPLEMENTATION) | — |
+| **D1** | Enhanced Robustness (Dim 6) | **COMPLETED** | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) (P2) | — (inline in evaluator.py, metrics.py, scoring.py) |
 | **D2** | Controllability & Transparency (Dim 7) | NOT STARTED | [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) (P3, READY FOR IMPLEMENTATION) | — |
 | **E** | Normalization & Composite Scoring | NOT STARTED | [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) (P2, READY FOR IMPLEMENTATION) | — |
 | **F** | Statistical Rigor & Reproducibility | NOT STARTED | [week5-6_phase-f_statistical-rigor.md](./specs/week5-6_phase-f_statistical-rigor.md) (P2, PENDING) | — |
@@ -34,10 +34,10 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 | 3 | Action-Decision Alignment | Behavioural | **COMPLETED** | ~70% | AlignmentMetrics + verb-tool mapping + LCS sequence matching (2026-04-01) |
 | 4 | Success & Efficiency | Behavioural | PARTIALLY DONE | ~75% | Token accuracy improved; Reflex token tracking fixed (2026-03-12) |
 | 5 | Behavioural Safety | Behavioural | SPEC READY | ~15% | Implementation spec completed (2026-04-01); ToolCallRecord enables enforcement; mock tools added for C1-C4 (2026-03-12) |
-| 6 | Robustness & Scalability | Systemic | PARTIALLY DONE | ~40% | — |
+| 6 | Robustness & Scalability | Systemic | **D1 COMPLETED** | ~75% | Phase D1 completed (2026-04-01): all perturbations, stability index, complexity scaling |
 | 7 | Controllability, Transparency & Resource Efficiency | Systemic | PARTIALLY DONE | ~45% | TAO cycle tracking enabled |
 
-**Overall estimated completion: ~28% → ~37% of the 7-dimension framework** (Phase C1 Dim3 completed; Phase C3 Dim5 spec ready)
+**Overall estimated completion: ~37% → ~44% of the 7-dimension framework** (Phase C1 Dim3 completed; Phase D1 Dim6 completed; Phase C3 Dim5 spec ready)
 
 ---
 
@@ -152,7 +152,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 
 ---
 
-#### Dimension 6: Robustness & Scalability (Systemic) - ~40%
+#### Dimension 6: Robustness & Scalability (Systemic) - ~40% → ~75%
 
 **Proposal requires:**
 - Temperature/seed sweeps for variance-based stability indices
@@ -161,17 +161,26 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 - Progressive scaling experiments (performance vs task complexity)
 - Multiple runs (3-5) with mean +/- 95% CI
 
-**Current status (DONE):**
-- Input perturbation tests exist (2 perturbations per task in test_suite.py)
-- `RobustnessMetrics` with degradation calculation
+**Current status (DONE — Phase D1, 2026-04-01):**
+- ~~Input perturbation tests exist (2 perturbations per task in test_suite.py)~~ **ENHANCED**: Now runs ALL perturbation variants per task (not just the first)
+- ~~`RobustnessMetrics` with degradation calculation~~ **EXTENDED** with 6 new D1 fields:
+  - `perturbation_variant_count`: total perturbed task executions
+  - `absolute_degradation`: |S_clean - S_noisy|
+  - `stability_index`: prompt-variant stability proxy via variance formula — `1 - min(p*(1-p)/0.25, 1.0)`
+  - `success_by_complexity`: per-band success rate (simple/medium/complex)
+  - `complexity_decline`: `max(0, success_simple - success_complex)`
+  - `scaling_score`: `1 - complexity_decline`
 - Original vs perturbed success rate comparison
+- Per-task robustness scoring: 1.0 (both succeed), 0.5 (original succeeds, perturbed fails), 0.0 (otherwise)
+- D1-aligned Dim6 formula: `dim6 = mean(norm_degradation, stability_index, scaling_score)`
+- Report & visualisation updated with D1 sub-indicators
+- 29 unit tests all passing (tests/unit_tests/test_robustness_d1.py)
 
-**Current status (MISSING):**
-- No temperature/seed sweep (variance-based stability)
+**Current status (REMAINING — Stage 2 future):**
+- No true temperature/seed sweep (requires refactoring pattern graphs into runtime-configurable factories)
 - Perturbations are hand-written, not generated via nlpaug/textattack
-- No progressive scaling experiments
-- No multiple runs or confidence intervals
-- No statistical rigor (mean +/- 95% CI)
+- No multiple runs or confidence intervals (Phase F)
+- No statistical rigor — mean +/- 95% CI (Phase F)
 
 ---
 
@@ -448,7 +457,7 @@ Given the project timeline (Figure 1 in proposal: Stage 3 Full Evaluation is ~Ma
 | **P2** | B1 | Reasoning Quality | Medium-High | NOT STARTED |
 | **P2** | C1 | Action-Decision Alignment | Medium | **COMPLETED** (2026-04-01) |
 | **P2** | C2 | Complete Success & Efficiency | Low | NOT STARTED |
-| **P3** | D1 | Enhance Robustness | Medium | NOT STARTED |
+| **P3** | D1 | Enhance Robustness | Medium | **COMPLETED** (2026-04-01) |
 | **P3** | D2 | Controllability & Transparency | Medium | NOT STARTED (prerequisite Phase A ready) |
 | **P3** | C3 | Behavioural Safety | Medium | SPEC READY (2026-04-01), IMPLEMENTATION PENDING |
 | **P4** | B2 | Cognitive Safety (proxy) | Medium | NOT STARTED |

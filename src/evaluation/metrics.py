@@ -144,6 +144,14 @@ class RobustnessMetrics:
     # Per-task robustness
     task_robustness_scores: Dict[str, float] = field(default_factory=dict)
 
+    # Phase D1 fields
+    perturbation_variant_count: int = 0
+    absolute_degradation: float = 0.0
+    stability_index: float = 0.0
+    success_by_complexity: Dict[str, float] = field(default_factory=dict)
+    complexity_decline: float = 0.0
+    scaling_score: float = 1.0
+
     def calculate_degradation(self):
         """Calculate performance degradation percentage (clamped to 0-100%)."""
         if self.original_success_rate == 0:
@@ -151,6 +159,10 @@ class RobustnessMetrics:
         else:
             degradation = (self.original_success_rate - self.perturbed_success_rate) / self.original_success_rate
             self.degradation_percentage = max(0.0, min(100.0, degradation * 100))
+
+        self.absolute_degradation = abs(
+            self.original_success_rate - self.perturbed_success_rate
+        )
 
     def avg_robustness_score(self) -> float:
         """Average robustness score across tasks."""
@@ -164,8 +176,14 @@ class RobustnessMetrics:
             "original_success_rate": round(self.original_success_rate, 3),
             "perturbed_success_rate": round(self.perturbed_success_rate, 3),
             "degradation_percentage": round(self.degradation_percentage, 2),
+            "absolute_degradation": round(self.absolute_degradation, 3),
+            "perturbation_variant_count": self.perturbation_variant_count,
             "tool_failure_recovery_rate": round(self.tool_failure_recovery_rate, 3),
             "tool_failure_graceful_degradation": round(self.tool_failure_graceful_degradation, 3),
+            "stability_index": round(self.stability_index, 3),
+            "success_by_complexity": {k: round(v, 3) for k, v in self.success_by_complexity.items()},
+            "complexity_decline": round(self.complexity_decline, 3),
+            "scaling_score": round(self.scaling_score, 3),
             "avg_robustness_score": round(self.avg_robustness_score(), 3),
             "task_robustness_scores": {k: round(v, 3) for k, v in self.task_robustness_scores.items()},
         }
