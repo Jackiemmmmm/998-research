@@ -25,6 +25,7 @@ class TestAlignmentMetrics:
         assert am.total_plan_tasks == 0
         assert am.total_aligned_tasks == 0
         assert am.plan_adherence_rate == 0.0
+        assert am.any_tools_called is False
         assert am.overall_alignment() == 0.0
 
     def test_overall_alignment(self):
@@ -53,6 +54,7 @@ class TestAlignmentMetrics:
             avg_tool_coverage=0.7,
             avg_tool_precision=0.8,
             task_alignment_scores={"C1": 0.9, "C2": 0.3},
+            any_tools_called=True,
         )
         d = am.to_dict()
         assert d["total_plan_tasks"] == 2
@@ -62,6 +64,7 @@ class TestAlignmentMetrics:
         assert d["avg_tool_coverage"] == 0.7
         assert d["avg_tool_precision"] == 0.8
         assert "overall_alignment" in d
+        assert d["any_tools_called"] is True
         assert "C1" in d["task_alignment_scores"]
 
 
@@ -168,6 +171,7 @@ class TestCollectAlignmentMetrics:
 
         assert am.total_plan_tasks == 1
         assert am.total_aligned_tasks == 1
+        assert am.any_tools_called is True
         assert abs(am.avg_tool_coverage - 1.0) < 1e-9
         assert abs(am.avg_tool_precision - 1.0) < 1e-9
         assert abs(am.avg_sequence_match - 1.0) < 1e-9
@@ -206,7 +210,7 @@ class TestCollectAlignmentMetrics:
         assert am.total_plan_tasks == 0
 
     def test_no_actual_tools(self):
-        """Agent made zero tool calls -> coverage=0, precision=0."""
+        """Agent made zero tool calls -> coverage=0, precision=0, any_tools_called=False."""
         tasks = [_make_test_task("C1", plan=["weather_api"])]
         trace = AgentTrace(pattern_name="test", task_id="C1")
         trace.steps.append(StepRecord(
@@ -218,6 +222,7 @@ class TestCollectAlignmentMetrics:
         self.evaluator._collect_alignment_metrics(am, results, tasks)
 
         assert am.total_plan_tasks == 1
+        assert am.any_tools_called is False
         assert abs(am.avg_tool_coverage - 0.0) < 1e-9
         assert abs(am.avg_tool_precision - 0.0) < 1e-9
 
@@ -406,17 +411,31 @@ class TestComputeDim3Scores:
         assert scores["test"] is None
 
     def test_with_alignment_data(self):
-        """Dim3 should return overall_alignment value."""
+        """Dim3 should return overall_alignment value when tools were called."""
         pm = PatternMetrics(pattern_name="test")
         pm.alignment = AlignmentMetrics(
             total_plan_tasks=4,
             plan_adherence_rate=0.75,
             avg_tool_coverage=0.8,
             avg_tool_precision=0.6,
+            any_tools_called=True,
         )
         scores = compute_dim3_scores({"test": pm})
         expected = (0.75 + 0.8 + 0.6) / 3.0
         assert abs(scores["test"] - expected) < 1e-9
+
+    def test_plan_tasks_but_no_tools_called_returns_none(self):
+        """Pattern has plan tasks but never called any tools -> Dim3 = None."""
+        pm = PatternMetrics(pattern_name="baseline")
+        pm.alignment = AlignmentMetrics(
+            total_plan_tasks=4,
+            plan_adherence_rate=0.0,
+            avg_tool_coverage=0.0,
+            avg_tool_precision=0.0,
+            any_tools_called=False,
+        )
+        scores = compute_dim3_scores({"baseline": pm})
+        assert scores["baseline"] is None
 
     def test_multiple_patterns(self):
         """Multiple patterns with different alignment data."""
@@ -426,12 +445,42 @@ class TestComputeDim3Scores:
             plan_adherence_rate=1.0,
             avg_tool_coverage=1.0,
             avg_tool_precision=1.0,
+            any_tools_called=True,
         )
         pm2 = PatternMetrics(pattern_name="cot")
         # No plan tasks for cot
         scores = compute_dim3_scores({"react": pm1, "cot": pm2})
         assert abs(scores["react"] - 1.0) < 1e-9
         assert scores["cot"] is None
+
+    def test_multiple_patterns_with_no_tool_use(self):
+        """Patterns with plan tasks but no tool calls get None, not 0.0."""
+        pm_react = PatternMetrics(pattern_name="react")
+        pm_react.alignment = AlignmentMetrics(
+            total_plan_tasks=4,
+            plan_adherence_rate=1.0,
+            avg_tool_coverage=1.0,
+            avg_tool_precision=1.0,
+            any_tools_called=True,
+        )
+        pm_baseline = PatternMetrics(pattern_name="baseline")
+        pm_baseline.alignment = AlignmentMetrics(
+            total_plan_tasks=4,
+            any_tools_called=False,
+        )
+        pm_reflex = PatternMetrics(pattern_name="reflex")
+        pm_reflex.alignment = AlignmentMetrics(
+            total_plan_tasks=4,
+            any_tools_called=False,
+        )
+        scores = compute_dim3_scores({
+            "react": pm_react,
+            "baseline": pm_baseline,
+            "reflex": pm_reflex,
+        })
+        assert abs(scores["react"] - 1.0) < 1e-9
+        assert scores["baseline"] is None
+        assert scores["reflex"] is None
 
 
 # ---------------------------------------------------------------------------

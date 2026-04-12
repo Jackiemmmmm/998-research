@@ -693,6 +693,10 @@ class PatternEvaluator:
             intersection = planned_set & actual_set
             tool_coverage = len(intersection) / len(planned_set)
 
+            # Track whether any tools were actually called across plan tasks
+            if actual_tools:
+                alignment_metrics.any_tools_called = True
+
             # Compute tool_precision: |planned ∩ actual| / |actual|
             if len(actual_set) > 0:
                 tool_precision = len(intersection) / len(actual_set)

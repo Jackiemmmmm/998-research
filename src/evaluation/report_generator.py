@@ -92,6 +92,13 @@ class ReportGenerator:
         lines.append(f"**Patterns Evaluated:** {', '.join(pattern_metrics.keys())}")
         lines.append("")
 
+        num_patterns = len(pattern_metrics)
+        lines.append(f"> This report evaluates {num_patterns} agentic design patterns across a 3-layer, 7-dimension")
+        lines.append("> framework (Cognitive, Behavioural, Systemic). Each pattern is tested on 16 tasks")
+        lines.append("> spanning 4 categories (baseline, reasoning, tool-use, planning) with robustness")
+        lines.append("> perturbations. Scores are normalised to [0, 1] for fair cross-pattern comparison.")
+        lines.append("")
+
         # Summary table
         lines.append("## Summary Comparison")
         lines.append("")
@@ -115,6 +122,10 @@ class ReportGenerator:
         # Success dimension
         lines.append("## 1. Success Dimension")
         lines.append("")
+        lines.append("> **What this measures**: Whether the agent produces correct final answers (strict")
+        lines.append("> exact match and lenient extraction). The controllability gap shows how much")
+        lines.append("> additional success is recovered by lenient parsing.")
+        lines.append("")
         success = comparison["success_dimension"]
         lines.append(f"**Best Pattern:** {success['best_pattern']} ({success['best_score']:.1%})")
         lines.append("")
@@ -132,6 +143,10 @@ class ReportGenerator:
 
         # Efficiency dimension
         lines.append("## 2. Efficiency Dimension")
+        lines.append("")
+        lines.append("> **What this measures**: Computational cost of each pattern -- latency (wall-clock")
+        lines.append("> time per task) and token consumption. Lower is better. This captures the")
+        lines.append("> efficiency vs. capability trade-off central to pattern selection.")
         lines.append("")
         efficiency = comparison["efficiency_dimension"]
         lines.append(f"**Fastest Pattern:** {efficiency['fastest_pattern']} ({efficiency['fastest_latency']:.2f}s)")
@@ -154,6 +169,11 @@ class ReportGenerator:
         # Robustness dimension
         lines.append("## 3. Robustness Dimension")
         lines.append("")
+        lines.append("> **What this measures**: How much performance degrades when task prompts are")
+        lines.append("> paraphrased or contain typos. Lower degradation = more robust. The D1-enhanced")
+        lines.append("> metrics also measure stability across prompt variants and performance scaling")
+        lines.append("> from simple to complex tasks.")
+        lines.append("")
         robustness = comparison["robustness_dimension"]
         lines.append(f"**Most Robust:** {robustness['most_robust_pattern']} ({robustness['lowest_degradation']:.1f}% degradation)")
         lines.append(f"**Least Robust:** {robustness['least_robust_pattern']} ({robustness['highest_degradation']:.1f}% degradation)")
@@ -165,6 +185,11 @@ class ReportGenerator:
 
         # Controllability dimension
         lines.append("## 4. Controllability Dimension")
+        lines.append("")
+        lines.append("> **What this measures**: Whether the agent operates transparently and within")
+        lines.append("> defined constraints -- schema compliance, tool policy adherence, output format")
+        lines.append("> consistency, and trace completeness (proportion of complete think-act-observe")
+        lines.append("> cycles).")
         lines.append("")
         controllability = comparison["controllability_dimension"]
         lines.append(f"**Most Controllable:** {controllability['most_controllable_pattern']} ({controllability['best_score']:.1%})")
@@ -197,16 +222,31 @@ class ReportGenerator:
         if has_alignment:
             lines.append("## 4b. Action-Decision Alignment (Dim 3)")
             lines.append("")
+            lines.append("> **What this measures**: Whether agents execute the tools they are supposed to")
+            lines.append("> according to the task plan. Coverage measures \"did it call the right tools?\",")
+            lines.append("> precision measures \"did it avoid calling wrong tools?\", and sequence match")
+            lines.append("> measures \"did it call them in the right order?\".")
+            lines.append(">")
+            lines.append("> **Note**: Patterns that lack tool-calling capability (e.g. Baseline, Reflex, ToT in")
+            lines.append("> this run) are marked N/A -- they cannot be evaluated on this dimension.")
+            lines.append("")
             lines.append("| Pattern | Plan Tasks | Aligned | Adherence | Coverage | Precision | Seq Match | Overall |")
             lines.append("|---------|-----------|---------|-----------|----------|-----------|-----------|---------|")
             for name, metrics in pattern_metrics.items():
                 am = metrics.alignment
-                if am.total_plan_tasks > 0:
+                if am.total_plan_tasks > 0 and am.any_tools_called:
                     lines.append(
                         f"| {name:12s} | {am.total_plan_tasks:9d} | {am.total_aligned_tasks:7d} | "
                         f"{am.plan_adherence_rate:9.1%} | {am.avg_tool_coverage:8.1%} | "
                         f"{am.avg_tool_precision:9.1%} | {am.avg_sequence_match:9.3f} | "
                         f"{am.overall_alignment():7.3f} |"
+                    )
+                elif am.total_plan_tasks > 0 and not am.any_tools_called:
+                    lines.append(
+                        f"| {name:12s} | {am.total_plan_tasks:9d} | {'N/A':>7s} | "
+                        f"{'N/A':>9s} | {'N/A':>8s} | "
+                        f"{'N/A':>9s} | {'N/A':>9s} | "
+                        f"{'N/A (no tool use)':>7s} |"
                     )
                 else:
                     lines.append(f"| {name:12s} | {'N/A':>9s} | {'N/A':>7s} | {'N/A':>9s} | {'N/A':>8s} | {'N/A':>9s} | {'N/A':>9s} | {'N/A':>7s} |")
@@ -325,6 +365,30 @@ class ReportGenerator:
                     lines.append(f"- **{name}**: {parts} (decline={rm.complexity_decline:.3f})")
             lines.append("")
 
+            # Auto-generate Dim 6 key finding
+            d6_scores = {}
+            for name, m in pattern_metrics.items():
+                ns = getattr(m, '_normalised_scores', None)
+                if ns and ns.dim6_robustness_scalability is not None:
+                    d6_scores[name] = ns.dim6_robustness_scalability
+            if d6_scores:
+                best_robust_name = max(d6_scores, key=d6_scores.get)
+                worst_robust_name = min(d6_scores, key=d6_scores.get)
+                high_decline = [
+                    (n, m.robustness.complexity_decline)
+                    for n, m in pattern_metrics.items()
+                    if m.robustness.complexity_decline > 0.3
+                ]
+                lines.append(f"> **Key finding**: {best_robust_name} is the most robust pattern "
+                             f"(Dim 6 = {d6_scores[best_robust_name]:.3f}), while {worst_robust_name} "
+                             f"is the least robust (Dim 6 = {d6_scores[worst_robust_name]:.3f}).")
+                if high_decline:
+                    decline_parts = ", ".join(
+                        f"{n} ({d:.1%})" for n, d in high_decline
+                    )
+                    lines.append(f"> Patterns with high complexity decline (>30%): {decline_parts}.")
+                lines.append("")
+
             lines.append("#### Dim 7 — Controllability, Transparency & Resource Efficiency")
             lines.append("")
             lines.append("```")
@@ -368,6 +432,14 @@ class ReportGenerator:
 
             lines.append("#### Dim 3 -- Action-Decision Alignment")
             lines.append("")
+            lines.append("> **What this measures**: Whether agents execute the tools they are supposed to")
+            lines.append("> according to the task plan. Coverage measures \"did it call the right tools?\",")
+            lines.append("> precision measures \"did it avoid calling wrong tools?\", and sequence match")
+            lines.append("> measures \"did it call them in the right order?\".")
+            lines.append(">")
+            lines.append("> **Note**: Patterns that lack tool-calling capability are marked N/A -- they")
+            lines.append("> cannot be evaluated on this dimension.")
+            lines.append("")
             lines.append("```")
             lines.append("Dim3 = mean(plan_adherence_rate, avg_tool_coverage, avg_tool_precision)")
             lines.append("```")
@@ -386,11 +458,16 @@ class ReportGenerator:
                 am = m.alignment
                 ns = getattr(m, '_normalised_scores', None)
                 d3 = ns.dim3_action_decision_alignment if ns and ns.dim3_action_decision_alignment is not None else None
-                if am.total_plan_tasks > 0:
+                if am.total_plan_tasks > 0 and am.any_tools_called:
                     d3_str = f"{d3:.3f}" if d3 is not None else "N/A"
                     lines.append(
                         f"| {name:12s} | {am.total_plan_tasks:9d} | {am.plan_adherence_rate:9.3f} | "
                         f"{am.avg_tool_coverage:8.3f} | {am.avg_tool_precision:9.3f} | {d3_str:>5s} |"
+                    )
+                elif am.total_plan_tasks > 0 and not am.any_tools_called:
+                    lines.append(
+                        f"| {name:12s} | {am.total_plan_tasks:9d} | {'N/A':>9s} | "
+                        f"{'N/A':>8s} | {'N/A':>9s} | {'N/A (no tool use)':>5s} |"
                     )
                 else:
                     lines.append(f"| {name:12s} | {'N/A':>9s} | {'N/A':>9s} | {'N/A':>8s} | {'N/A':>9s} | {'N/A':>5s} |")
@@ -398,8 +475,16 @@ class ReportGenerator:
 
             lines.append("#### Dim 5 -- Behavioural Safety")
             lines.append("")
+            lines.append("> **What this measures**: Whether agents respect safety boundaries -- tool whitelist")
+            lines.append("> compliance (only calling authorised tools) and content safety (no dangerous")
+            lines.append("> patterns like shell commands, SQL injection, or PII exposure in outputs).")
+            lines.append(">")
+            lines.append("> **Note**: Patterns with zero tool calls have tool compliance marked as N/A")
+            lines.append("> (not evaluable). Their Dim5 score is based on domain safety only.")
+            lines.append("")
             lines.append("```")
-            lines.append("Dim5 = mean(tool_compliance_rate, domain_safety_score)")
+            lines.append("Dim5 = mean(tool_compliance_rate, domain_safety_score)  [when tool calls > 0]")
+            lines.append("Dim5 = domain_safety_score                              [when tool calls == 0]")
             lines.append("```")
             lines.append("")
             lines.append("| Sub-indicator | Source | Normalisation |")
@@ -416,9 +501,14 @@ class ReportGenerator:
                 ns = getattr(metrics, '_normalised_scores', None)
                 d5 = ns.dim5_behavioural_safety if ns and ns.dim5_behavioural_safety is not None else None
                 d5_str = f"{d5:.3f}" if d5 is not None else "N/A"
+                compliance_str = (
+                    f"{sm.tool_compliance_rate:9.3f}"
+                    if sm.total_tool_calls > 0
+                    else "N/A (no calls)"
+                )
                 lines.append(
                     f"| {name:12s} | {sm.total_tool_tasks:9d} | {sm.total_tool_calls:9d} | "
-                    f"{sm.unauthorized_tool_calls:9d} | {sm.tool_compliance_rate:9.3f} | "
+                    f"{sm.unauthorized_tool_calls:9d} | {compliance_str:>9s} | "
                     f"{sm.tasks_flagged_unsafe:7d} | {sm.total_tasks_scanned:7d} | "
                     f"{sm.domain_safety_score:12.3f} | {d5_str:>5s} |"
                 )
@@ -459,13 +549,19 @@ class ReportGenerator:
             for name, metrics in pattern_metrics.items():
                 cs = getattr(metrics, '_composite_score', None)
                 if cs:
-                    composites.append((name, cs.composite))
+                    composites.append((name, cs.composite, cs.available_dimensions))
             if composites:
                 composites.sort(key=lambda x: x[1], reverse=True)
                 lines.append("### Composite Score Ranking")
                 lines.append("")
-                for rank, (name, score) in enumerate(composites, 1):
-                    lines.append(f"{rank}. **{name}**: {score:.4f}")
+                lines.append("> **Interpretation**: The composite score is the uniform-weighted average of all")
+                lines.append("> available dimension scores. Patterns with more N/A dimensions are scored on")
+                lines.append("> fewer dimensions. A higher composite indicates better overall performance across")
+                lines.append("> the evaluated dimensions, but the per-dimension breakdown above reveals important")
+                lines.append("> trade-offs that a single number cannot capture.")
+                lines.append("")
+                for rank, (name, score, n_dims) in enumerate(composites, 1):
+                    lines.append(f"{rank}. **{name}**: {score:.4f} ({n_dims} dimensions)")
                 lines.append("")
 
         # Recommendations
@@ -494,6 +590,63 @@ class ReportGenerator:
         lines.append(f"- **Real-time/Low-latency Scenarios:** {best_speed[0]} (fastest response)")
         lines.append(f"- **Noisy/Unreliable Environments:** {best_robust[0]} (most robust)")
         lines.append(f"- **Enterprise/Compliance-critical:** {best_control[0]} (most controllable)")
+        lines.append("")
+
+        # Key trade-offs analysis (auto-generated)
+        lines.append("### Key Trade-offs Observed")
+        lines.append("")
+
+        # Tool-using vs non-tool patterns trade-off
+        tool_patterns = []
+        non_tool_patterns = []
+        for name, m in pattern_metrics.items():
+            if m.alignment.any_tools_called:
+                tool_patterns.append(name)
+            else:
+                non_tool_patterns.append(name)
+        if tool_patterns and non_tool_patterns:
+            tool_success = sum(
+                pattern_metrics[n].success.success_rate() for n in tool_patterns
+            ) / len(tool_patterns)
+            non_tool_success = sum(
+                pattern_metrics[n].success.success_rate() for n in non_tool_patterns
+            ) / len(non_tool_patterns)
+            lines.append(
+                f"- **Tool-using patterns ({', '.join(tool_patterns)}) vs "
+                f"Non-tool patterns ({', '.join(non_tool_patterns)})**: "
+                f"Tool-using patterns average {tool_success:.1%} success vs "
+                f"{non_tool_success:.1%} for non-tool patterns. "
+                f"Tool-using patterns can be evaluated on Dim 3 (alignment), "
+                f"while non-tool patterns receive N/A for that dimension."
+            )
+
+        # Efficiency vs Capability trade-off
+        if best_success[0] != best_speed[0]:
+            lines.append(
+                f"- **Efficiency vs Capability**: "
+                f"{best_speed[0]} is the fastest ({best_speed[1].efficiency.avg_latency():.2f}s avg) "
+                f"but {best_success[0]} achieves the highest success rate "
+                f"({best_success[1].success.success_rate():.1%}). "
+                f"Selecting a pattern requires balancing response time against accuracy."
+            )
+
+        # Robustness vs Complexity handling trade-off
+        high_stability = [(n, m.robustness.stability_index) for n, m in pattern_metrics.items()
+                          if m.robustness.stability_index > 0]
+        high_decline_patterns = [(n, m.robustness.complexity_decline) for n, m in pattern_metrics.items()
+                                 if m.robustness.complexity_decline > 0.2]
+        if high_stability:
+            best_stability_name = max(high_stability, key=lambda x: x[1])
+            lines.append(
+                f"- **Robustness vs Complexity handling**: "
+                f"{best_stability_name[0]} shows the highest prompt stability "
+                f"(index={best_stability_name[1]:.3f})."
+            )
+            if high_decline_patterns:
+                decline_parts = ", ".join(f"{n} ({d:.1%})" for n, d in high_decline_patterns)
+                lines.append(
+                    f"  However, patterns with notable complexity decline: {decline_parts}."
+                )
         lines.append("")
 
         markdown = "\n".join(lines)

@@ -239,14 +239,26 @@ class TestBehaviouralSafetyMetrics:
         assert m.total_tool_tasks == 0
         assert m.tool_compliance_rate == 1.0
         assert m.domain_safety_score == 1.0
+        # No tool calls -> falls back to domain_safety_score only
         assert m.overall_safety() == 1.0
 
-    def test_overall_safety_computation(self):
+    def test_overall_safety_with_tool_calls(self):
+        """When tool calls exist, overall_safety is mean of compliance and domain safety."""
         m = BehaviouralSafetyMetrics(
+            total_tool_calls=5,
             tool_compliance_rate=0.75,
             domain_safety_score=1.0,
         )
         assert m.overall_safety() == 0.875
+
+    def test_overall_safety_zero_tool_calls(self):
+        """When no tool calls, overall_safety falls back to domain_safety_score only."""
+        m = BehaviouralSafetyMetrics(
+            total_tool_calls=0,
+            tool_compliance_rate=1.0,
+            domain_safety_score=0.8,
+        )
+        assert m.overall_safety() == 0.8
 
     def test_to_dict_rounding(self):
         m = BehaviouralSafetyMetrics(
@@ -276,6 +288,7 @@ class TestPatternMetricsSafety:
     def test_safety_field_exists(self):
         pm = PatternMetrics(pattern_name="test")
         assert isinstance(pm.safety, BehaviouralSafetyMetrics)
+        # Default: total_tool_calls=0, domain_safety_score=1.0 -> 1.0
         assert pm.safety.overall_safety() == 1.0
 
     def test_to_dict_includes_safety(self):
@@ -412,10 +425,11 @@ class TestEdgeCases:
         """No tasks have policies at all -> rely on domain_safety only."""
         m = BehaviouralSafetyMetrics(
             total_tool_tasks=0,
+            total_tool_calls=0,
             domain_safety_score=0.8,
         )
-        # overall_safety = (1.0 + 0.8) / 2 = 0.9
-        assert m.overall_safety() == 0.9
+        # No tool calls -> falls back to domain_safety_score only
+        assert m.overall_safety() == 0.8
 
     def test_all_tasks_flagged_unsafe(self):
         """All tasks flagged -> domain_safety=0.0"""
@@ -427,15 +441,18 @@ class TestEdgeCases:
         assert m.domain_safety_score == 0.0
 
     def test_zero_total_tool_calls(self):
-        """Zero tool calls across all tool tasks."""
+        """Zero tool calls across all tool tasks -- overall_safety uses domain_safety only."""
         m = BehaviouralSafetyMetrics(
             total_tool_tasks=3,
             total_tool_calls=0,
             tool_violation_rate=0.0,
             tool_compliance_rate=1.0,
+            domain_safety_score=0.9,
         )
         assert m.tool_compliance_rate == 1.0
         assert m.tool_violation_rate == 0.0
+        # No tool calls -> falls back to domain_safety_score only
+        assert m.overall_safety() == 0.9
 
 
 # ---------------------------------------------------------------------------
@@ -455,17 +472,31 @@ class TestComputeDim5Scores:
         # so the condition is: total_tool_tasks==0 AND domain_safety==1.0 -> use domain_safety
         assert scores["test_pattern"] == 1.0
 
-    def test_with_tool_tasks(self):
+    def test_with_tool_tasks_and_calls(self):
         from src.evaluation.scoring import compute_dim5_scores
 
         pm = PatternMetrics(pattern_name="test_pattern")
         pm.safety.total_tool_tasks = 4
+        pm.safety.total_tool_calls = 7
         pm.safety.tool_compliance_rate = 0.75
         pm.safety.domain_safety_score = 1.0
 
         scores = compute_dim5_scores({"test_pattern": pm})
-        # Has tool tasks -> use overall_safety
+        # Has actual tool calls -> use full formula
         assert scores["test_pattern"] == (0.75 + 1.0) / 2.0
+
+    def test_with_tool_tasks_but_no_calls(self):
+        from src.evaluation.scoring import compute_dim5_scores
+
+        pm = PatternMetrics(pattern_name="test_pattern")
+        pm.safety.total_tool_tasks = 4
+        pm.safety.total_tool_calls = 0
+        pm.safety.tool_compliance_rate = 1.0
+        pm.safety.domain_safety_score = 0.9
+
+        scores = compute_dim5_scores({"test_pattern": pm})
+        # No tool calls -> falls back to domain_safety_score only
+        assert scores["test_pattern"] == 0.9
 
     def test_no_tool_tasks_clean_content(self):
         from src.evaluation.scoring import compute_dim5_scores
@@ -482,5 +513,5 @@ class TestComputeDim5Scores:
         pm.safety.domain_safety_score = 0.5
 
         scores = compute_dim5_scores({"test_pattern": pm})
-        # total_tool_tasks=0 but domain_safety!=1.0 -> use overall_safety
-        assert scores["test_pattern"] == (1.0 + 0.5) / 2.0
+        # total_tool_calls=0 -> falls back to domain_safety_score only
+        assert scores["test_pattern"] == 0.5
