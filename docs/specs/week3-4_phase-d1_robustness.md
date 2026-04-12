@@ -5,13 +5,13 @@
 > **Week**: 3-4
 > **Phase**: [D - Systemic Layer Enhancement (Dim 6)](../PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-d-systemic-layer-enhancement-dimensions-6--7)
 > **Proposal Ref**: [Group-1.pdf Section 2.2.3 Dim6](../Group-1.pdf)
-> **Status**: READY FOR IMPLEMENTATION
+> **Status**: IMPLEMENTED
 
 ---
 
 ## 1. Objective
 
-Extend the current perturbation-only robustness evaluation into a proposal-aligned Dimension 6 module that measures perturbation tolerance, cross-variant stability, and complexity-sensitive performance decline, while remaining fully compatible with the current pattern and evaluator architecture.
+Document and refine the now-implemented proposal-aligned Dimension 6 module that measures perturbation tolerance, cross-variant stability, and complexity-sensitive performance decline, while remaining fully compatible with the current pattern and evaluator architecture.
 
 ---
 
@@ -25,12 +25,32 @@ This Phase D1 specification must remain aligned with the repository's current ex
 - `src/evaluation/metrics.py` already contains `RobustnessMetrics`
 - `src/evaluation/evaluator.py` already runs an original-task pass plus a robustness pass
 - all evaluated patterns (`Baseline`, `ReAct`, `ReAct_Enhanced`, `CoT`, `Reflex`, `ToT`) are pre-built graphs imported in `run_evaluation.py`
+- `src/evaluation/controllability.py` and `src/evaluation/scoring.py` are already implemented for Phase D2/E
+- `src/evaluation/report_generator.py` and `src/evaluation/visualization.py` already consume `_normalised_scores` and `_composite_score`
 
-### 2.2 What this implies for D1
+### 2.2 What is already implemented around D1 in adjacent phases
+
+Since the original draft of this D1 spec, the repository has changed in an important way:
+
+1. **Phase D2 is already integrated**
+   - `evaluator.py` now computes `ControllabilityResult`
+   - `metrics.py` already stores extended controllability outputs in `PatternMetrics`
+
+2. **Phase E is already integrated**
+   - `scoring.py` already computes `dim4`, `dim6`, `dim7`, reserve indicators, and composite scores
+   - `report_generator.py` already exports normalised scores and composite rankings
+   - `visualization.py` already renders a normalised heatmap and a radar chart based on `_normalised_scores`
+
+3. **Implication for D1**
+   - D1 is no longer only a planned upgrade; its core metrics are already integrated into the robustness pipeline
+   - the spec must now stay aligned with the implemented D2/E interfaces rather than describing a parallel scoring path
+   - any further D1 revision should refine the robustness fields consumed by `compute_dim6_scores()` and by the existing reporting/visualisation flow
+
+### 2.3 What this implies for D1
 
 The proposal mentions temperature or seed sweeps. However, in the current codebase, the pattern graphs are instantiated at import time and are not yet parameterised as reusable graph factories. Therefore:
 
-1. **Stage 1 for Week 3-4** should be implemented using the current architecture:
+1. **Stage 1 for Week 3-4** has now been implemented using the current architecture:
    - run all available prompt perturbations
    - compute degradation
    - compute a stability proxy from prompt-variant consistency
@@ -39,11 +59,50 @@ The proposal mentions temperature or seed sweeps. However, in the current codeba
 2. **Stage 2 for later work** may add true temperature or seed sweeps:
    - only after `llm_config.py` and pattern construction are refactored to support runtime-configurable model parameters
 
-This specification therefore prioritises methodological correctness **within the current repository design**, rather than introducing incompatible abstractions.
+This specification therefore prioritises methodological correctness **within the current repository design**, while updating the documentation to match the latest merged implementation.
 
 ---
 
-## 3. Input
+## 3. Evidence From Current Evaluation Results
+
+The current repository already produces a full evaluation report plus JSON/CSV exports. These outputs are useful for D1 because they now show both what has already been implemented and what still needs clearer interpretation.
+
+### 3.1 What the current report already shows
+
+From `reports/evaluation_report.md` and the exported CSV/JSON outputs:
+
+- all patterns already have `original_success_rate`, `perturbed_success_rate`, and `degradation_percentage`
+- the current `Dim6` is already computed from:
+  - `norm_degradation`
+  - `stability_index`
+  - `scaling_score`
+- `evaluation_results.json` already exports `perturbation_variant_count`, `absolute_degradation`, `stability_index`, `success_by_complexity`, `complexity_decline`, and `scaling_score`
+- `tool_failure_recovery_rate` still appears in the raw robustness block, but it is no longer the primary signal used by `Dim6`
+- the report can now rank patterns by degradation, stability, and scaling retention rather than degradation alone
+
+### 3.2 Why this matters for D1
+
+This means the current report now supports a more complete **D1-aligned** notion of robustness, but it still needs careful interpretation in the spec.
+
+Examples visible in the current report:
+
+- `ReAct_Enhanced` shows the highest degradation (`63.6%`) and also a low `stability_index` (`0.333`), which suggests that its weakness is not only overall drop but also cross-variant inconsistency
+- `ToT` shows the lowest degradation (`18.8%`), but the report also shows `scaling_score = 0.500`, meaning low degradation does not automatically imply strong complexity retention
+- `CoT` has comparatively strong `stability_index = 0.778` but only `scaling_score = 0.500`, which shows why D1 should not be interpreted as degradation alone
+- all patterns still have `tool_failure_recovery_rate = 0.0`, which supports keeping that field only for backward compatibility rather than as a primary D1 indicator
+
+### 3.3 D1 revision implication
+
+Therefore Phase D1 should now be treated as a **results-driven implementation already visible in the report**, with the spec clarifying how to read and maintain it:
+
+1. preserve the current report pipeline
+2. keep degradation as one valid sub-indicator
+3. retain `stability_index` and `scaling_score` as the two D1-specific explanatory signals already used in the report
+4. use the report to explain *why* robustness differs across patterns, not just *how much* degradation occurred
+
+---
+
+## 4. Input
 
 | Field Name | Source File | Source Class/Method | Current Value Range | Sample Value | Usage |
 |------------|-------------|--------------------|--------------------|--------------|-------|
@@ -56,10 +115,12 @@ This specification therefore prioritises methodological correctness **within the
 | `perturbed_success_rate` | `src/evaluation/metrics.py` | `RobustnessMetrics.perturbed_success_rate` | `[0, 1]` | runtime-generated | Perturbed-input baseline |
 | `degradation_percentage` | `src/evaluation/metrics.py` | `RobustnessMetrics.degradation_percentage` | `[0, 100]` | runtime-generated | Existing D1-compatible field |
 | `task_robustness_scores` | `src/evaluation/metrics.py` | `RobustnessMetrics.task_robustness_scores` | `task_id -> float` | runtime-generated | Per-task robustness summary |
+| `_normalised_scores.dim6_robustness_scalability` | `src/evaluation/scoring.py` | `NormalizedDimensionScores` | `[0, 1]` or `None` | `0.73` | Existing Phase E output that D1 must feed correctly |
+| `_composite_score.composite` | `src/evaluation/scoring.py` | `CompositeScore.composite` | `[0, 1]` | `0.71` | Downstream comparison score affected by D1 changes |
 
 ---
 
-## 4. Output
+## 5. Output
 
 P1 should extend the existing `RobustnessMetrics` structure rather than creating a separate disconnected robustness module.
 
@@ -100,9 +161,9 @@ class RobustnessMetrics:
 
 ---
 
-## 5. Computation Logic
+## 6. Computation Logic
 
-### 5.1 Perturbation Protocol
+### 6.1 Perturbation Protocol
 
 The current evaluator only has a single robustness pass. For Phase D1, this pass must be upgraded from "use the first perturbation only" to "run all available perturbations for each task".
 
@@ -124,7 +185,7 @@ This ensures that:
 - robustness is measured over a small but meaningful variant family
 - the implementation remains compatible with the current static graph architecture
 
-### 5.2 Original vs Perturbed Success
+### 6.2 Original vs Perturbed Success
 
 Let:
 
@@ -148,7 +209,7 @@ degradation_percentage = 100 * (S_clean - S_noisy) / S_clean   otherwise
 
 clamped to `[0, 100]`.
 
-### 5.3 Per-Task Robustness Score
+### 6.3 Per-Task Robustness Score
 
 For each task:
 
@@ -170,7 +231,7 @@ Then:
 task_robustness_score(task) = mean(all variant scores for that task)
 ```
 
-### 5.4 Stability Index
+### 6.4 Stability Index
 
 The proposal refers to variance-based stability. Since the current codebase does not yet support true runtime temperature sweep over re-instantiated graphs, D1 should use a **prompt-variant stability proxy**.
 
@@ -205,7 +266,7 @@ Interpretation:
 - `1.0` means fully stable across prompt variants
 - values closer to `0.0` mean high sensitivity to perturbation
 
-### 5.5 Success by Complexity
+### 6.5 Success by Complexity
 
 Using the original-task results only:
 
@@ -225,7 +286,7 @@ success_by_complexity = {
 }
 ```
 
-### 5.6 Complexity Decline and Scaling Score
+### 6.6 Complexity Decline and Scaling Score
 
 The proposal's Dim6 requires scalability under increasing task difficulty. In the current task suite, the cleanest operationalisation is performance retention from `simple` to `complex`.
 
@@ -241,9 +302,9 @@ Interpretation:
 - `1.0` means no performance loss from simple to complex tasks
 - lower values indicate poorer scalability
 
-### 5.7 Phase E Interface for Dim 6
+### 6.7 Phase E Interface for Dim 6
 
-Phase D1 does **not** own the final dimension-level normalisation policy, but it must expose sub-indicators that Phase E can aggregate.
+Phase D1 does **not** own the final dimension-level normalisation policy, but it must expose sub-indicators that the **already implemented** Phase E module can aggregate.
 
 For the current repository, the recommended Phase E Dim6 formula is:
 
@@ -261,53 +322,68 @@ This is preferable to the older placeholder formula using `tool_failure_recovery
 - it is supported by the current task suite
 - it does not depend on a tool-failure simulation pipeline that is not yet meaningfully implemented
 
+#### Current repository note
+
+At the time of this update, `src/evaluation/scoring.py` already computes `dim6` from:
+
+```text
+mean(
+    1 - degradation_percentage / 100,
+    stability_index,
+    scaling_score
+)
+```
+
+This means the **existing normalisation/reporting/composite pipeline** is already consuming the D1-aligned sub-indicators. The main D1 work now is to keep the spec, report interpretation, and any later maintenance changes consistent with that implementation.
+
 ---
 
-## 6. Edge Cases
+## 7. Edge Cases
 
 | Case | Expected Behaviour |
 |------|--------------------|
 | A task has no perturbations | Exclude it from perturbation-based D1 metrics; keep it in `success_by_complexity` |
 | `S_clean == 0` | `degradation_percentage = 0.0`; rely on `absolute_degradation` for interpretation |
-| No perturbed runs exist at all | `perturbation_variant_count = 0`; `dim6_score` should later be treated as unavailable by Phase E |
+| No perturbed runs exist at all | `perturbation_variant_count = 0`; `dim6_score` is treated as unavailable by Phase E |
 | Only one prompt variant exists for a task | Exclude that task from stability variance computation |
 | No `simple` or no `complex` tasks are present | `complexity_decline = 0.0`, `scaling_score = 1.0` |
 | All variants succeed or all variants fail | variance = 0, therefore task-level stability = 1.0 |
 
 ---
 
-## 7. Integration Points
+## 8. Integration Points
 
-| Action | File | What to Change |
+| Action | File | D1-Relevant Responsibility |
 |--------|------|----------------|
-| MODIFY | `src/evaluation/metrics.py` | Extend `RobustnessMetrics` with D1 fields |
-| MODIFY | `src/evaluation/evaluator.py` | Run all perturbations and compute new D1 statistics |
-| MODIFY | `src/evaluation/scoring.py` | Replace old Dim6 placeholder aggregation with D1-aligned formula |
-| MODIFY | `src/evaluation/report_generator.py` | Add D1 statistics to JSON, Markdown, and CSV outputs |
-| MODIFY | `src/evaluation/visualization.py` | Extend robustness plot to show stability and scaling alongside degradation |
-| OPTIONAL | `src/evaluation/__init__.py` | Export any D1 helper functions if a separate helper module is created |
+| IMPLEMENTED | `src/evaluation/metrics.py` | `RobustnessMetrics` now includes the D1 fields |
+| IMPLEMENTED | `src/evaluation/evaluator.py` | robustness execution now runs perturbation variants and computes D1 statistics |
+| IMPLEMENTED | `src/evaluation/scoring.py` | `compute_dim6_scores()` now consumes `stability_index` and `scaling_score` |
+| IMPLEMENTED | `src/evaluation/report_generator.py` | report output now exposes D1 fields and D1-aligned Dim6 summaries |
+| IMPLEMENTED / OPTIONAL EXTENSION | `src/evaluation/visualization.py` | current plots stay compatible with D1-backed normalised scores; dedicated robustness subplots remain optional |
+| OPTIONAL | `src/evaluation/__init__.py` | only needed if additional D1 helpers are exposed later |
 
-### Recommended implementation order
+### Recommended maintenance / verification order
 
-1. update `RobustnessMetrics` in `metrics.py`
-2. update `_run_robustness_tests()` in `evaluator.py` so all perturbations are executed
-3. update `_collect_robustness_metrics()` in `evaluator.py`
-4. update `scoring.py` so Dim6 uses the new D1 sub-indicators
-5. update `report_generator.py`
-6. update `visualization.py`
-7. add unit tests
+1. verify `RobustnessMetrics` stays aligned with the current D1 fields in `metrics.py`
+2. verify `_run_robustness_tests()` and `_collect_robustness_metrics()` still execute all perturbations and compute D1 statistics correctly
+3. verify `scoring.py` continues to use the D1-aligned `dim6` formula
+4. verify `report_generator.py` and `evaluation_report.md` still surface the D1 fields clearly
+5. extend visualisation only if later analysis needs explicit stability/scaling plots
+6. update `visualization.py` only if additional D1-specific plots are needed
+7. extend unit tests only when D1 logic changes
 
 ---
 
-## 8. Reference Implementation Sketch
+## 9. Reference Implementation Sketch
 
-The following code snippets are **reference-only** and are included to help P1 implement D1 later.
+The following code snippets are **reference-only** and are included to mirror the current D1 logic in a compact, readable form.
 
 - They are designed to fit the **current repository architecture**
-- They do **not** imply that the repository has already implemented D1
-- They should be treated as a safe blueprint, not as the source of truth over Sections 4-7
+- They are documentation aids, not replacements for the actual source files
+- They should be treated as a safe blueprint for maintenance, not as the source of truth over Sections 4-7
+- They should be read together with the current D2/E implementation already present in `controllability.py`, `scoring.py`, `report_generator.py`, and `visualization.py`
 
-### 8.1 `src/evaluation/metrics.py`
+### 9.1 `src/evaluation/metrics.py`
 
 ```python
 @dataclass
@@ -342,7 +418,7 @@ class RobustnessMetrics:
         )
 ```
 
-### 8.2 `src/evaluation/evaluator.py` - run all perturbations
+### 9.2 `src/evaluation/evaluator.py` - run all perturbations
 
 ```python
 async def _run_robustness_tests(
@@ -371,7 +447,7 @@ async def _run_robustness_tests(
     return perturbed_results
 ```
 
-### 8.3 `src/evaluation/evaluator.py` - compute D1 metrics
+### 9.3 `src/evaluation/evaluator.py` - compute D1 metrics
 
 ```python
 def _collect_robustness_metrics(
@@ -443,7 +519,7 @@ def _collect_robustness_metrics(
     robustness_metrics.scaling_score = 1.0 - robustness_metrics.complexity_decline
 ```
 
-### 8.4 helper sketch for complexity-based scaling
+### 9.4 helper sketch for complexity-based scaling
 
 ```python
 def _compute_success_by_complexity(
@@ -469,7 +545,7 @@ def _compute_complexity_decline(success_by_complexity: Dict[str, float]) -> floa
     return max(0.0, success_simple - success_complex)
 ```
 
-### 8.5 `src/evaluation/scoring.py` - D1-aligned Dim 6 formula
+### 9.5 `src/evaluation/scoring.py` - D1-aligned Dim 6 formula
 
 ```python
 def compute_dim6_scores(
@@ -497,7 +573,7 @@ def compute_dim6_scores(
     return result
 ```
 
-### 8.6 `src/evaluation/report_generator.py` - D1 output example
+### 9.6 `src/evaluation/report_generator.py` - D1 output example
 
 ```python
 "robustness": {
@@ -514,19 +590,30 @@ def compute_dim6_scores(
 }
 ```
 
-### 8.7 Recommended unit-test targets
+### 9.7 Compatibility note with current D2/E code
 
-At minimum, P1 should later add tests covering:
+The implemented D1 path follows this strategy:
+
+1. keep the existing `compute_all_scores()` entrypoint unchanged
+2. keep `PatternMetrics` as the shared container used by D2/E reports
+3. add D1 robustness fields inside `RobustnessMetrics`
+4. switch only the `dim6` internals from the old placeholder formula to the D1-aligned one
+
+This minimizes regression risk and keeps D1 aligned with the code that is already merged for adjacent phases.
+
+### 9.8 Recommended unit-test targets
+
+The current repository already includes D1 unit tests in `tests/unit_tests/test_robustness_d1.py`, and at minimum they should continue covering:
 
 1. all perturbations are executed, not only the first variant
 2. `absolute_degradation` matches `abs(S_clean - S_noisy)`
-3. `stability_index` matches the variance-based proxy in Section 5.4
-4. `complexity_decline` and `scaling_score` match Section 5.6
+3. `stability_index` matches the variance-based proxy in Section 6.4
+4. `complexity_decline` and `scaling_score` match Section 6.6
 5. `compute_dim6_scores()` returns `None` when `perturbation_variant_count == 0`
 
 ---
 
-## 9. Verification Cases
+## 10. Verification Cases
 
 ### Case 1: Absolute degradation
 
@@ -598,7 +685,7 @@ Expected:
 
 ---
 
-## 10. Open Questions (Resolved for Week 3-4)
+## 11. Open Questions (Resolved for Week 3-4)
 
 1. **Should D1 implement true temperature sweep now?**
    - No. Not in Week 3-4, because the current pattern graphs are not yet runtime-parameterised.
@@ -613,8 +700,8 @@ Expected:
 
 ## Checklist Before Handing to P1
 
-- [x] Every field in Section 3 exists in the current codebase or is a clearly defined extension of an existing D1 structure
-- [x] Every formula in Section 5 is implementation-ready
+- [x] Every field in Section 4 exists in the current codebase or is a clearly defined extension of an existing D1 structure
+- [x] Every formula in Section 6 is implementation-ready
 - [x] Edge cases are explicitly defined
 - [x] Integration points are exact file paths
 - [x] Verification cases can be copied into unit tests directly
