@@ -151,7 +151,11 @@ class TestExtractReact:
         assert trace.tao_cycles == 0
 
     def test_react_ai_no_content_with_tool_calls(self):
-        """Test ReAct where AI message has tool_calls but empty content."""
+        """Test ReAct where AI message has tool_calls but empty content.
+
+        A synthetic THINK step is created to preserve TAO cycle structure,
+        ensuring trace_completeness correctly detects THINK->ACT->OBSERVE.
+        """
         response = {
             "messages": [
                 MockHumanMessage("Get weather"),
@@ -168,11 +172,14 @@ class TestExtractReact:
 
         trace = TraceExtractor.extract(response, "react", "task_004")
 
-        # No THINK step since content was empty
+        # Synthetic THINK step is created even when content is empty
         step_types = [s.step_type for s in trace.steps]
-        assert StepType.THINK not in step_types
+        assert StepType.THINK in step_types
+        assert trace.total_think_steps == 1
         assert trace.total_act_steps == 1
         assert trace.total_observe_steps == 1
+        # Should form a complete TAO cycle
+        assert trace.tao_cycles == 1
 
 
 # ---- Reflex pattern tests ----

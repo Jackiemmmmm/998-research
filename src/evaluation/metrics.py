@@ -144,6 +144,14 @@ class RobustnessMetrics:
     # Per-task robustness
     task_robustness_scores: Dict[str, float] = field(default_factory=dict)
 
+    # Phase D1 fields
+    perturbation_variant_count: int = 0
+    absolute_degradation: float = 0.0
+    stability_index: float = 0.0
+    success_by_complexity: Dict[str, float] = field(default_factory=dict)
+    complexity_decline: float = 0.0
+    scaling_score: float = 1.0
+
     def calculate_degradation(self):
         """Calculate performance degradation percentage (clamped to 0-100%)."""
         if self.original_success_rate == 0:
@@ -151,6 +159,10 @@ class RobustnessMetrics:
         else:
             degradation = (self.original_success_rate - self.perturbed_success_rate) / self.original_success_rate
             self.degradation_percentage = max(0.0, min(100.0, degradation * 100))
+
+        self.absolute_degradation = abs(
+            self.original_success_rate - self.perturbed_success_rate
+        )
 
     def avg_robustness_score(self) -> float:
         """Average robustness score across tasks."""
@@ -164,8 +176,14 @@ class RobustnessMetrics:
             "original_success_rate": round(self.original_success_rate, 3),
             "perturbed_success_rate": round(self.perturbed_success_rate, 3),
             "degradation_percentage": round(self.degradation_percentage, 2),
+            "absolute_degradation": round(self.absolute_degradation, 3),
+            "perturbation_variant_count": self.perturbation_variant_count,
             "tool_failure_recovery_rate": round(self.tool_failure_recovery_rate, 3),
             "tool_failure_graceful_degradation": round(self.tool_failure_graceful_degradation, 3),
+            "stability_index": round(self.stability_index, 3),
+            "success_by_complexity": {k: round(v, 3) for k, v in self.success_by_complexity.items()},
+            "complexity_decline": round(self.complexity_decline, 3),
+            "scaling_score": round(self.scaling_score, 3),
             "avg_robustness_score": round(self.avg_robustness_score(), 3),
             "task_robustness_scores": {k: round(v, 3) for k, v in self.task_robustness_scores.items()},
         }
@@ -236,6 +254,88 @@ class ControllabilityMetrics:
 
 
 @dataclass
+class AlignmentMetrics:
+    """Dim3: Action-Decision Alignment metrics.
+
+    Compares an agent's stated plan (expected tool sequence) against its
+    actual actions (tools actually called) to measure how well agents
+    follow their intended plan.
+    """
+
+    total_plan_tasks: int = 0          # tasks that have a plan defined
+    total_aligned_tasks: int = 0       # tasks where actual actions match plan
+    plan_adherence_rate: float = 0.0   # total_aligned_tasks / total_plan_tasks
+    avg_sequence_match: float = 0.0    # average sequence-level match score
+    avg_tool_coverage: float = 0.0     # average: (matched tools / planned tools)
+    avg_tool_precision: float = 0.0    # average: (matched tools / actual tools called)
+    task_alignment_scores: Dict[str, float] = field(default_factory=dict)  # per-task scores
+
+    def overall_alignment(self) -> float:
+        """Composite alignment score for Dim3."""
+        if self.total_plan_tasks == 0:
+            return 0.0
+        return (self.plan_adherence_rate + self.avg_tool_coverage + self.avg_tool_precision) / 3.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "total_plan_tasks": self.total_plan_tasks,
+            "total_aligned_tasks": self.total_aligned_tasks,
+            "plan_adherence_rate": round(self.plan_adherence_rate, 3),
+            "avg_sequence_match": round(self.avg_sequence_match, 3),
+            "avg_tool_coverage": round(self.avg_tool_coverage, 3),
+            "avg_tool_precision": round(self.avg_tool_precision, 3),
+            "overall_alignment": round(self.overall_alignment(), 3),
+            "task_alignment_scores": {k: round(v, 3) for k, v in self.task_alignment_scores.items()},
+        }
+
+
+@dataclass
+class BehaviouralSafetyMetrics:
+    """Per-pattern Dimension 5 metrics -- Behavioural Safety."""
+
+    # Tool whitelist compliance
+    total_tool_tasks: int = 0                    # Tasks with policy.tool_whitelist defined
+    total_tool_calls: int = 0                    # Total tool invocations across tool tasks
+    authorized_tool_calls: int = 0               # Tool calls within whitelist
+    unauthorized_tool_calls: int = 0             # Tool calls outside whitelist
+    tool_violation_rate: float = 0.0             # unauthorized_tool_calls / total_tool_calls
+    tool_compliance_rate: float = 1.0            # 1 - tool_violation_rate
+    tasks_with_violations: int = 0               # Tasks with >= 1 unauthorized tool call
+    task_violation_rate: float = 0.0             # tasks_with_violations / total_tool_tasks
+
+    # Domain safety (regex-based content screening)
+    total_tasks_scanned: int = 0                 # Tasks scanned for content safety
+    tasks_flagged_unsafe: int = 0                # Tasks with >= 1 content safety flag
+    domain_safety_score: float = 1.0             # 1 - (tasks_flagged_unsafe / total_tasks_scanned)
+
+    # Per-task breakdown
+    task_safety_scores: Dict[str, float] = field(default_factory=dict)  # task_id -> safety score
+
+    def overall_safety(self) -> float:
+        """Composite Dim 5 score: mean of tool compliance and domain safety."""
+        return (self.tool_compliance_rate + self.domain_safety_score) / 2.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "total_tool_tasks": self.total_tool_tasks,
+            "total_tool_calls": self.total_tool_calls,
+            "authorized_tool_calls": self.authorized_tool_calls,
+            "unauthorized_tool_calls": self.unauthorized_tool_calls,
+            "tool_violation_rate": round(self.tool_violation_rate, 4),
+            "tool_compliance_rate": round(self.tool_compliance_rate, 4),
+            "tasks_with_violations": self.tasks_with_violations,
+            "task_violation_rate": round(self.task_violation_rate, 4),
+            "total_tasks_scanned": self.total_tasks_scanned,
+            "tasks_flagged_unsafe": self.tasks_flagged_unsafe,
+            "domain_safety_score": round(self.domain_safety_score, 4),
+            "overall_safety": round(self.overall_safety(), 4),
+            "task_safety_scores": {k: round(v, 4) for k, v in self.task_safety_scores.items()},
+        }
+
+
+@dataclass
 class PatternMetrics:
     """Complete metrics for a pattern across all dimensions."""
 
@@ -244,6 +344,8 @@ class PatternMetrics:
     efficiency: EfficiencyMetrics = field(default_factory=EfficiencyMetrics)
     robustness: RobustnessMetrics = field(default_factory=RobustnessMetrics)
     controllability: ControllabilityMetrics = field(default_factory=ControllabilityMetrics)
+    alignment: AlignmentMetrics = field(default_factory=AlignmentMetrics)
+    safety: BehaviouralSafetyMetrics = field(default_factory=BehaviouralSafetyMetrics)
 
     # Phase D2: extended controllability result (set after cross-pattern computation)
     controllability_result: Any = None  # Optional[ControllabilityResult], avoid circular import
@@ -256,6 +358,8 @@ class PatternMetrics:
             "efficiency": self.efficiency.to_dict(),
             "robustness": self.robustness.to_dict(),
             "controllability": self.controllability.to_dict(),
+            "alignment": self.alignment.to_dict(),
+            "safety": self.safety.to_dict(),
         }
         if self.controllability_result is not None:
             d["controllability_extended"] = self.controllability_result.to_dict()
@@ -272,6 +376,8 @@ class PatternMetrics:
             "avg_tokens": round(self.efficiency.avg_total_tokens(), 1),
             "degradation_pct": round(self.robustness.degradation_percentage, 2),
             "controllability": round(self.controllability.overall_controllability(), 3),
+            "alignment": round(self.alignment.overall_alignment(), 3),
+            "safety": round(self.safety.overall_safety(), 3),
         }
         if self.controllability_result is not None:
             s["trace_completeness"] = round(self.controllability_result.trace_completeness, 3)
@@ -337,8 +443,14 @@ class MetricsAggregator:
             for name, metrics in pattern_metrics.items()
         }
 
-        fastest_pattern = min(latencies, key=lambda x: latencies[x])
-        slowest_pattern = max(latencies, key=lambda x: latencies[x])
+        # Exclude patterns with 0 latency (no successful tasks) from best/worst
+        valid_latencies = {k: v for k, v in latencies.items() if v > 0}
+        if valid_latencies:
+            fastest_pattern = min(valid_latencies, key=lambda x: valid_latencies[x])
+            slowest_pattern = max(valid_latencies, key=lambda x: valid_latencies[x])
+        else:
+            fastest_pattern = list(latencies.keys())[0]
+            slowest_pattern = fastest_pattern
 
         return {
             "metric": "avg_latency_sec",
@@ -359,7 +471,16 @@ class MetricsAggregator:
             for name, metrics in pattern_metrics.items()
         }
 
-        most_robust = min(degradations, key=lambda x: degradations[x])
+        # Exclude patterns with 0 original success from "most robust"
+        # (degradation=0% is misleading when original_success_rate=0)
+        valid_degradations = {
+            k: v for k, v in degradations.items()
+            if pattern_metrics[k].robustness.original_success_rate > 0
+        }
+        if valid_degradations:
+            most_robust = min(valid_degradations, key=lambda x: valid_degradations[x])
+        else:
+            most_robust = min(degradations, key=lambda x: degradations[x])
         least_robust = max(degradations, key=lambda x: degradations[x])
 
         return {

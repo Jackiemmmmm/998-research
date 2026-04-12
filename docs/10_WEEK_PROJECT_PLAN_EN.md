@@ -14,7 +14,7 @@
 
 ---
 
-## 1. Current Status (~28% Complete)
+## 1. Current Status (~52% Complete)
 
 > Completion assessment source: [PROJECT_GAP_ANALYSIS_AND_PLAN.md § Summary Table](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#part-1-current-completion-status-gap-analysis)
 
@@ -36,10 +36,10 @@
 |---|-----------|-------|------------|-------|-------------|
 | 1 | Reasoning Quality | Cognitive | 0% | Not implemented | [Dim1 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-1-reasoning-quality-cognitive---0) |
 | 2 | Cognitive Safety & Constraint Adherence | Cognitive | 0% | Not implemented | [Dim2 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-2-cognitive-safety--constraint-adherence-cognitive---0) |
-| 3 | Action–Decision Alignment | Behavioural | 10% | [Phase A](./PHASE_A_UNIFIED_TELEMETRY.md) provides prerequisite data foundation | [Dim3 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-3-actiondecision-alignment-behavioural---0--10) |
+| 3 | Action–Decision Alignment | Behavioural | ~70% | **Phase C1 COMPLETED** (2026-04-01): AlignmentMetrics + verb-tool mapping + LCS sequence matching + Dim3 scoring | [Dim3 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-3-actiondecision-alignment-behavioural---0--10--70) |
 | 4 | Success & Efficiency | Behavioural | ~75% | Basic judge + metrics exist; missing normalised cost score | [Dim4 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-4-success--efficiency-behavioural---70--75) |
-| 5 | Behavioural Safety | Behavioural | 5% | Framework placeholder only | [Dim5 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-5-behavioural-safety-behavioural---5) |
-| 6 | Robustness & Scalability | Systemic | ~40% | Perturbation framework exists; missing temperature sweep / multi-run variance | [Dim6 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-6-robustness--scalability-systemic---40) |
+| 5 | Behavioural Safety | Behavioural | ~70% | **Phase C3 COMPLETED** (2026-04-01): tool whitelist validation + domain safety regex + Dim5 scoring | [Dim5 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-5-behavioural-safety-behavioural---5--15--70) |
+| 6 | Robustness & Scalability | Systemic | ~75% | **Phase D1 COMPLETED** (2026-04-01): all perturbations, stability index, complexity scaling, D1-aligned Dim6 formula | [Dim6 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-6-robustness--scalability-systemic---40--75) |
 | 7 | Controllability, Transparency & Resource Efficiency | Systemic | ~45% | Trace completeness foundation exists; missing policy-flag / override tests | [Dim7 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-7-controllability-transparency--resource-efficiency-systemic---35--45) |
 
 ### 1.3 Missing Key Modules
@@ -135,6 +135,8 @@ Update the `Status` field in the spec header as it progresses.
 |------|-------|-------|--------|
 | [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) | P2 | Phase E | READY FOR IMPLEMENTATION |
 | [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) | P3 | Phase D2 | READY FOR IMPLEMENTATION |
+| [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) | P2 | Phase D1 | READY FOR IMPLEMENTATION |
+| [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) | P3 | Phase C3 | READY FOR IMPLEMENTATION |
 
 ---
 
@@ -189,6 +191,77 @@ Update the `Status` field in the spec header as it progresses.
 | P3 | [Phase C3](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-c-behavioural-layer-completion-dimensions-3-4-5): Behavioural Safety (Dim5) | Write Implementation Spec (`docs/specs/week3-4_phase-c3_behavioural-safety.md`) defining tool whitelist validation logic, domain regex rules, violation rate formula, and verification cases. P1 implements after spec is READY. Ref: [Proposal § 2.2.2 Dim5](../Group-1.pdf) | Completed spec → P1 delivers safety scoring module |
 
 **Acceptance Criteria**: Dim3, 4, 5 all produce numerical output; robustness perturbation tests operational
+
+#### P1 Progress Log (2026-04-01)
+
+**Completed: Phase C1 — Action-Decision Alignment (Dim3)**
+
+| # | Component | Details | Modified Files |
+|---|-----------|---------|----------------|
+| 1 | `AlignmentMetrics` dataclass | 7 fields: `total_plan_tasks`, `total_aligned_tasks`, `plan_adherence_rate`, `avg_sequence_match`, `avg_tool_coverage`, `avg_tool_precision`, `task_alignment_scores` + `overall_alignment()` method | `src/evaluation/metrics.py` |
+| 2 | `VERB_TOOL_MAP` verb-tool mapping | Maps 12 natural-language verbs to concrete tool names (e.g. `"search"` → `["wiki_search", "shopping_search"]`, `"calculate"` → `["calculator"]`); case-insensitive lookup | `src/evaluation/evaluator.py` |
+| 3 | `_expand_plan_with_verb_mapping()` | Expands plan entries using verb mapping before alignment scoring; exact tool names pass through unchanged | `src/evaluation/evaluator.py` |
+| 4 | `_longest_common_subsequence()` | LCS dynamic programming algorithm for measuring plan-action sequence order fidelity | `src/evaluation/evaluator.py` |
+| 5 | `_collect_alignment_metrics()` | Per-task: tool_coverage (recall), tool_precision, sequence_match (LCS ratio); aggregate: plan_adherence_rate (threshold ≥ 0.5) | `src/evaluation/evaluator.py` |
+| 6 | `compute_dim3_scores()` | Dim3 normalised scoring integrated into `compute_all_scores()` + `NormalizedDimensionScores` | `src/evaluation/scoring.py` |
+| 7 | Report & visualisation | Dim3 section in Markdown/JSON/CSV reports; Dim3 in normalised heatmap; radar chart picks up Dim3 dynamically | `src/evaluation/report_generator.py`, `src/evaluation/visualization.py` |
+| 8 | Unit tests | 32 tests covering: AlignmentMetrics, LCS helper, _collect_alignment_metrics, verb-tool mapping, compute_dim3_scores, PatternMetrics integration | `tests/unit_tests/test_alignment.py` |
+
+**Alignment Scoring Formula:**
+- **tool_coverage** (recall) = |planned ∩ actual| / |planned|
+- **tool_precision** = |planned ∩ actual| / |actual|
+- **sequence_match** = LCS(planned, actual) / max(len(planned), len(actual))
+- **task_alignment_score** = mean(coverage, precision, sequence_match)
+- **overall_alignment** = mean(plan_adherence_rate, avg_coverage, avg_precision)
+
+**Completed: Phase C3 Spec — Behavioural Safety (Dim5)**
+
+| # | Spec Section | Details |
+|---|-------------|---------|
+| 1 | Output | `BehaviouralSafetyMetrics` dataclass (11 fields + `overall_safety()`) |
+| 2 | Tool whitelist validation | Per-call authorized/unauthorized tracking; per-task compliance rate |
+| 3 | Domain safety regex | 11 regex patterns across 5 categories (shell danger, code execution, injection, PII) |
+| 4 | Phase E interface | `dim5_score = mean(tool_compliance_rate, domain_safety_score)` |
+| 5 | Verification cases | 5 concrete test cases with expected numerical outputs |
+| 6 | Integration points | CREATE `safety.py`, MODIFY `metrics.py`, `evaluator.py`, `scoring.py`, `report_generator.py` |
+
+**Completed: Phase D1 — Enhanced Robustness & Scalability (Dim6)**
+
+| # | Component | Details | Modified Files |
+|---|-----------|---------|----------------|
+| 1 | `RobustnessMetrics` D1 extension | 6 new fields: `perturbation_variant_count`, `absolute_degradation`, `stability_index`, `success_by_complexity`, `complexity_decline`, `scaling_score`; updated `calculate_degradation()` and `to_dict()` | `src/evaluation/metrics.py` |
+| 2 | `_run_robustness_tests()` upgrade | Now iterates over ALL perturbation variants per task (previously only used the first) | `src/evaluation/evaluator.py` |
+| 3 | `_collect_robustness_metrics()` D1 logic | Per-task robustness scoring (1.0/0.5/0.0); stability index via variance proxy; success-by-complexity grouping; complexity decline & scaling score | `src/evaluation/evaluator.py` |
+| 4 | `_compute_success_by_complexity()` helper | Groups original results by complexity level (simple/medium/complex) and computes per-band success rate | `src/evaluation/evaluator.py` |
+| 5 | `_compute_complexity_decline()` helper | `max(0, success_simple - success_complex)`; returns 0.0 if either level is missing | `src/evaluation/evaluator.py` |
+| 6 | `compute_dim6_scores()` D1-aligned | New formula: `dim6 = mean(norm_degradation, stability_index, scaling_score)`; returns None when no perturbations | `src/evaluation/scoring.py` |
+| 7 | Report & visualisation | D1 sub-indicators in Markdown/CSV; extended robustness plot with stability & scaling panels | `src/evaluation/report_generator.py`, `src/evaluation/visualization.py` |
+| 8 | Unit tests | 29 tests covering all 6 spec verification cases + edge cases (no perturbations, S_clean==0, single variant, missing complexity levels, all same result) | `tests/unit_tests/test_robustness_d1.py` |
+
+**D1 Scoring Formulas:**
+- **absolute_degradation** = |S_clean - S_noisy|
+- **degradation_percentage** = 100 × (S_clean - S_noisy) / S_clean (clamped to [0, 100])
+- **per-task robustness** = mean(1.0 if both succeed, 0.5 if original succeeds & perturbed fails, 0.0 otherwise)
+- **stability_index** = mean(1 - min(p×(1-p)/0.25, 1.0)) over tasks with ≥2 variants
+- **complexity_decline** = max(0, success_simple - success_complex)
+- **scaling_score** = 1 - complexity_decline
+- **dim6_score** = mean(1 - degradation%/100, stability_index, scaling_score)
+
+**Completed: Phase C3 — Behavioural Safety (Dim5)**
+
+| # | Component | Details | Modified Files |
+|---|-----------|---------|----------------|
+| 1 | `safety.py` module (NEW) | `UNSAFE_PATTERNS` (12 compiled regex across 5 categories: destructive shell, privilege escalation, code execution, SQL/XSS injection, PII exposure); `check_tool_compliance()`, `check_content_safety()`, `compute_task_safety()` | `src/evaluation/safety.py` |
+| 2 | `BehaviouralSafetyMetrics` dataclass | 10 fields: `total_tool_tasks`, `total_tool_calls`, `authorized_tool_calls`, `unauthorized_tool_calls`, `tool_violation_rate`, `tool_compliance_rate`, `tasks_with_violations`, `task_violation_rate`, `domain_safety_score`, `task_safety_scores` + `overall_safety()` | `src/evaluation/metrics.py` |
+| 3 | `_collect_safety_metrics()` | Per-task: tool whitelist validation via trace tool calls + content safety scanning on output and step content; aggregate: violation rates, compliance rates, domain safety score | `src/evaluation/evaluator.py` |
+| 4 | `compute_dim5_scores()` | Dim5 normalised scoring: `overall_safety() = mean(tool_compliance_rate, domain_safety_score)`; integrated into `compute_all_scores()` and `NormalizedDimensionScores` | `src/evaluation/scoring.py` |
+| 5 | Report & visualisation | Dim5 section in Markdown report; Dim5 in dimension summary table and CSV; Dim5 in normalised heatmap | `src/evaluation/report_generator.py`, `src/evaluation/visualization.py` |
+| 6 | Unit tests | 41 tests covering: tool compliance, content safety (all 5 regex categories), BehaviouralSafetyMetrics, compute_dim5_scores, edge cases, all 5 spec verification cases | `tests/unit_tests/test_safety.py` |
+
+**Week 3-4 Status: ALL TASKS COMPLETE** ✓
+- [x] P1: Phase C1 — Action-Decision Alignment (Dim3)
+- [x] P2: Phase D1 — Enhanced Robustness (Dim6)
+- [x] P3: Phase C3 — Behavioural Safety (Dim5)
 
 ---
 

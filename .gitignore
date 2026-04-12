@@ -164,5 +164,4 @@ uv.lock
 .langgraph_api/
 .DS_Store
 
-reports/*
 reports_before_fix/*

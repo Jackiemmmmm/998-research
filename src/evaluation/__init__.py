@@ -7,11 +7,14 @@ Controllability, Transparency & Resource Efficiency.
 
 from .evaluator import PatternEvaluator
 from .metrics import (
+    AlignmentMetrics,
+    BehaviouralSafetyMetrics,
     ControllabilityMetrics,
     EfficiencyMetrics,
     RobustnessMetrics,
     SuccessMetrics,
 )
+from .safety import check_tool_compliance, check_content_safety, compute_task_safety
 from .controllability import ControllabilityResult
 from .scoring import CompositeScore, NormalizedDimensionScores
 from .report_generator import ReportGenerator
@@ -26,7 +29,12 @@ __all__ = [
     "EfficiencyMetrics",
     "RobustnessMetrics",
     "ControllabilityMetrics",
+    "AlignmentMetrics",
+    "BehaviouralSafetyMetrics",
     "ControllabilityResult",
+    "check_tool_compliance",
+    "check_content_safety",
+    "compute_task_safety",
     "NormalizedDimensionScores",
     "CompositeScore",
     "ReportGenerator",

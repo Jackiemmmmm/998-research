@@ -94,7 +94,9 @@ class LLMConfig:
                     model=model_name,
                     base_url=base_url,
                     temperature=0,
-                    num_ctx=49152,
+                    num_ctx=16384,
+                    num_predict=2048,
+                    client_kwargs={"timeout": 120.0},
                 )
             except ImportError:
                 # Fallback to init_chat_model

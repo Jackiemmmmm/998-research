@@ -1,7 +1,7 @@
 # Project Gap Analysis & Implementation Plan
 
 > Generated: 2026-03-03
-> Last Updated: 2026-03-12 (Week 1-2 P1 Agent 稳定化修复)
+> Last Updated: 2026-04-01 (Week 3-4 P1 Dim3 implementation + P3 Dim5 Spec)
 > Based on: Group-1.pdf (Project Proposal) + CLAUDE.md + Current Codebase Review
 
 ## Phase Implementation Status
@@ -11,9 +11,9 @@
 | **A** | Unified Telemetry & Adapter Layer | **COMPLETED** | — | [PHASE_A_UNIFIED_TELEMETRY.md](./PHASE_A_UNIFIED_TELEMETRY.md) |
 | **B1** | Cognitive Layer — Reasoning Quality (Dim 1) | NOT STARTED | — (P1 self-drives, Week 5–6) | — |
 | **B2** | Cognitive Layer — Cognitive Safety (Dim 2) | NOT STARTED | [week5-6_phase-b2_cognitive-safety.md](./specs/week5-6_phase-b2_cognitive-safety.md) (P3, PENDING) | — |
-| **C1** | Action–Decision Alignment (Dim 3) | NOT STARTED | — (P1 self-drives, Week 3–4) | — |
-| **C3** | Behavioural Safety (Dim 5) | NOT STARTED | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) (P3, PENDING) | — |
-| **D1** | Enhanced Robustness (Dim 6) | SPEC READY, IMPLEMENTATION PENDING | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) (P2, READY FOR IMPLEMENTATION) | — |
+| **C1** | Action–Decision Alignment (Dim 3) | **COMPLETED** | — (P1 self-drives) | — (inline in evaluator.py, scoring.py) |
+| **C3** | Behavioural Safety (Dim 5) | **COMPLETED** | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) (P3) | — (inline in safety.py, evaluator.py, scoring.py) |
+| **D1** | Enhanced Robustness (Dim 6) | **COMPLETED** | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) (P2) | — (inline in evaluator.py, metrics.py, scoring.py) |
 | **D2** | Controllability & Transparency (Dim 7) | NOT STARTED | [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) (P3, READY FOR IMPLEMENTATION) | — |
 | **E** | Normalization & Composite Scoring | NOT STARTED | [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) (P2, READY FOR IMPLEMENTATION) | — |
 | **F** | Statistical Rigor & Reproducibility | NOT STARTED | [week5-6_phase-f_statistical-rigor.md](./specs/week5-6_phase-f_statistical-rigor.md) (P2, PENDING) | — |
@@ -31,13 +31,13 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 |---|-----------|-------|--------|------------|---------------|
 | 1 | Reasoning Quality | Cognitive | NOT IMPLEMENTED | 0% | Trace foundation ready |
 | 2 | Cognitive Safety & Constraint Adherence | Cognitive | NOT IMPLEMENTED | 0% | Trace foundation ready |
-| 3 | Action-Decision Alignment | Behavioural | PREREQUISITE READY | 10% | THINK/ACT steps now captured |
+| 3 | Action-Decision Alignment | Behavioural | **COMPLETED** | ~70% | AlignmentMetrics + verb-tool mapping + LCS sequence matching (2026-04-01) |
 | 4 | Success & Efficiency | Behavioural | PARTIALLY DONE | ~75% | Token accuracy improved; Reflex token tracking fixed (2026-03-12) |
-| 5 | Behavioural Safety | Behavioural | NOT IMPLEMENTED | 5% | ToolCallRecord enables enforcement; mock tools added for C1-C4 (2026-03-12) |
-| 6 | Robustness & Scalability | Systemic | PARTIALLY DONE | ~40% | — |
+| 5 | Behavioural Safety | Behavioural | **COMPLETED** | ~70% | Phase C3 completed (2026-04-01): tool whitelist validation + domain safety regex + Dim5 scoring |
+| 6 | Robustness & Scalability | Systemic | **D1 COMPLETED** | ~75% | Phase D1 completed (2026-04-01): all perturbations, stability index, complexity scaling |
 | 7 | Controllability, Transparency & Resource Efficiency | Systemic | PARTIALLY DONE | ~45% | TAO cycle tracking enabled |
 
-**Overall estimated completion: ~25% → ~28% of the 7-dimension framework** (Phase A provides foundation for Dim 1, 3, 5, 7)
+**Overall estimated completion: ~44% → ~52% of the 7-dimension framework** (Phase C1 Dim3, Phase D1 Dim6, Phase C3 Dim5 all completed)
 
 ---
 
@@ -77,18 +77,29 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 
 ---
 
-#### Dimension 3: Action-Decision Alignment (Behavioural) - 0% → 10%
+#### Dimension 3: Action-Decision Alignment (Behavioural) - 0% → 10% → ~70%
 
 **Proposal requires:**
 - Semantic comparison between planned and executed actions
 - Verb-tool mappings and embedding-based similarity
 - String-level matching of explicit plan strings ("Next I will...") as proxy
 
-**Current status:**
-- `TestTask` has a `plan` field (e.g., `["weather_api"]`) but it is never used during evaluation
-- No comparison between agent's stated intention and actual actions
-- ~~No telemetry captures the think-act-observe cycle per step~~ **RESOLVED by [Phase A](./PHASE_A_UNIFIED_TELEMETRY.md)**: `TraceExtractor` now captures `THINK` (intentions) and `ACT` (tool calls with `ToolCallRecord`) per step, enabling alignment comparison in Phase C1
-- **(2026-03-12)**: C1-C4 任务所需的 mock 工具（`weather_api`, `fx_api`, `calculator`, `wiki_search`, `shopping_search`）已实现并注册到 `src/tool/tool.py`，agent 现在可以正确调用这些工具完成 tool 类任务
+**Current status (DONE — Phase C1, 2026-04-01):**
+- ~~`TestTask` has a `plan` field (e.g., `["weather_api"]`) but it is never used during evaluation~~ **RESOLVED**: `_collect_alignment_metrics()` now compares `TestTask.plan` against actual tool calls extracted from `AgentTrace`
+- ~~No comparison between agent's stated intention and actual actions~~ **RESOLVED**: Full alignment scoring pipeline implemented
+- ~~No telemetry captures the think-act-observe cycle per step~~ **RESOLVED by [Phase A](./PHASE_A_UNIFIED_TELEMETRY.md)**: `TraceExtractor` now captures `THINK` (intentions) and `ACT` (tool calls with `ToolCallRecord`) per step
+- **(2026-03-12)**: Mock tools required by C1-C4 tasks (`weather_api`, `fx_api`, `calculator`, `wiki_search`, `shopping_search`) implemented and registered in `src/tool/tool.py`
+- **(2026-04-01)**: Phase C1 implementation completed, including the following components:
+  - `AlignmentMetrics` dataclass (metrics.py): tracks tool_coverage (recall), tool_precision (precision), sequence_match (LCS sequence match ratio), plan_adherence_rate
+  - `VERB_TOOL_MAP` verb-tool mapping dictionary (evaluator.py): expands natural-language verbs (e.g. "search", "calculate") to concrete tool names, enabling plans to use high-level verbs
+  - `_longest_common_subsequence()` LCS algorithm (evaluator.py): measures order fidelity between planned and actual tool calls
+  - `compute_dim3_scores()` (scoring.py): Dim3 normalised scoring, integrated into `compute_all_scores()` and `NormalizedDimensionScores`
+  - Report & visualisation (report_generator.py, visualization.py): Dim3 data added to Markdown/JSON/CSV reports and heatmap
+  - 32 unit tests all passing (tests/unit_tests/test_alignment.py)
+
+**Current status (REMAINING — Stage 2 future):**
+- Embedding-based semantic similarity (advanced matching, not required)
+- Extract natural-language intentions from THINK steps (e.g. "I will search for...") and compare against actual actions
 
 ---
 
@@ -115,7 +126,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 
 ---
 
-#### Dimension 5: Behavioural Safety (Behavioural) - 5%
+#### Dimension 5: Behavioural Safety (Behavioural) - 5% → ~15% → ~70%
 
 **Proposal requires:**
 - Tool invocation validated against whitelisted APIs
@@ -124,16 +135,27 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 - Violation rates, blocked attempts, sandbox logs
 - Static domain regex checks as Stage 1 proxy
 
-**Current status:**
-- `TestTask` has a `policy` field with `tool_whitelist`, but it is **never enforced** in the evaluator
-- `ControllabilityMetrics` has `unauthorized_tool_uses` field but is always 0 (never tracked)
-- No sandbox or controlled execution environment
-- No violation tracking
-- **(2026-03-12)**: Mock 工具已实现（`weather_api`, `fx_api`, `calculator`, `wiki_search`, `shopping_search`），为后续 tool whitelist 执行验证提供了前置条件
+**Current status (DONE — Phase C3, 2026-04-01):**
+- ~~`TestTask` has a `policy` field with `tool_whitelist`, but it is **never enforced** in the evaluator~~ **RESOLVED**: `_collect_safety_metrics()` now validates tool calls against whitelist per task
+- ~~`ControllabilityMetrics` has `unauthorized_tool_uses` field but is always 0 (never tracked)~~ **RESOLVED**: `BehaviouralSafetyMetrics` tracks authorized/unauthorized counts at per-call granularity
+- ~~No violation tracking~~ **RESOLVED**: per-task and aggregate violation rates computed
+- **(2026-03-12)**: Mock tools implemented (`weather_api`, `fx_api`, `calculator`, `wiki_search`, `shopping_search`), providing prerequisites for tool whitelist enforcement
+- **(2026-04-01)**: Phase C3 implementation completed, including:
+  - `src/evaluation/safety.py` (NEW): `UNSAFE_PATTERNS` (12 regex patterns across 5 categories), `check_tool_compliance()`, `check_content_safety()`, `compute_task_safety()`
+  - `BehaviouralSafetyMetrics` dataclass (metrics.py): 10 fields + `overall_safety()` method
+  - `_collect_safety_metrics()` (evaluator.py): per-task tool whitelist validation + content safety scanning
+  - `compute_dim5_scores()` (scoring.py): integrated into `compute_all_scores()` and `NormalizedDimensionScores`
+  - Report & visualisation updated with Dim5 data
+  - 41 unit tests all passing (tests/unit_tests/test_safety.py)
+
+**Current status (REMAINING — Stage 2 future):**
+- No controlled execution environment / sandbox
+- Domain regex is a proxy — not a full safety classifier
+- No blocked-attempt enforcement (monitoring only, not blocking)
 
 ---
 
-#### Dimension 6: Robustness & Scalability (Systemic) - ~40%
+#### Dimension 6: Robustness & Scalability (Systemic) - ~40% → ~75%
 
 **Proposal requires:**
 - Temperature/seed sweeps for variance-based stability indices
@@ -142,17 +164,26 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 - Progressive scaling experiments (performance vs task complexity)
 - Multiple runs (3-5) with mean +/- 95% CI
 
-**Current status (DONE):**
-- Input perturbation tests exist (2 perturbations per task in test_suite.py)
-- `RobustnessMetrics` with degradation calculation
+**Current status (DONE — Phase D1, 2026-04-01):**
+- ~~Input perturbation tests exist (2 perturbations per task in test_suite.py)~~ **ENHANCED**: Now runs ALL perturbation variants per task (not just the first)
+- ~~`RobustnessMetrics` with degradation calculation~~ **EXTENDED** with 6 new D1 fields:
+  - `perturbation_variant_count`: total perturbed task executions
+  - `absolute_degradation`: |S_clean - S_noisy|
+  - `stability_index`: prompt-variant stability proxy via variance formula — `1 - min(p*(1-p)/0.25, 1.0)`
+  - `success_by_complexity`: per-band success rate (simple/medium/complex)
+  - `complexity_decline`: `max(0, success_simple - success_complex)`
+  - `scaling_score`: `1 - complexity_decline`
 - Original vs perturbed success rate comparison
+- Per-task robustness scoring: 1.0 (both succeed), 0.5 (original succeeds, perturbed fails), 0.0 (otherwise)
+- D1-aligned Dim6 formula: `dim6 = mean(norm_degradation, stability_index, scaling_score)`
+- Report & visualisation updated with D1 sub-indicators
+- 29 unit tests all passing (tests/unit_tests/test_robustness_d1.py)
 
-**Current status (MISSING):**
-- No temperature/seed sweep (variance-based stability)
+**Current status (REMAINING — Stage 2 future):**
+- No true temperature/seed sweep (requires refactoring pattern graphs into runtime-configurable factories)
 - Perturbations are hand-written, not generated via nlpaug/textattack
-- No progressive scaling experiments
-- No multiple runs or confidence intervals
-- No statistical rigor (mean +/- 95% CI)
+- No multiple runs or confidence intervals (Phase F)
+- No statistical rigor — mean +/- 95% CI (Phase F)
 
 ---
 
@@ -427,11 +458,11 @@ Given the project timeline (Figure 1 in proposal: Stage 3 Full Evaluation is ~Ma
 | **P1** | E | Normalization & Composite Scoring | Medium | NOT STARTED |
 | **P1** | F | Statistical Rigor (multi-run, CI) | Medium | NOT STARTED |
 | **P2** | B1 | Reasoning Quality | Medium-High | NOT STARTED |
-| **P2** | C1 | Action-Decision Alignment | Medium | NOT STARTED (prerequisite Phase A ready) |
+| **P2** | C1 | Action-Decision Alignment | Medium | **COMPLETED** (2026-04-01) |
 | **P2** | C2 | Complete Success & Efficiency | Low | NOT STARTED |
-| **P3** | D1 | Enhance Robustness | Medium | NOT STARTED |
+| **P3** | D1 | Enhance Robustness | Medium | **COMPLETED** (2026-04-01) |
 | **P3** | D2 | Controllability & Transparency | Medium | NOT STARTED (prerequisite Phase A ready) |
-| **P3** | C3 | Behavioural Safety | Medium | NOT STARTED (prerequisite Phase A ready) |
+| **P3** | C3 | Behavioural Safety | Medium | **COMPLETED** (2026-04-01) |
 | **P4** | B2 | Cognitive Safety (proxy) | Medium | NOT STARTED |
 | **P5** | G | Report & Visualization Polish | Medium | NOT STARTED |
 
