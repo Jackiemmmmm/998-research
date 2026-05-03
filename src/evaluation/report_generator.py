@@ -1,11 +1,178 @@
 """Report Generator - Generate evaluation reports."""
 
 import json
+import os
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from .metrics import MetricsAggregator, PatternMetrics
+from .statistics import StatisticalReport
+
+
+def _render_statistical_section(
+    statistical_report: StatisticalReport,
+    run_metadata: Optional[Dict[str, Any]] = None,
+) -> list:
+    """Render the Phase F "Statistical Rigor" markdown section.
+
+    Produces:
+
+    1. A ``mean ± 95 % CI`` summary table covering the headline metrics.
+    2. The pairwise Cohen's d table for ``composite_score``.
+    """
+    lines = []
+    lines.append("## 7. Statistical Rigor (Phase F)")
+    lines.append("")
+    lines.append(f"Repeated runs: **N = {statistical_report.num_runs}**.")
+    if run_metadata is not None and run_metadata.get("robustness_reused"):
+        lines.append(
+            "> Robustness perturbations were run **once** and replayed; "
+            "robustness CI underestimates true variance."
+        )
+    lines.append("")
+
+    # ------------------------------------------------------------------
+    # Mean ± 95% CI summary table
+    # ------------------------------------------------------------------
+    lines.append("### Mean ± 95 % CI by Pattern")
+    lines.append("")
+    headline_metrics = [
+        ("composite_score", "Composite"),
+        ("success_rate_strict", "Success (strict)"),
+        ("avg_latency_sec", "Latency (s)"),
+        ("avg_total_tokens", "Avg Tokens"),
+        ("degradation_percentage", "Degradation %"),
+    ]
+    header = "| Pattern | " + " | ".join(label for _, label in headline_metrics) + " |"
+    sep = "|---------|" + "|".join(["---"] * len(headline_metrics)) + "|"
+    lines.append(header)
+    lines.append(sep)
+    for name, stats in statistical_report.per_pattern.items():
+        cells = [name]
+        for metric_key, _ in headline_metrics:
+            s = stats.summaries.get(metric_key)
+            if s is None:
+                cells.append("N/A")
+            else:
+                # Render compactly: mean [low, high]
+                cells.append(
+                    f"{s.mean:.3f} ± {(s.ci95_high - s.mean):.3f}"
+                )
+        lines.append("| " + " | ".join(cells) + " |")
+    lines.append("")
+
+    # ------------------------------------------------------------------
+    # Pairwise Cohen's d for composite_score (spec section 5.4 + 5.7)
+    # ------------------------------------------------------------------
+    lines.append("### Pairwise Effect Sizes — composite_score (Cohen's d)")
+    lines.append("")
+    lines.append("> Cohen's d magnitudes: 0.2 small, 0.5 medium, 0.8 large.")
+    lines.append("> Zero-variance fallback uses ±999.0 to avoid infinities.")
+    lines.append("")
+
+    # Caveat (post-2026-05-03 review): when an underlying metric has
+    # a very small per-pattern std (e.g. seed_supported=true makes
+    # success_rate identical across runs), the pooled std collapses
+    # toward 0 and Cohen's d is mathematically correct but practically
+    # meaningless -- the standard 0.2/0.5/0.8 thresholds no longer
+    # apply.  Emit a heads-up automatically when we detect any pattern
+    # whose composite std is below the threshold.
+    SMALL_STD_THRESHOLD = 0.01
+    composite_stds = []
+    for ps in statistical_report.per_pattern.values():
+        s = ps.summaries.get("composite_score")
+        if s is not None:
+            composite_stds.append(s.std)
+    if composite_stds and min(composite_stds) < SMALL_STD_THRESHOLD:
+        lines.append(
+            f"> **Caveat — small-variance inflation**: at least one pattern "
+            f"has `std(composite_score) < {SMALL_STD_THRESHOLD}` "
+            f"(seed-controlled execution + suppressed robustness variance). "
+            f"When pooled std collapses, Cohen's d magnitudes are "
+            f"mathematically correct but practically dominated by floating-point "
+            f"noise; **do not interpret these via the standard 0.2/0.5/0.8 "
+            f"thresholds**. Read these alongside the mean ± CI table above."
+        )
+        lines.append("")
+
+    composite_pairs = statistical_report.pairwise_effect_sizes.get(
+        "composite_score", []
+    )
+    if not composite_pairs:
+        lines.append("_No composite pairwise data available._")
+    else:
+        lines.append("| Pattern A | Pattern B | Cohen's d |")
+        lines.append("|-----------|-----------|-----------|")
+        for pair in composite_pairs:
+            lines.append(
+                f"| {pair.pattern_a} | {pair.pattern_b} | {pair.cohens_d:.3f} |"
+            )
+    lines.append("")
+    return lines
+
+
+def _git_rev(args: list) -> str:
+    """Run ``git rev-parse <args>`` and return stripped stdout, or ``"unknown"``.
+
+    Phase F spec section 5.6: capture branch + commit for reproducibility,
+    falling back to ``"unknown"`` on detached-HEAD / missing-binary errors.
+    """
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", *args],
+            stderr=subprocess.DEVNULL,
+            cwd=str(Path(__file__).resolve().parent.parent.parent),
+        )
+        return out.decode("utf-8").strip()
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return "unknown"
+
+
+def _build_phase_f_metadata(
+    num_runs: int,
+    delay_between_tasks: Optional[float] = None,
+    task_timeout: Optional[float] = None,
+    parallel: Optional[bool] = None,
+    max_concurrency: Optional[int] = None,
+    robustness_reused: bool = False,
+    insufficient_runs: bool = False,
+) -> Dict[str, Any]:
+    """Assemble the Phase F metadata block (spec §5.6 + §5.7).
+
+    Pulls provider/model from ``LLMConfig.get_model_info()``; the judge
+    model is resolved from the ``JUDGE_OLLAMA_MODEL`` env var (falls
+    back to ``"unknown"`` when unset, matching Phase B1's runtime
+    behaviour where it reuses the agent model).
+    """
+    # Local import to avoid circular dependency at module load time.
+    from src.llm_config import LLMConfig
+
+    info = LLMConfig.get_model_info()
+    judge_model = os.getenv("JUDGE_OLLAMA_MODEL", "unknown")
+
+    metadata: Dict[str, Any] = {
+        "generated_at": datetime.now().isoformat(),
+        "num_runs": num_runs,
+        "provider_model": {
+            "provider": info.get("provider"),
+            "model": info.get("model"),
+        },
+        "judge_model": judge_model,
+        "delay_between_tasks": delay_between_tasks,
+        "task_timeout": task_timeout,
+        "parallel": parallel,
+        "max_concurrency": max_concurrency,
+        "robustness_reused": robustness_reused,
+        "seed_supported": bool(info.get("seed_supported", False)),
+        "seed": info.get("seed"),
+        "git_branch": _git_rev(["--abbrev-ref", "HEAD"]),
+        "git_commit": _git_rev(["HEAD"]),
+    }
+    if insufficient_runs:
+        metadata["insufficient_runs"] = True
+    return metadata
 
 
 class ReportGenerator:
@@ -15,23 +182,40 @@ class ReportGenerator:
     def generate_json_report(
         pattern_metrics: Dict[str, PatternMetrics],
         output_path: Optional[str] = None,
+        statistical_report: Optional[StatisticalReport] = None,
+        run_metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Generate JSON report.
 
         Args:
-            pattern_metrics: Dict of {pattern_name: PatternMetrics}
-            output_path: Optional path to save report
+            pattern_metrics: Dict of {pattern_name: PatternMetrics} for
+                the latest single run (back-compat baseline content).
+            output_path: Optional path to save report.
+            statistical_report: Optional Phase F multi-run aggregate;
+                when supplied, ``run_records``, ``statistical_summaries``
+                and ``pairwise_effect_sizes`` are added per spec §5.7.
+            run_metadata: Optional metadata block (Phase F spec §5.6).
+                When supplied it replaces the legacy ``metadata`` block.
 
         Returns:
             Report dictionary
         """
         # Build comprehensive report
-        report = {
-            "metadata": {
+        if run_metadata is not None:
+            metadata_block = dict(run_metadata)
+            metadata_block.setdefault(
+                "patterns_evaluated", list(pattern_metrics.keys())
+            )
+            metadata_block.setdefault("total_patterns", len(pattern_metrics))
+        else:
+            metadata_block = {
                 "generated_at": datetime.now().isoformat(),
                 "patterns_evaluated": list(pattern_metrics.keys()),
                 "total_patterns": len(pattern_metrics),
-            },
+            }
+
+        report = {
+            "metadata": metadata_block,
             "individual_metrics": {
                 name: metrics.to_dict()
                 for name, metrics in pattern_metrics.items()
@@ -60,6 +244,28 @@ class ReportGenerator:
                 for i, (name, data) in enumerate(ranked)
             ]
 
+        # Phase F: Statistical layer (multi-run aggregation).  Schema follows
+        # spec §5.7: ``single_run_latest`` mirrors the legacy keying by
+        # pattern name; ``run_records``, ``statistical_summaries`` and
+        # ``pairwise_effect_sizes`` are added when available.
+        if statistical_report is not None:
+            report["single_run_latest"] = {
+                name: metrics.to_dict()
+                for name, metrics in pattern_metrics.items()
+            }
+            report["run_records"] = {
+                name: [r.to_dict() for r in stats.run_records]
+                for name, stats in statistical_report.per_pattern.items()
+            }
+            report["statistical_summaries"] = {
+                name: {k: v.to_dict() for k, v in stats.summaries.items()}
+                for name, stats in statistical_report.per_pattern.items()
+            }
+            report["pairwise_effect_sizes"] = {
+                metric: [e.to_dict() for e in pairs]
+                for metric, pairs in statistical_report.pairwise_effect_sizes.items()
+            }
+
         # Save to file if path provided
         if output_path:
             Path(output_path).parent.mkdir(parents=True, exist_ok=True)
@@ -72,12 +278,22 @@ class ReportGenerator:
     def generate_markdown_report(
         pattern_metrics: Dict[str, PatternMetrics],
         output_path: Optional[str] = None,
+        statistical_report: Optional[StatisticalReport] = None,
+        run_metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Generate Markdown report.
 
         Args:
-            pattern_metrics: Dict of {pattern_name: PatternMetrics}
+            pattern_metrics: Dict of {pattern_name: PatternMetrics} for
+                the latest single run.
             output_path: Optional path to save report
+            statistical_report: Optional Phase F multi-run aggregate;
+                when supplied, an additional "Statistical Rigor" section
+                is appended with the mean ± 95 % CI summary table and
+                pairwise composite-score effect-size table.
+            run_metadata: Optional Phase F metadata block.  When
+                supplied, the document header surfaces ``num_runs``,
+                ``judge_model``, git ref and reproducibility info.
 
         Returns:
             Markdown string
@@ -90,6 +306,28 @@ class ReportGenerator:
         lines.append("")
         lines.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append(f"**Patterns Evaluated:** {', '.join(pattern_metrics.keys())}")
+        if run_metadata is not None:
+            lines.append(f"**Number of Runs:** {run_metadata.get('num_runs', 'unknown')}")
+            pm = run_metadata.get("provider_model", {}) or {}
+            lines.append(
+                f"**Agent Model:** {pm.get('provider', '?')}/{pm.get('model', '?')}"
+            )
+            lines.append(f"**Judge Model:** {run_metadata.get('judge_model', 'unknown')}")
+            lines.append(
+                f"**Git:** {run_metadata.get('git_branch', 'unknown')} "
+                f"@ {run_metadata.get('git_commit', 'unknown')[:8]}"
+            )
+            if run_metadata.get("robustness_reused"):
+                lines.append(
+                    "> **Note:** robustness_reused = true — perturbation suite was "
+                    "run **once** and replayed across all runs to bound cost. "
+                    "Robustness CI width therefore underestimates true variance."
+                )
+            if run_metadata.get("insufficient_runs"):
+                lines.append(
+                    "> **Warning:** num_runs = 1 — confidence intervals are not "
+                    "meaningful and the report is marked `insufficient_runs = true`."
+                )
         lines.append("")
 
         num_patterns = len(pattern_metrics)
@@ -98,6 +336,31 @@ class ReportGenerator:
         lines.append("> spanning 4 categories (baseline, reasoning, tool-use, planning) with robustness")
         lines.append("> perturbations. Scores are normalised to [0, 1] for fair cross-pattern comparison.")
         lines.append("")
+
+        # Multi-run helpers used throughout the report (post-2026-05-04 polish):
+        # when N>1 we prefer Phase F statistical means over the latest
+        # single-run snapshot in headline tables and "Best Pattern" callouts.
+        multi_run = (
+            statistical_report is not None
+            and statistical_report.num_runs > 1
+        )
+
+        def _stat_mean(pattern_name: str, metric: str):
+            """Return Phase F mean for a metric, or None if absent."""
+            if not multi_run:
+                return None
+            ps = statistical_report.per_pattern.get(pattern_name)
+            if ps is None:
+                return None
+            summary = ps.summaries.get(metric)
+            return summary.mean if summary is not None else None
+
+        def _dim_value(pattern_name: str, ns_value, metric: str):
+            """Prefer Phase F mean; fall back to single-run normalised score."""
+            stat = _stat_mean(pattern_name, metric)
+            if stat is not None:
+                return stat
+            return ns_value
 
         # Summary table
         lines.append("## Summary Comparison")
@@ -127,11 +390,49 @@ class ReportGenerator:
         lines.append("> additional success is recovered by lenient parsing.")
         lines.append("")
         success = comparison["success_dimension"]
-        lines.append(f"**Best Pattern:** {success['best_pattern']} ({success['best_score']:.1%})")
+        # Post-2026-05-04 review polish: when N>1, use the multi-run
+        # statistical mean for the headline rather than the latest
+        # single-run snapshot.  Otherwise stochastic patterns like ToT
+        # (whose success rate has CI ± 0.155 across 3 runs) get reported
+        # at their best run, which overstates capability.
+        if multi_run:
+            best_pat, best_mean, best_margin = None, -1.0, 0.0
+            for pname in pattern_metrics.keys():
+                ps = statistical_report.per_pattern.get(pname)
+                if ps is None:
+                    continue
+                s = ps.summaries.get("success_rate_strict")
+                if s is None:
+                    continue
+                if s.mean > best_mean:
+                    best_pat, best_mean = pname, s.mean
+                    best_margin = s.ci95_high - s.mean
+            if best_pat is not None:
+                lines.append(
+                    f"**Best Pattern (mean across N = {statistical_report.num_runs} runs):** "
+                    f"{best_pat} ({best_mean:.1%} strict ± {best_margin:.1%} 95 % CI). "
+                    f"_Note: the **latest single run** alone is "
+                    f"{success['best_pattern']} ({success['best_score']:.1%}) — different "
+                    f"because stochastic patterns (e.g. ToT) vary across runs._"
+                )
+            else:
+                lines.append(f"**Best Pattern:** {success['best_pattern']} ({success['best_score']:.1%})")
+        else:
+            lines.append(f"**Best Pattern:** {success['best_pattern']} ({success['best_score']:.1%})")
         lines.append("")
         lines.append("### Success Rates by Pattern")
         for pattern, rate in success["rates"].items():
-            lines.append(f"- **{pattern}**: {rate:.1%}")
+            line = f"- **{pattern}**: {rate:.1%}"
+            if multi_run:
+                ps = statistical_report.per_pattern.get(pattern)
+                if ps is not None:
+                    s = ps.summaries.get("success_rate_strict")
+                    if s is not None and s.std > 0:
+                        line += (
+                            f"  _(mean {s.mean:.1%} ± "
+                            f"{(s.ci95_high - s.mean):.1%}, n={s.n})_"
+                        )
+            lines.append(line)
         lines.append("")
 
         # By category and complexity
@@ -175,12 +476,29 @@ class ReportGenerator:
         lines.append("> from simple to complex tasks.")
         lines.append("")
         robustness = comparison["robustness_dimension"]
-        lines.append(f"**Most Robust:** {robustness['most_robust_pattern']} ({robustness['lowest_degradation']:.1f}% degradation)")
-        lines.append(f"**Least Robust:** {robustness['least_robust_pattern']} ({robustness['highest_degradation']:.1f}% degradation)")
+        lines.append(f"**Most Robust (raw degradation %):** {robustness['most_robust_pattern']} ({robustness['lowest_degradation']:.1f}% degradation)")
+        lines.append(f"**Least Robust (raw degradation %):** {robustness['least_robust_pattern']} ({robustness['highest_degradation']:.1f}% degradation)")
+        lines.append("")
+        lines.append(
+            "> ⚠ **Cross-section note**: this section ranks by *raw* degradation percentage. "
+            "The composite **Dim 6** in § 5 combines `norm_degradation × stability_index × scaling_score` "
+            "and can give a different ranking — for example, a pattern with the lowest degradation "
+            "may still score lower on Dim 6 if its `complexity_decline` is high. **Read both views together.**"
+        )
         lines.append("")
         lines.append("### Performance Degradation by Pattern")
         for pattern, deg in robustness["degradations"].items():
-            lines.append(f"- **{pattern}**: {deg:.1f}%")
+            line = f"- **{pattern}**: {deg:.1f}%"
+            if multi_run:
+                ps = statistical_report.per_pattern.get(pattern)
+                if ps is not None:
+                    s = ps.summaries.get("degradation_percentage")
+                    if s is not None and s.std > 0:
+                        line += (
+                            f"  _(mean {s.mean:.1f}% ± "
+                            f"{(s.ci95_high - s.mean):.1f}%, n={s.n})_"
+                        )
+            lines.append(line)
         lines.append("")
 
         # Controllability dimension
@@ -561,20 +879,60 @@ class ReportGenerator:
                 )
             lines.append("")
 
+            # Dim 2 placeholder note (post-2026-05-04 polish): Phase B2
+            # is owned by P3 and not yet implemented; we surface this
+            # explicitly so readers don't think Dim 2 is silently zero.
+            lines.append("#### Dim 2 -- Cognitive Safety & Constraint Adherence")
+            lines.append("")
+            lines.append(
+                "> 🚧 **Not yet implemented** — Phase B2 is owned by **P3 (Kapila)** per the "
+                "[10-week project plan](./10_WEEK_PROJECT_PLAN_EN.md#week-56-cognitive-layer--statistical-rigor) "
+                "Week 5-6 row. The forward-compatibility field `dim2_cognitive_safety` already exists in "
+                "`run_records` and `PatternRunRecord`; it will populate automatically once Phase B2 "
+                "lands without any further Phase F changes."
+            )
+            lines.append("")
+            lines.append(
+                "Planned scope (per [Group-1.pdf § 2.2.1 Dim2](../Group-1.pdf)): "
+                "toxicity keyword filtering, unsupported-claim / hallucination detection, "
+                "and constraint-adherence scoring."
+            )
+            lines.append("")
+
+            # Phase F bug fix: when statistical_report is available
+            # (multi-run), prefer the per-pattern statistical mean over
+            # the latest single-run snapshot for each dimension.
+            # `multi_run`, `_stat_mean`, `_dim_value` are defined at
+            # the top of generate_markdown_report (lifted post-2026-05-04
+            # polish so they can be reused in section 1 and elsewhere).
             lines.append("### Dimension Score Summary")
             lines.append("")
+            if multi_run:
+                lines.append(
+                    f"> Values are mean across **N = {statistical_report.num_runs} runs** "
+                    f"(Phase F `statistical_summaries`). Patterns/dimensions with `N/A` "
+                    f"have all-`None` runs (e.g. Baseline has no THINK steps -> Dim 1 N/A)."
+                )
+                lines.append("")
             lines.append("| Pattern | Dim 1 (Reason) | Dim 3 (Align) | Dim 4 (Success) | Dim 5 (Safety) | Dim 6 (Robust) | Dim 7 (Control) | Composite |")
             lines.append("|---------|----------------|--------------|----------------|----------------|----------------|-----------------|-----------|")
             for name, metrics in pattern_metrics.items():
                 ns = getattr(metrics, '_normalised_scores', None)
                 cs = getattr(metrics, '_composite_score', None)
-                d1 = f"{ns.dim1_reasoning_quality:.3f}" if ns and ns.dim1_reasoning_quality is not None else "N/A"
-                d3 = f"{ns.dim3_action_decision_alignment:.3f}" if ns and ns.dim3_action_decision_alignment is not None else "N/A"
-                d4 = f"{ns.dim4_success_efficiency:.3f}" if ns and ns.dim4_success_efficiency is not None else "N/A"
-                d5 = f"{ns.dim5_behavioural_safety:.3f}" if ns and ns.dim5_behavioural_safety is not None else "N/A"
-                d6 = f"{ns.dim6_robustness_scalability:.3f}" if ns and ns.dim6_robustness_scalability is not None else "N/A"
-                d7 = f"{ns.dim7_controllability:.3f}" if ns and ns.dim7_controllability is not None else "N/A"
-                comp = f"{cs.composite:.3f}" if cs else "N/A"
+                d1_v = _dim_value(name, ns.dim1_reasoning_quality if ns else None, "dim1_reasoning_quality")
+                d3_v = _dim_value(name, ns.dim3_action_decision_alignment if ns else None, "dim3_action_decision_alignment")
+                d4_v = _dim_value(name, ns.dim4_success_efficiency if ns else None, "dim4_success_efficiency")
+                d5_v = _dim_value(name, ns.dim5_behavioural_safety if ns else None, "dim5_behavioural_safety")
+                d6_v = _dim_value(name, ns.dim6_robustness_scalability if ns else None, "dim6_robustness_scalability")
+                d7_v = _dim_value(name, ns.dim7_controllability if ns else None, "dim7_controllability")
+                comp_v = _dim_value(name, cs.composite if cs else None, "composite_score")
+                d1 = f"{d1_v:.3f}" if d1_v is not None else "N/A"
+                d3 = f"{d3_v:.3f}" if d3_v is not None else "N/A"
+                d4 = f"{d4_v:.3f}" if d4_v is not None else "N/A"
+                d5 = f"{d5_v:.3f}" if d5_v is not None else "N/A"
+                d6 = f"{d6_v:.3f}" if d6_v is not None else "N/A"
+                d7 = f"{d7_v:.3f}" if d7_v is not None else "N/A"
+                comp = f"{comp_v:.3f}" if comp_v is not None else "N/A"
                 lines.append(f"| {name:12s} | {d1:14s} | {d3:12s} | {d4:14s} | {d5:14s} | {d6:14s} | {d7:15s} | {comp:9s} |")
             lines.append("")
 
@@ -592,24 +950,72 @@ class ReportGenerator:
                     lines.append(f"| {name:12s} | {s:9s} | {tc:15s} | {tao:15s} |")
             lines.append("")
 
-            # Composite ranking
+            # Composite ranking — dual view per post-2026-05-03 review:
+            # the "evaluable-dim mean" view is honest to the spec but
+            # rewards patterns with more N/A dimensions (e.g. Baseline,
+            # which is a raw-LLM control with no reasoning trace and no
+            # tool use, gets averaged over only 3 dimensions and ends up
+            # ranking #1).  We additionally surface an "all-7-dim mean
+            # (N/A=0)" view so the supervisor can compare both.
             composites = []
             for name, metrics in pattern_metrics.items():
                 cs = getattr(metrics, '_composite_score', None)
-                if cs:
-                    composites.append((name, cs.composite, cs.available_dimensions))
+                ns = getattr(metrics, '_normalised_scores', None)
+                if cs is None or ns is None:
+                    continue
+                # Collect all 7 normalised dim scores
+                seven_dims = [
+                    ns.dim1_reasoning_quality,
+                    ns.dim2_cognitive_safety,
+                    ns.dim3_action_decision_alignment,
+                    ns.dim4_success_efficiency,
+                    ns.dim5_behavioural_safety,
+                    ns.dim6_robustness_scalability,
+                    ns.dim7_controllability,
+                ]
+                # Override with Phase F means where available (multi-run).
+                if multi_run:
+                    metric_names = [
+                        "dim1_reasoning_quality",
+                        "dim2_cognitive_safety",
+                        "dim3_action_decision_alignment",
+                        "dim4_success_efficiency",
+                        "dim5_behavioural_safety",
+                        "dim6_robustness_scalability",
+                        "dim7_controllability",
+                    ]
+                    for i, m in enumerate(metric_names):
+                        stat = _stat_mean(name, m)
+                        if stat is not None:
+                            seven_dims[i] = stat
+                # All-7-dim mean treats N/A as 0.
+                penalised = sum((v if v is not None else 0.0) for v in seven_dims) / 7.0
+                composites.append((name, cs.composite, cs.available_dimensions, penalised))
             if composites:
+                # Default ranking: by evaluable-dim mean (current spec behaviour)
                 composites.sort(key=lambda x: x[1], reverse=True)
                 lines.append("### Composite Score Ranking")
                 lines.append("")
-                lines.append("> **Interpretation**: The composite score is the uniform-weighted average of all")
-                lines.append("> available dimension scores. Patterns with more N/A dimensions are scored on")
-                lines.append("> fewer dimensions. A higher composite indicates better overall performance across")
-                lines.append("> the evaluated dimensions, but the per-dimension breakdown above reveals important")
-                lines.append("> trade-offs that a single number cannot capture.")
+                lines.append("> **Read this caveat first**: two composite views are reported below because")
+                lines.append("> the spec's \"evaluable-dim mean\" rewards patterns with more N/A dimensions.")
+                lines.append("> For example, **Baseline (raw-LLM control)** has N/A on Dim 1 (no reasoning trace)")
+                lines.append("> and Dim 3 (no tool use), so its composite averages over only 3 dimensions while")
+                lines.append("> tool/reasoning patterns like CoT average over 5. **Always read these rankings")
+                lines.append("> alongside the per-dimension breakdown above** — a single number cannot capture")
+                lines.append("> patterns that are unmeasurable on a dimension vs. patterns that fail it.")
                 lines.append("")
-                for rank, (name, score, n_dims) in enumerate(composites, 1):
+                lines.append("**View A — Evaluable-dim mean** (spec §5.7, uniform weight over available dims):")
+                lines.append("")
+                for rank, (name, score, n_dims, _) in enumerate(composites, 1):
                     lines.append(f"{rank}. **{name}**: {score:.4f} ({n_dims} dimensions)")
+                lines.append("")
+                # Penalised view (N/A=0)
+                penalised_sorted = sorted(composites, key=lambda x: x[3], reverse=True)
+                lines.append("**View B — All-7-dim mean (N/A treated as 0)**: penalises unmeasurable dimensions.")
+                lines.append("Useful for comparing patterns on equal footing, but harsh on the raw-LLM control.")
+                lines.append("")
+                for rank, (name, _spec_score, _n_dims, penalised) in enumerate(penalised_sorted, 1):
+                    lines.append(f"{rank}. **{name}**: {penalised:.4f}")
                 lines.append("")
 
         # Recommendations
@@ -618,7 +1024,31 @@ class ReportGenerator:
         lines.append("### Scenario-Based Pattern Selection")
         lines.append("")
 
-        # Find best for each scenario
+        # Find best for each scenario.
+        # "Complex Reasoning Tasks" must use Dim 1 (reasoning quality)
+        # NOT raw success rate -- otherwise the raw-LLM Baseline (which
+        # has no reasoning trace at all and is N/A on Dim 1) would be
+        # falsely recommended for tasks that explicitly need reasoning.
+        # See post-2026-05-03 review.
+        def _dim1_score(item):
+            ns = getattr(item[1], '_normalised_scores', None)
+            if ns and ns.dim1_reasoning_quality is not None:
+                return ns.dim1_reasoning_quality
+            return -1.0  # patterns without reasoning are not eligible
+
+        best_reasoning_candidates = [
+            (k, v) for k, v in pattern_metrics.items() if _dim1_score((k, v)) >= 0
+        ]
+        if best_reasoning_candidates:
+            best_reasoning = max(best_reasoning_candidates, key=_dim1_score)
+            best_reasoning_score = _dim1_score(best_reasoning)
+            best_reasoning_label = (
+                f"{best_reasoning[0]} (Dim 1 reasoning quality = "
+                f"{best_reasoning_score:.3f})"
+            )
+        else:
+            best_reasoning_label = "no pattern produced an evaluable reasoning trace"
+
         best_success = max(pattern_metrics.items(), key=lambda x: x[1].success.success_rate())
         best_speed = min(
             ((k, v) for k, v in pattern_metrics.items() if v.efficiency.avg_latency() > 0),
@@ -634,7 +1064,15 @@ class ReportGenerator:
             return item[1].controllability.overall_controllability()
         best_control = max(pattern_metrics.items(), key=_dim7_score)
 
-        lines.append(f"- **Complex Reasoning Tasks:** {best_success[0]} (highest success rate)")
+        lines.append(
+            f"- **Complex Reasoning Tasks:** {best_reasoning_label} -- highest *evaluable* "
+            f"reasoning quality. Patterns with N/A on Dim 1 (e.g. Baseline) are excluded."
+        )
+        lines.append(
+            f"- **Highest Raw Success Rate (any task type):** {best_success[0]} "
+            f"({best_success[1].success.success_rate()*100:.1f}%) -- note this includes "
+            f"patterns that succeed without reasoning."
+        )
         lines.append(f"- **Real-time/Low-latency Scenarios:** {best_speed[0]} (fastest response)")
         lines.append(f"- **Noisy/Unreliable Environments:** {best_robust[0]} (most robust)")
         lines.append(f"- **Enterprise/Compliance-critical:** {best_control[0]} (most controllable)")
@@ -696,6 +1134,14 @@ class ReportGenerator:
                     f"  However, patterns with notable complexity decline: {decline_parts}."
                 )
         lines.append("")
+
+        # Phase F: Statistical Rigor section.  Renders the mean ± 95 % CI
+        # summary table for headline metrics + the pairwise composite
+        # effect-size table (spec §5.7).
+        if statistical_report is not None:
+            lines.extend(
+                _render_statistical_section(statistical_report, run_metadata)
+            )
 
         markdown = "\n".join(lines)
 

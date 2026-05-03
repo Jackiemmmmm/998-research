@@ -184,10 +184,10 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 - 29 unit tests all passing (tests/unit_tests/test_robustness_d1.py)
 
 **Current status (REMAINING — Stage 2 future):**
-- No true temperature/seed sweep (requires refactoring pattern graphs into runtime-configurable factories)
+- No true temperature/seed sweep (requires refactoring pattern graphs into runtime-configurable factories) — seed support landed in Phase F (2026-05-03), but the patterns construct their LLM at module load so temperature/seed sweeps still need a small refactor
 - Perturbations are hand-written, not generated via nlpaug/textattack
-- No multiple runs or confidence intervals (Phase F)
-- No statistical rigor — mean +/- 95% CI (Phase F)
+- ~~No multiple runs or confidence intervals (Phase F)~~ **CLOSED** (Phase F, 2026-05-03)
+- ~~No statistical rigor — mean +/- 95% CI (Phase F)~~ **CLOSED** (Phase F, 2026-05-03)
 
 ---
 
@@ -222,8 +222,8 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 | **0-1 Normalization** | Proposal requires all sub-indicators normalized to 0-1 range. Current metrics are raw values. | OPEN | Phase E |
 | **Dimension-Level Scoring** | No averaging of sub-indicators into dimension scores. | OPEN | Phase E |
 | **Composite Scoring** | No weighted/uniform combination of dimension scores into a final composite. | OPEN | Phase E |
-| **Statistical Rigor** | No multiple runs (3-5), no confidence intervals, no seed fixing. | OPEN | Phase F |
-| **Sensitivity Analysis** | No weight variation analysis in appendix. | OPEN | Phase F |
+| **Statistical Rigor** | ~~No multiple runs (3-5), no confidence intervals, no seed fixing.~~ Multi-run loop, mean ± 95 % CI (t-distribution), pairwise Cohen's d for composite + success rate, seed support where backend exposes it. | **CLOSED** (2026-05-03, Phase F) → [details](./PHASE_F_STATISTICAL_RIGOR.md) |
+| **Sensitivity Analysis** | No weight variation analysis in appendix. | OPEN | Phase F (multi-run / CI infra now in place) — Week 7-8 P2 task |
 
 ---
 
@@ -407,28 +407,35 @@ Adopted a **post-hoc message parsing** strategy instead of modifying pattern int
 
 ---
 
-### Phase F: Statistical Rigor & Reproducibility
+### Phase F: Statistical Rigor & Reproducibility — **COMPLETED (2026-05-03)**
 
-**F1. Fix model versions and seeds**
-- Add seed configuration to LLMConfig
-- Fix temperature across runs (unless doing temperature sweep)
-- Document model version in evaluation metadata
+> Implementation: [PHASE_F_STATISTICAL_RIGOR.md](./PHASE_F_STATISTICAL_RIGOR.md)
+> Spec: [`docs/specs/week5-6_phase-f_statistical-rigor.md`](./specs/week5-6_phase-f_statistical-rigor.md)
 
-**F2. Multiple runs with CI**
-- Configure evaluator for N=3-5 repeated runs
-- Compute mean +/- 95% confidence interval for all metrics
-- Add error bars to all visualizations
+**F1. Fix model versions and seeds — DONE**
+- `LLMConfig.get_model(seed=...)` wires seed into `ChatOllama` when the installed `langchain_ollama` exposes it (verified true on the pinned `>=0.3.x`)
+- `LLMConfig.get_model_info()` reports honest `seed_supported: bool` + resolved `seed`; `EVAL_SEED` env var is read as a fallback
+- Provider/model + judge model are recorded in every Phase F report's `metadata` block
 
-**F3. Publish evaluation artifacts**
-- Structured JSON logs per run
-- Aggregate results with statistical measures
-- Reproduction scripts
+**F2. Multiple runs with CI — DONE**
+- `--num-runs` (default 3, range 1–5; 1 marks `insufficient_runs=true`) drives the new `_run_multi()` orchestrator in `run_evaluation.py`
+- `compute_ci95()` uses a t-distribution lookup for `n ∈ {2..5}` per spec § 5.3
+- Pairwise Cohen's d is computed for both `composite_score` and `success_rate_strict` per § 5.4 (with the FP-noise epsilon → ±999.0 fallback)
+- `EvaluationVisualizer` overlays 95 % CI error bars on success-rate / efficiency plots and emits a new `composite_ci.png`
 
-**Files to create/modify:**
-- `src/llm_config.py` (MODIFY - add seed support)
-- `src/evaluation/evaluator.py` (MODIFY - multi-run loop, CI calculation)
-- `src/evaluation/visualization.py` (MODIFY - error bars)
-- `run_evaluation.py` (MODIFY - configurable num_runs)
+**F3. Publish evaluation artifacts — DONE**
+- JSON output extended with `single_run_latest`, `run_records`, `statistical_summaries`, `pairwise_effect_sizes` (schema matches spec § 5.7 example)
+- Markdown output gains a "Statistical Rigor (Phase F)" section: mean ± 95 % CI table + pairwise composite Cohen's d table
+- `--robustness-once` cost-control switch reuses the first run's perturbation suite and marks `robustness_reused=true`
+
+**Files created/modified:**
+- `src/evaluation/statistics.py` (CREATE) — Phase F core (5 dataclasses + helpers + `aggregate_runs`)
+- `src/evaluation/__init__.py` (MODIFY) — export Phase F surface
+- `src/evaluation/report_generator.py` (MODIFY) — extend JSON/Markdown with Phase F keys; metadata block helper
+- `src/evaluation/visualization.py` (MODIFY) — CI error bars + composite-CI plot
+- `src/llm_config.py` (MODIFY) — seed support + extended `get_model_info()`
+- `run_evaluation.py` (MODIFY) — `--num-runs`, `--robustness-{every-run,once}`, `--output-dir`, multi-run orchestrator
+- `tests/unit_tests/test_statistics.py` (CREATE) — 16 tests covering all 8 spec verification cases + defensive companions
 
 ---
 
@@ -460,7 +467,7 @@ Given the project timeline (Figure 1 in proposal: Stage 3 Full Evaluation is ~Ma
 |----------|-------|-------------|-----------------|--------|
 | **P0** | A | Unified Telemetry & Adapter | High (foundation) | **COMPLETED** → [details](./PHASE_A_UNIFIED_TELEMETRY.md) |
 | **P1** | E | Normalization & Composite Scoring | Medium | NOT STARTED |
-| **P1** | F | Statistical Rigor (multi-run, CI) | Medium | NOT STARTED |
+| **P1** | F | Statistical Rigor (multi-run, CI) | Medium | **COMPLETED** (2026-05-03, P1) → [details](./PHASE_F_STATISTICAL_RIGOR.md) |
 | **P2** | B1 | Reasoning Quality | Medium-High | **COMPLETED** (2026-05-03, P1 self-driven) |
 | **P2** | C1 | Action-Decision Alignment | Medium | **COMPLETED** (2026-04-01) |
 | **P2** | C2 | Complete Success & Efficiency | Low | NOT STARTED |

@@ -159,7 +159,7 @@ class PatternEvaluator:
         self._collect_alignment_metrics(metrics.alignment, original_results, test_tasks)
         self._collect_safety_metrics(metrics.safety, original_results, test_tasks)
         await self._collect_cognitive_metrics(
-            metrics.cognitive, original_results, test_tasks
+            metrics, original_results, test_tasks
         )
 
         # Calculate original success rate for robustness
@@ -863,11 +863,11 @@ class PatternEvaluator:
 
     async def _collect_cognitive_metrics(
         self,
-        cognitive_metrics: CognitiveMetrics,
+        metrics: PatternMetrics,
         results: List[TaskResult],
         tasks: List[TestTask],
     ):
-        """Collect Dim1 Reasoning Quality metrics.
+        """Collect Dim1 Reasoning Quality metrics + Phase F bridge.
 
         For each task we extract THINK steps from the trace, ask the
         ReasoningJudge to score coherence (skipped when there are no
@@ -878,7 +878,17 @@ class PatternEvaluator:
 
         Judge calls are blocking I/O against Ollama, so we run them in
         parallel via ``asyncio.gather`` + ``asyncio.to_thread``.
+
+        Phase F bridge (this method's second responsibility): the per-task
+        ``ReasoningQualityResult`` list and per-task agent outputs are
+        born locally inside this function and would otherwise be GC'd
+        when ``evaluate_pattern`` returns.  ``run_evaluation.py`` only
+        sees the returned ``PatternMetrics``, so we surface both as
+        private attributes (``_per_task_reasoning`` and
+        ``_task_outputs_for_run``) for the multi-run orchestrator to
+        feed into ``inject_self_consistency_scores()``.
         """
+        cognitive_metrics = metrics.cognitive
         task_lookup = {t.id: t for t in tasks}
 
         # Build a single ReasoningJudge so the underlying chat model
@@ -916,16 +926,21 @@ class PatternEvaluator:
             aggregated.task_quality_scores
         )
 
-        # Stash the raw per-task results on each TaskResult so the Phase F
-        # multi-run hook can pick them up (one ReasoningQualityResult per
-        # (pattern, task, run)).  Use setattr because TaskResult is a
-        # dataclass and we don't want to declare this private cache as a
-        # formal field.
-        for rq in per_task:
-            for r in results:
-                if r.task_id == rq.task_id:
-                    setattr(r, "_reasoning_quality_result", rq)
-                    break
+        # Phase F bridge: surface per-task data on PatternMetrics so the
+        # multi-run orchestrator in run_evaluation.py (which only sees
+        # PatternMetrics, not the local TaskResult list) can feed
+        # inject_self_consistency_scores().  Without these two attributes
+        # Dim1.self_consistency stays None even at N > 1.
+        #   _per_task_reasoning: list of ReasoningQualityResult objects
+        #     that inject_self_consistency_scores() will mutate in place
+        #     on the latest run (reasoning_quality.py:650).
+        #   _task_outputs_for_run: {task_id: raw output string} that
+        #     compute_self_consistency_score() needs for cross-run
+        #     equivalence-class comparison.
+        metrics._per_task_reasoning = list(per_task)
+        metrics._task_outputs_for_run = {
+            r.task_id: r.output for r in results if r.output
+        }
 
 
 def _compute_success_by_complexity(

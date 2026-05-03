@@ -52,7 +52,10 @@ This means Week 5-6 Phase F is expected to include:
 | `efficiency.avg_total_tokens()` | `src/evaluation/metrics.py` | `EfficiencyMetrics.avg_total_tokens()` | `>= 0` | `1325.5` | Mean/CI for token cost |
 | `robustness.degradation_percentage` | `src/evaluation/metrics.py` | `RobustnessMetrics.degradation_percentage` | `[0, 100]` | `25.0` | Mean/CI for robustness loss |
 | `controllability.overall_controllability()` | `src/evaluation/metrics.py` | `ControllabilityMetrics.overall_controllability()` | `[0, 1]` | `0.83` | Mean/CI for base controllability |
+| `_normalised_scores.dim1_reasoning_quality` | `src/evaluation/scoring.py` | `NormalizedDimensionScores` | `[0, 1]` or `None` | `0.820` | Phase E dimension-level aggregation (Phase B1 output) |
+| `_normalised_scores.dim3_action_decision_alignment` | `src/evaluation/scoring.py` | `NormalizedDimensionScores` | `[0, 1]` or `None` | `0.640` | Phase E dimension-level aggregation (Phase C1 output) |
 | `_normalised_scores.dim4_success_efficiency` | `src/evaluation/scoring.py` | `NormalizedDimensionScores` | `[0, 1]` or `None` | `0.741` | Phase E dimension-level aggregation |
+| `_normalised_scores.dim5_behavioural_safety` | `src/evaluation/scoring.py` | `NormalizedDimensionScores` | `[0, 1]` or `None` | `0.910` | Phase E dimension-level aggregation (Phase C3 output) |
 | `_normalised_scores.dim6_robustness_scalability` | `src/evaluation/scoring.py` | `NormalizedDimensionScores` | `[0, 1]` or `None` | `0.618` | Phase E dimension-level aggregation |
 | `_normalised_scores.dim7_controllability` | `src/evaluation/scoring.py` | `NormalizedDimensionScores` | `[0, 1]` or `None` | `0.801` | Phase E dimension-level aggregation |
 | `_composite_score.composite` | `src/evaluation/scoring.py` | `CompositeScore.composite` | `[0, 1]` | `0.720` | Main pairwise comparison target |
@@ -93,7 +96,10 @@ class PatternRunRecord:
     avg_total_tokens: float
     degradation_percentage: float
     overall_controllability: float
+    dim1_reasoning_quality: float | None
+    dim3_action_decision_alignment: float | None
     dim4_success_efficiency: float | None
+    dim5_behavioural_safety: float | None
     dim6_robustness_scalability: float | None
     dim7_controllability: float | None
     composite_score: float | None
@@ -121,7 +127,7 @@ class StatisticalReport:
 - `StatisticalSummary`
   - one metric aggregated across all repeated runs of the same pattern
 - `PairwiseEffectSize`
-  - pairwise comparison for one metric, initially required only for `composite_score`
+  - pairwise comparison for one metric; required for both `composite_score` and `success_rate_strict` (see §5.4)
 - `PatternStatistics`
   - per-pattern Phase F object used by report generation
 - `StatisticalReport`
@@ -160,6 +166,12 @@ Important:
 - Phase F must preserve the existing `PatternMetrics` outputs for each run
 - Phase F must keep a complete list of run-level records; do not aggregate too early
 - Phase F should support repeated execution under controlled model settings suitable for reproducibility
+
+Cost / budget controls (multi-run amplifies wall-clock; ref Proposal C3 / C7):
+
+- The robustness perturbation suite (Phase D1) **must run inside every one of the `N` repeated runs**, otherwise robustness mean/CI cannot be computed honestly across runs.
+- To bound cost, Phase F implementation should expose a `--robustness-every-run / --robustness-once` switch: default is `every-run`; `once` reuses the first run's `RobustnessMetrics` for all `N` records and **must mark `robustness_reused = true`** in metadata so the report is not misread.
+- Concurrency-control flags (`delay`, `parallel`, `max_concurrency`) and the agent/judge model identifiers must be held **constant** across the `N` runs. Any change between runs invalidates the statistical comparison and Phase F must refuse to aggregate them into the same `StatisticalReport`.
 
 ### 5.2 Mean and Standard Deviation
 
@@ -232,12 +244,15 @@ Edge case:
 
 Required Week 5-6 scope:
 
-- compute pairwise Cohen's d for `composite_score`
-- optional but recommended: also compute for `success_rate_strict`
+- compute pairwise Cohen's d for **both** `composite_score` and `success_rate_strict`
+- `composite_score` is the primary deliverable; `success_rate_strict` is a sanity-check companion that the JSON example in §5.7 also expects
+- additional metrics (latency, tokens, dim-level scores) are optional in this phase
 
 ### 5.5 Primary Aggregation Targets
 
-Phase F must aggregate at least the following metrics:
+Phase F must aggregate **all of the following** metrics. The Week 6 milestone explicitly requires "all 7 dimensions produce scores; multi-run and CI calculation supported", so every `dim*` field already populated by Phase B1 / C1 / C3 / D1 / D2 / E **must** be carried into the statistical layer.
+
+Raw run-level metrics:
 
 1. `success_rate_strict`
 2. `success_rate_lenient`
@@ -245,10 +260,21 @@ Phase F must aggregate at least the following metrics:
 4. `avg_total_tokens`
 5. `degradation_percentage`
 6. `overall_controllability`
-7. `dim4_success_efficiency`
-8. `dim6_robustness_scalability`
-9. `dim7_controllability`
-10. `composite_score`
+
+Normalised dimension scores (per `NormalizedDimensionScores`, may be `None` per §6 edge case):
+
+7. `dim1_reasoning_quality` — Phase B1 (DONE 2026-05-03)
+8. `dim3_action_decision_alignment` — Phase C1 (DONE 2026-04-01)
+9. `dim4_success_efficiency` — Phase E
+10. `dim5_behavioural_safety` — Phase C3 (DONE 2026-04-01)
+11. `dim6_robustness_scalability` — Phase D1 (DONE 2026-04-01)
+12. `dim7_controllability` — Phase D2 / Phase E
+
+Final aggregate:
+
+13. `composite_score`
+
+Note on `dim2_cognitive_safety`: P3's Phase B2 spec is the source. If Phase B2 lands during Week 5-6, Phase F's run-record flattener must include `dim2_cognitive_safety` automatically — implementer should make `PatternRunRecord` resilient to new `NormalizedDimensionScores` fields rather than hard-coding the list.
 
 ### 5.6 Reproducibility Metadata
 
@@ -262,8 +288,9 @@ Every statistical report must record:
 - `parallel`
 - `max_concurrency`
 
-- git branch
-- git commit hash
+- git branch — obtain via `subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])`; on failure (e.g. detached HEAD or no git binary) record `"unknown"`
+- git commit hash — obtain via `subprocess.check_output(["git", "rev-parse", "HEAD"])`; on failure record `"unknown"`
+- robustness_reused — `bool`, see §5.1 cost-control switch; defaults to `false`
 
 In addition, Phase F should support:
 
@@ -285,17 +312,20 @@ Recommended JSON structure:
 ```json
 {
   "metadata": {
-    "generated_at": "2026-03-28T15:30:00",
+    "generated_at": "2026-05-10T15:30:00",
     "num_runs": 3,
     "provider_model": {
       "provider": "ollama",
-      "model": "llama3.2"
+      "model": "llama3.1"
     },
+    "judge_model": "qwen2.5:7b",
     "delay_between_tasks": 1.0,
     "task_timeout": 180.0,
     "parallel": true,
     "max_concurrency": 1,
-    "git_branch": "codex/updated-phase-d1",
+    "robustness_reused": false,
+    "seed_supported": false,
+    "git_branch": "main",
     "git_commit": "abc1234"
   },
   "single_run_latest": {
@@ -481,18 +511,51 @@ Expected:
 ```text
 Input:
   PatternMetrics for ReAct where:
-    success_rate_strict = 0.625
-    avg_latency_sec = 4.8
-    composite_score = 0.712
+    success.success_rate()         = 0.625
+    success.lenient_success_rate() = 0.750
+    efficiency.avg_latency()       = 4.8
+    efficiency.avg_total_tokens()  = 1325.5
+    robustness.degradation_percentage   = 25.0
+    controllability.overall_controllability() = 0.83
+  NormalizedDimensionScores for ReAct where:
+    dim1_reasoning_quality            = None     # Phase B1 reports None for ReAct (no THINK steps)
+    dim3_action_decision_alignment    = 0.640
+    dim4_success_efficiency           = 0.741
+    dim5_behavioural_safety           = 0.910
+    dim6_robustness_scalability       = 0.618
+    dim7_controllability              = 0.801
+  CompositeScore for ReAct where:
+    composite = 0.712
+
 Expected:
   PatternRunRecord(
     run_index=1,
     pattern_name="ReAct",
     success_rate_strict=0.625,
+    success_rate_lenient=0.750,
     avg_latency_sec=4.8,
+    avg_total_tokens=1325.5,
+    degradation_percentage=25.0,
+    overall_controllability=0.83,
+    dim1_reasoning_quality=None,
+    dim3_action_decision_alignment=0.640,
+    dim4_success_efficiency=0.741,
+    dim5_behavioural_safety=0.910,
+    dim6_robustness_scalability=0.618,
+    dim7_controllability=0.801,
     composite_score=0.712,
-    ...
   )
+```
+
+### Case 8: All-None dimension excluded from summary
+
+```text
+Input:
+  Three runs of ReAct, every run reports dim1_reasoning_quality = None
+Expected:
+  PatternStatistics.summaries does NOT contain a "dim1_reasoning_quality" key
+  (per §6 edge case "if all are None, summary should be omitted")
+  run_records still preserve the None values verbatim
 ```
 
 ---
@@ -506,7 +569,10 @@ Expected:
    - Above it. `run_evaluation.py` should own repeated-run orchestration, while `PatternEvaluator` should remain the unit for one full evaluation pass.
 
 3. **Which metric should be the required effect-size target?**
-   - `composite_score`, because it is the final cross-pattern comparison metric promised in the proposal.
+   - **Both `composite_score` and `success_rate_strict`** are required for Week 5-6 (see §5.4).
+   - `composite_score` is the headline cross-pattern comparison metric promised in the proposal.
+   - `success_rate_strict` is added so reviewers can sanity-check that composite movements are driven by real behavioural change rather than weighting artefacts.
+   - Other metrics may be added opportunistically if the implementation cost is trivial.
 
 ---
 

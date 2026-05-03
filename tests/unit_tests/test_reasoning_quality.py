@@ -628,3 +628,205 @@ class TestCognitiveMetricsAggregation:
 class TestConstants:
     def test_expected_min_think_steps(self):
         assert EXPECTED_MIN_THINK_STEPS == 2
+
+
+# ---------------------------------------------------------------------------
+# Phase F bridge: _collect_cognitive_metrics surfaces per-task data
+# onto PatternMetrics so run_evaluation.py's multi-run orchestrator
+# can feed inject_self_consistency_scores().  Without this bridge
+# Dim1.self_consistency stays None even at N > 1.
+# ---------------------------------------------------------------------------
+
+import asyncio
+
+from src.evaluation.evaluator import PatternEvaluator, TaskResult
+
+
+def _make_task_result(
+    task_id: str,
+    *,
+    output: str = "",
+    think_contents: Optional[List[str]] = None,
+    judge_success: bool = False,
+    lenient_judge_success: bool = False,
+) -> TaskResult:
+    """Build a real TaskResult (the dataclass the evaluator actually uses)."""
+    tr = TaskResult(
+        task_id=task_id,
+        task_category="qa",
+        task_complexity="simple",
+        pattern_name="TestPattern",
+    )
+    tr.output = output
+    tr.judge_success = judge_success
+    tr.lenient_judge_success = lenient_judge_success
+    tr.trace = _make_trace(
+        task_id=task_id, think_contents=think_contents or ["plan", "act"]
+    )
+    return tr
+
+
+def _make_test_task(task_id: str, *, ground_truth: str = "42") -> TestTask:
+    """Build a real TestTask with a minimal exact-match judge config."""
+    return TestTask(
+        id=task_id,
+        category="qa",
+        complexity="simple",
+        prompt=f"prompt for {task_id}",
+        ground_truth=ground_truth,
+        judge={"mode": "exact"},
+    )
+
+
+class _AlwaysFallbackJudge(ReasoningJudge):
+    """ReasoningJudge that returns the rule-based 0.5 fallback for every call.
+
+    Used so the bridge tests don't depend on a live Ollama instance.
+    """
+
+    def __init__(self):
+        super().__init__(llm=object())
+
+    def evaluate_coherence(  # type: ignore[override]
+        self, query, reasoning_steps, final_output
+    ):
+        return 0.5, "fallback: scripted (test)", True
+
+
+class TestPhaseFBridge:
+    """Verify the Phase F data bridge inside _collect_cognitive_metrics."""
+
+    def _run_collect(self, results: List[TaskResult], tasks: List[TestTask]) -> PatternMetrics:
+        """Drive _collect_cognitive_metrics synchronously with a stubbed judge."""
+        evaluator = PatternEvaluator()
+        metrics = PatternMetrics(pattern_name="TestPattern")
+
+        # Patch ReasoningJudge() so the production code path picks up our
+        # always-fallback judge instead of trying to connect to Ollama.
+        import src.evaluation.evaluator as ev_module
+
+        original = ev_module.ReasoningJudge
+        ev_module.ReasoningJudge = _AlwaysFallbackJudge
+        try:
+            asyncio.run(
+                evaluator._collect_cognitive_metrics(metrics, results, tasks)
+            )
+        finally:
+            ev_module.ReasoningJudge = original
+        return metrics
+
+    def test_per_task_reasoning_is_attached(self):
+        """metrics._per_task_reasoning must be a list of ReasoningQualityResult."""
+        results = [
+            _make_task_result("T1", output="42", judge_success=True),
+            _make_task_result("T2", output="not 42", judge_success=False),
+        ]
+        tasks = [_make_test_task("T1"), _make_test_task("T2")]
+
+        metrics = self._run_collect(results, tasks)
+
+        assert hasattr(metrics, "_per_task_reasoning")
+        assert isinstance(metrics._per_task_reasoning, list)
+        assert len(metrics._per_task_reasoning) == 2
+        ids = {rq.task_id for rq in metrics._per_task_reasoning}
+        assert ids == {"T1", "T2"}
+        # Every entry must be a ReasoningQualityResult, not None
+        assert all(
+            isinstance(rq, ReasoningQualityResult) for rq in metrics._per_task_reasoning
+        )
+
+    def test_task_outputs_for_run_is_attached(self):
+        """metrics._task_outputs_for_run must be {task_id: output}."""
+        results = [
+            _make_task_result("T1", output="answer-one"),
+            _make_task_result("T2", output="answer-two"),
+        ]
+        tasks = [_make_test_task("T1"), _make_test_task("T2")]
+
+        metrics = self._run_collect(results, tasks)
+
+        assert hasattr(metrics, "_task_outputs_for_run")
+        assert metrics._task_outputs_for_run == {
+            "T1": "answer-one",
+            "T2": "answer-two",
+        }
+
+    def test_empty_outputs_are_excluded(self):
+        """Tasks with empty output strings must not appear in the dict.
+
+        Empty outputs would crash compute_self_consistency_score in
+        downstream injection (Judge._extract_answer needs raw text).
+        """
+        results = [
+            _make_task_result("T1", output="real answer"),
+            _make_task_result("T2", output=""),  # e.g. timed-out task
+        ]
+        tasks = [_make_test_task("T1"), _make_test_task("T2")]
+
+        metrics = self._run_collect(results, tasks)
+
+        assert metrics._task_outputs_for_run == {"T1": "real answer"}
+        # _per_task_reasoning still lists T2 because it produced a trace
+        assert {rq.task_id for rq in metrics._per_task_reasoning} == {"T1", "T2"}
+
+    def test_bridge_feeds_inject_self_consistency_end_to_end(self):
+        """Two simulated runs → inject_self_consistency_scores actually fires.
+
+        This is the regression test for the original bug: previously the
+        bridge attributes were never written, so per_pattern_runs and
+        task_outputs were both empty → the hook was a no-op even at N>1.
+        """
+        # Run 1
+        run1_results = [
+            _make_task_result("T1", output="42", judge_success=True),
+        ]
+        tasks = [_make_test_task("T1", ground_truth="42")]
+        metrics_run1 = self._run_collect(run1_results, tasks)
+
+        # Run 2 with the same task and the same answer
+        run2_results = [
+            _make_task_result("T1", output="42", judge_success=True),
+        ]
+        metrics_run2 = self._run_collect(run2_results, tasks)
+
+        # Replay what run_evaluation.py:154-164 does to assemble the
+        # arguments for inject_self_consistency_scores.
+        per_pattern_runs = {
+            "TestPattern": [
+                metrics_run1._per_task_reasoning,
+                metrics_run2._per_task_reasoning,
+            ],
+        }
+        task_outputs = {
+            ("TestPattern", "T1"): [
+                metrics_run1._task_outputs_for_run["T1"],
+                metrics_run2._task_outputs_for_run["T1"],
+            ],
+        }
+        task_specs = {t.id: t for t in tasks}
+        pattern_metrics = {"TestPattern": metrics_run2}
+
+        inject_self_consistency_scores(
+            per_pattern_runs=per_pattern_runs,
+            task_outputs=task_outputs,
+            task_specs=task_specs,
+            pattern_metrics=pattern_metrics,
+        )
+
+        # Two identical answers ⇒ self_consistency = 1.0 on the latest run.
+        latest = metrics_run2._per_task_reasoning[0]
+        assert latest.self_consistency_score == pytest.approx(1.0)
+        # CognitiveMetrics on the latest PatternMetrics must be refreshed.
+        assert metrics_run2.cognitive.avg_self_consistency_score == pytest.approx(1.0)
+
+    def test_no_dead_setattr_on_taskresult(self):
+        """Regression: the old setattr(_reasoning_quality_result) loop is gone.
+
+        Ensures we don't accidentally re-introduce the dead per-TaskResult
+        cache that nothing reads (it lived from Phase B1 to the Phase F
+        bridge fix and was the source of the original bug).
+        """
+        results = [_make_task_result("T1", output="x")]
+        tasks = [_make_test_task("T1")]
+        self._run_collect(results, tasks)
+        assert not hasattr(results[0], "_reasoning_quality_result")

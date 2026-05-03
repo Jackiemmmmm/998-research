@@ -17,6 +17,47 @@ logger = logging.getLogger(__name__)
 _JUDGE_FALLBACK_WARNED = False
 
 
+# ---------------------------------------------------------------------------
+# Phase F — Reproducibility helpers
+# ---------------------------------------------------------------------------
+
+def _ollama_supports_seed() -> bool:
+    """Check whether the installed ``langchain_ollama`` exposes ``seed``.
+
+    Phase F spec section 5.6 requires that we honestly report whether
+    determinism is available.  The current ``ChatOllama`` lists ``seed``
+    in its pydantic model fields; older versions did not.  We probe
+    once and cache the result in :data:`_OLLAMA_SEED_SUPPORTED`.
+    """
+    try:
+        from langchain_ollama import ChatOllama
+    except ImportError:
+        return False
+    fields = getattr(ChatOllama, "model_fields", None)
+    if fields is None:
+        return False
+    return "seed" in fields
+
+
+_OLLAMA_SEED_SUPPORTED: bool = _ollama_supports_seed()
+
+
+def _resolve_seed(explicit: Optional[int]) -> Optional[int]:
+    """Pick the seed value: explicit arg wins, then ``EVAL_SEED`` env."""
+    if explicit is not None:
+        return explicit
+    raw = os.getenv("EVAL_SEED")
+    if raw is None or raw == "":
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        logger.warning(
+            "EVAL_SEED=%r is not an integer; ignoring (seed disabled).", raw
+        )
+        return None
+
+
 class LLMConfig:
     """Configuration for LLM providers."""
 
@@ -49,12 +90,17 @@ class LLMConfig:
     }
 
     @staticmethod
-    def get_model(provider: Optional[str] = None):
+    def get_model(provider: Optional[str] = None, seed: Optional[int] = None):
         """Get initialized chat model for specified provider.
 
         Args:
             provider: Provider name (ollama, groq, cerebras, google_genai)
                      If None, uses LLM_PROVIDER from .env
+            seed: Optional integer seed for deterministic decoding.  Only
+                wired through when the active backend exposes it
+                (currently: ChatOllama with langchain_ollama >= 0.x).
+                If ``None``, the ``EVAL_SEED`` env var is consulted as a
+                fallback.
 
         Returns:
             Initialized chat model
@@ -91,6 +137,9 @@ class LLMConfig:
         model_string_template = str(config["model_string"])
         model_string = model_string_template.format(model=model_name)
 
+        # Resolve seed (explicit arg > EVAL_SEED env var > None).
+        resolved_seed = _resolve_seed(seed)
+
         # Special handling for Ollama
         if provider == "ollama":
             base_url = str(config["base_url"])
@@ -98,7 +147,7 @@ class LLMConfig:
             # Use ChatOllama directly for better tool support
             try:
                 from langchain_ollama import ChatOllama
-                return ChatOllama(
+                kwargs = dict(
                     model=model_name,
                     base_url=base_url,
                     temperature=0,
@@ -106,6 +155,12 @@ class LLMConfig:
                     num_predict=2048,
                     client_kwargs={"timeout": 120.0},
                 )
+                # Only set seed when the installed ChatOllama actually
+                # supports it; older versions silently ignore unknown
+                # kwargs in pydantic, but here we want a hard guarantee.
+                if resolved_seed is not None and _OLLAMA_SEED_SUPPORTED:
+                    kwargs["seed"] = resolved_seed
+                return ChatOllama(**kwargs)
             except ImportError:
                 # Fallback to init_chat_model
                 return init_chat_model(
@@ -118,7 +173,18 @@ class LLMConfig:
 
     @staticmethod
     def get_model_info(provider: Optional[str] = None) -> dict:
-        """Get information about configured model."""
+        """Get information about configured model.
+
+        Phase F extends this with reproducibility-relevant fields:
+
+        - ``seed_supported`` -- ``True`` only when the active backend
+          actually exposes a deterministic seed parameter.  For Ollama
+          this depends on the installed ``langchain_ollama`` version;
+          other providers currently report ``False`` (they do not
+          expose seed control through their langchain wrappers).
+        - ``seed`` -- the resolved seed value (explicit arg or
+          ``EVAL_SEED`` env), or ``None`` when no seed is configured.
+        """
         if provider is None:
             provider = os.getenv("LLM_PROVIDER", "google_genai")
 
@@ -128,10 +194,17 @@ class LLMConfig:
             return {"error": f"Unknown provider: {provider}"}
 
         config = LLMConfig.PROVIDERS[provider]
+
+        seed_value = _resolve_seed(None)
+        # Only Ollama exposes seed today via ChatOllama.model_fields.
+        seed_supported = provider == "ollama" and _OLLAMA_SEED_SUPPORTED
+
         return {
             "provider": provider,
             "model": config["model"],
             "requires_api_key": config["requires_api_key"],
+            "seed_supported": seed_supported,
+            "seed": seed_value if seed_supported else None,
         }
 
     @staticmethod

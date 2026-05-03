@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 
 matplotlib.use('Agg')  # Use non-interactive backend
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 
 from .metrics import PatternMetrics
+from .statistics import StatisticalReport
 
 
 class EvaluationVisualizer:
@@ -32,11 +33,16 @@ class EvaluationVisualizer:
     def generate_all_plots(
         self,
         pattern_metrics: Dict[str, PatternMetrics],
+        statistical_report: Optional[StatisticalReport] = None,
     ) -> List[str]:
         """Generate all visualization plots.
 
         Args:
             pattern_metrics: Dict of {pattern_name: PatternMetrics}
+            statistical_report: Optional Phase F multi-run aggregate.
+                When supplied, ``plot_success_rates`` overlays 95 % CI
+                error bars and an additional composite-score CI bar
+                plot is emitted.  No-op for single-run.
 
         Returns:
             List of generated file paths
@@ -44,12 +50,12 @@ class EvaluationVisualizer:
         generated_files = []
 
 
-        # 1. Success rate comparison
-        path = self.plot_success_rates(pattern_metrics)
+        # 1. Success rate comparison (with CI error bars when available)
+        path = self.plot_success_rates(pattern_metrics, statistical_report)
         generated_files.append(path)
 
-        # 2. Efficiency comparison
-        path = self.plot_efficiency_comparison(pattern_metrics)
+        # 2. Efficiency comparison (with CI error bars when available)
+        path = self.plot_efficiency_comparison(pattern_metrics, statistical_report)
         generated_files.append(path)
 
         # 3. Robustness comparison
@@ -77,19 +83,53 @@ class EvaluationVisualizer:
             path = self.plot_normalised_heatmap(pattern_metrics)
             generated_files.append(path)
 
+        # 8. Composite-score CI bar plot (Phase F, multi-run only)
+        if statistical_report is not None and statistical_report.num_runs > 1:
+            path = self.plot_composite_ci(statistical_report)
+            generated_files.append(path)
+
         return generated_files
 
     def plot_success_rates(
         self,
         pattern_metrics: Dict[str, PatternMetrics],
+        statistical_report: Optional[StatisticalReport] = None,
     ) -> str:
-        """Plot success rates comparison."""
+        """Plot success rates comparison.
+
+        When ``statistical_report`` is supplied and reports multiple
+        runs, overlays 95 % CI error bars on each bar.  Falls back to
+        single-run rendering otherwise.
+        """
         patterns = list(pattern_metrics.keys())
         success_rates = [metrics.success.success_rate() * 100 for metrics in pattern_metrics.values()]
 
+        # Phase F: gather error-bar half-widths (in percent) when multi-run.
+        yerr = None
+        if statistical_report is not None and statistical_report.num_runs > 1:
+            err_vals: List[float] = []
+            for name in patterns:
+                stats = statistical_report.per_pattern.get(name)
+                if stats is None:
+                    err_vals.append(0.0)
+                    continue
+                summary = stats.summaries.get("success_rate_strict")
+                if summary is None:
+                    err_vals.append(0.0)
+                else:
+                    err_vals.append((summary.ci95_high - summary.mean) * 100)
+            yerr = err_vals
+
         fig, ax = plt.subplots(figsize=(10, 6))
 
-        bars = ax.bar(patterns, success_rates, color=self.colors[:len(patterns)])
+        bars = ax.bar(
+            patterns,
+            success_rates,
+            color=self.colors[:len(patterns)],
+            yerr=yerr,
+            capsize=6 if yerr else 0,
+            ecolor='black',
+        )
 
         # Add value labels on bars
         for bar in bars:
@@ -101,7 +141,10 @@ class EvaluationVisualizer:
             )
 
         ax.set_ylabel('Success Rate (%)', fontsize=12, fontweight='bold')
-        ax.set_title('Pattern Success Rate Comparison', fontsize=14, fontweight='bold')
+        title = 'Pattern Success Rate Comparison'
+        if yerr:
+            title += f' (95 % CI, N = {statistical_report.num_runs})'
+        ax.set_title(title, fontsize=14, fontweight='bold')
         ax.set_ylim(0, 110)
         ax.grid(axis='y', alpha=0.3)
 
@@ -115,16 +158,41 @@ class EvaluationVisualizer:
     def plot_efficiency_comparison(
         self,
         pattern_metrics: Dict[str, PatternMetrics],
+        statistical_report: Optional[StatisticalReport] = None,
     ) -> str:
-        """Plot efficiency metrics (latency and tokens)."""
+        """Plot efficiency metrics (latency and tokens) with optional CI."""
         patterns = list(pattern_metrics.keys())
         latencies = [metrics.efficiency.avg_latency() for metrics in pattern_metrics.values()]
         tokens = [metrics.efficiency.avg_total_tokens() for metrics in pattern_metrics.values()]
 
+        # Phase F error bars (multi-run only).
+        yerr_lat = None
+        yerr_tok = None
+        if statistical_report is not None and statistical_report.num_runs > 1:
+            yerr_lat = []
+            yerr_tok = []
+            for name in patterns:
+                stats = statistical_report.per_pattern.get(name)
+                if stats is None:
+                    yerr_lat.append(0.0)
+                    yerr_tok.append(0.0)
+                    continue
+                lat_s = stats.summaries.get("avg_latency_sec")
+                tok_s = stats.summaries.get("avg_total_tokens")
+                yerr_lat.append((lat_s.ci95_high - lat_s.mean) if lat_s else 0.0)
+                yerr_tok.append((tok_s.ci95_high - tok_s.mean) if tok_s else 0.0)
+
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
         # Latency plot
-        bars1 = ax1.bar(patterns, latencies, color=self.colors[:len(patterns)])
+        bars1 = ax1.bar(
+            patterns,
+            latencies,
+            color=self.colors[:len(patterns)],
+            yerr=yerr_lat,
+            capsize=6 if yerr_lat else 0,
+            ecolor='black',
+        )
         for bar in bars1:
             height = bar.get_height()
             ax1.text(
@@ -133,11 +201,21 @@ class EvaluationVisualizer:
                 ha='center', va='bottom', fontsize=9
             )
         ax1.set_ylabel('Average Latency (seconds)', fontsize=11, fontweight='bold')
-        ax1.set_title('Average Response Latency', fontsize=12, fontweight='bold')
+        title = 'Average Response Latency'
+        if yerr_lat:
+            title += f' (95 % CI, N = {statistical_report.num_runs})'
+        ax1.set_title(title, fontsize=12, fontweight='bold')
         ax1.grid(axis='y', alpha=0.3)
 
         # Token usage plot
-        bars2 = ax2.bar(patterns, tokens, color=self.colors[:len(patterns)])
+        bars2 = ax2.bar(
+            patterns,
+            tokens,
+            color=self.colors[:len(patterns)],
+            yerr=yerr_tok,
+            capsize=6 if yerr_tok else 0,
+            ecolor='black',
+        )
         for bar in bars2:
             height = bar.get_height()
             ax2.text(
@@ -146,11 +224,74 @@ class EvaluationVisualizer:
                 ha='center', va='bottom', fontsize=9
             )
         ax2.set_ylabel('Average Token Count', fontsize=11, fontweight='bold')
-        ax2.set_title('Average Token Usage', fontsize=12, fontweight='bold')
+        title2 = 'Average Token Usage'
+        if yerr_tok:
+            title2 += f' (95 % CI, N = {statistical_report.num_runs})'
+        ax2.set_title(title2, fontsize=12, fontweight='bold')
         ax2.grid(axis='y', alpha=0.3)
 
         plt.tight_layout()
         output_path = self.output_dir / "efficiency_comparison.png"
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+
+        return str(output_path)
+
+    def plot_composite_ci(
+        self,
+        statistical_report: StatisticalReport,
+    ) -> str:
+        """Bar plot of mean composite score with 95 % CI error bars.
+
+        Phase F: only emitted when multi-run aggregation is active.
+        """
+        patterns: List[str] = []
+        means: List[float] = []
+        errs: List[float] = []
+        for name, stats in statistical_report.per_pattern.items():
+            summary = stats.summaries.get("composite_score")
+            if summary is None:
+                continue
+            patterns.append(name)
+            means.append(summary.mean)
+            errs.append(summary.ci95_high - summary.mean)
+
+        if not patterns:
+            # Defensive: still produce a placeholder file so callers can
+            # depend on a stable output path.
+            output_path = self.output_dir / "composite_ci.png"
+            fig, ax = plt.subplots(figsize=(8, 4))
+            ax.text(0.5, 0.5, "No composite data", ha='center', va='center')
+            ax.set_axis_off()
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            return str(output_path)
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        bars = ax.bar(
+            patterns,
+            means,
+            color=self.colors[:len(patterns)],
+            yerr=errs,
+            capsize=6,
+            ecolor='black',
+        )
+        for bar, mean in zip(bars, means):
+            ax.text(
+                bar.get_x() + bar.get_width() / 2., bar.get_height(),
+                f'{mean:.3f}',
+                ha='center', va='bottom', fontsize=10, fontweight='bold'
+            )
+        ax.set_ylabel('Composite Score', fontsize=12, fontweight='bold')
+        ax.set_title(
+            f'Composite Score (mean ± 95 % CI, N = {statistical_report.num_runs})',
+            fontsize=14, fontweight='bold',
+        )
+        ax.set_ylim(0, 1.05)
+        ax.grid(axis='y', alpha=0.3)
+
+        plt.tight_layout()
+        output_path = self.output_dir / "composite_ci.png"
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
 

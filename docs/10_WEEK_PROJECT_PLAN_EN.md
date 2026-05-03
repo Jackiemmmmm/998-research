@@ -318,10 +318,48 @@ Update the `Status` field in the spec header as it progresses.
 
 **Phase F readiness**: `inject_self_consistency_scores()` is in place but dormant; once P2's multi-run loop lands, it activates automatically.
 
-**Week 5-6 Status: P1 task COMPLETE** ✓
+**Week 5-6 Status: P1 tasks COMPLETE** ✓
 - [x] P1: Phase B1 — Reasoning Quality (Dim1)
-- [ ] P2: Phase F — Statistical Rigor (multi-run + CI)
+- [x] P2: Phase F — Statistical Rigor (multi-run + CI) — implemented by P1 against P2's spec
 - [ ] P3: Phase B2 — Cognitive Safety (Dim2)
+
+#### P1 Progress Log (2026-05-03, Phase F)
+
+**Completed: Phase F — Statistical Rigor & Reproducibility**
+
+| # | Component | Details | Modified Files |
+|---|-----------|---------|----------------|
+| 1 | `statistics.py` module (NEW) | Pure dataclasses + helpers: `StatisticalSummary`, `PairwiseEffectSize`, `PatternRunRecord`, `PatternStatistics`, `StatisticalReport`; `compute_mean`, `compute_sample_std`, `compute_ci95` (t-distribution lookup `n ∈ {2..5}`), `compute_cohens_d` (with FP-noise epsilon → ±999.0 fallback per spec § 5.4); `flatten_pattern_metrics` (defensive `getattr` so Phase B2's `dim2_cognitive_safety` will be picked up automatically); `aggregate_runs` orchestrator (refuses unequal run counts per § 5.1; per-pattern summaries omit all-`None` metrics per § 6 + Case 8; pairwise Cohen's d emitted for both `composite_score` and `success_rate_strict` per § 5.4 + § 5.7) | `src/evaluation/statistics.py` (NEW) |
+| 2 | `--num-runs` + multi-run orchestrator | New `_run_multi()` in `run_evaluation.py` repeats `evaluate_multiple_patterns()` N times under identical concurrency / model config; flattens each run via `flatten_pattern_metrics`; calls Phase B1's `inject_self_consistency_scores()` between aggregation and reporting; `--num-runs` defaults to 3, accepts 1..5 (1 emits warning + sets `insufficient_runs=true`) | `run_evaluation.py` |
+| 3 | `--robustness-every-run` / `--robustness-once` switch | Cost control per spec § 5.1: default re-runs perturbations every pass; `--robustness-once` runs once on pass 1 and `_reuse_robustness_metrics()` rebases the same `RobustnessMetrics` onto runs 2..N, marking `robustness_reused=true` in metadata | `run_evaluation.py` |
+| 4 | Reproducibility metadata block | New `_build_phase_f_metadata()` in `report_generator.py`: `generated_at`, `num_runs`, `provider_model`, `judge_model` (env `JUDGE_OLLAMA_MODEL` fallback), `delay_between_tasks`, `task_timeout`, `parallel`, `max_concurrency`, `robustness_reused`, `seed_supported`, `seed`, `git_branch`, `git_commit` (via `subprocess.check_output(["git", "rev-parse", ...])` with try/except → `"unknown"`); `insufficient_runs` only when N == 1 | `src/evaluation/report_generator.py` |
+| 5 | Seed support in `LLMConfig` | `_ollama_supports_seed()` probes installed `langchain_ollama` for the `seed` field (true on the installed `>=0.3.x`); `LLMConfig.get_model(seed=...)` wires the seed into `ChatOllama` only when the field exists; `LLMConfig.get_model_info()` extends with honest `seed_supported: bool` and `seed: int | None`; `EVAL_SEED` env var is read as a fallback | `src/llm_config.py` |
+| 6 | Extended JSON / Markdown / CSV reports | `generate_json_report` and `generate_markdown_report` accept optional `statistical_report` + `run_metadata` kwargs; JSON adds `single_run_latest`, `run_records`, `statistical_summaries`, `pairwise_effect_sizes` (schema matches spec § 5.7 example); Markdown gets a "Statistical Rigor (Phase F)" section with one mean ± 95 % CI summary table + one pairwise composite Cohen's d table | `src/evaluation/report_generator.py` |
+| 7 | Visualisation error bars + composite CI plot | `EvaluationVisualizer.generate_all_plots()` accepts `statistical_report`; `plot_success_rates` and `plot_efficiency_comparison` overlay 95 % CI error bars when multi-run; new `plot_composite_ci()` emits `composite_ci.png`. All gracefully no-op for single-run | `src/evaluation/visualization.py` |
+| 8 | `__init__.py` exports | Phase F dataclasses + helpers (`StatisticalSummary`, `PairwiseEffectSize`, `PatternRunRecord`, `PatternStatistics`, `StatisticalReport`, `aggregate_runs`, `flatten_pattern_metrics`, etc.) | `src/evaluation/__init__.py` |
+| 9 | Unit tests | 16 tests across 8 spec verification cases (mean/std, CI n=3, zero-variance CI, Cohen's d normal, Cohen's d zero-variance ±999.0, None handling, run-record flattening, all-None summary omission) + 2 defensive companions (pairwise emission, unequal run counts refused) | `tests/unit_tests/test_statistics.py` (NEW) |
+| 10 | Implementation doc | Architecture, dataclass diagram, key formulas, reproducibility metadata table, smoke-run output, deviations from spec | `docs/PHASE_F_STATISTICAL_RIGOR.md` (NEW) |
+
+**Phase F Formulas (recap):**
+- `mean = (1/n) · Σ xᵢ`
+- `std = sqrt( Σ (xᵢ - μ)² / (n-1) )` for n ≥ 2; `0.0` otherwise
+- `CI95 = μ ± t_{0.975, n-1} · σ / √n`, with `t = {2: 12.706, 3: 4.303, 4: 3.182, 5: 2.776}`
+- `pooled_std = sqrt( ((n_a-1)·σ_a² + (n_b-1)·σ_b²) / (n_a + n_b − 2) )`
+- `Cohen's d = (μ_a − μ_b) / pooled_std`; if `pooled_std ≤ 1e-12` → `0.0` (means equal) or `±999.0` (sign of `μ_a − μ_b`)
+
+**Smoke run (mocked `evaluate_multiple_patterns()`, N=3, --robustness-every-run, --output-dir=/tmp/...):**
+
+| Output artefact | Verification |
+|----------------|-------------|
+| `evaluation_results.json` | top-level keys include `metadata`, `single_run_latest`, `run_records`, `statistical_summaries`, `pairwise_effect_sizes`; metadata has all 14 spec keys (incl. `seed_supported=true`, `git_branch`, `git_commit`) |
+| `evaluation_report.md` | contains "Statistical Rigor (Phase F)" section with mean ± 95 % CI table and pairwise composite-score Cohen's d table |
+| `figures/composite_ci.png` | bar plot of mean composite ± 95 % CI; emitted only when N > 1 |
+| `figures/success_rate_comparison.png` | overlaid 95 % CI error bars; title suffix `(95 % CI, N = 3)` |
+
+`pytest tests/unit_tests/test_statistics.py -v` → **16/16 passed**.
+`pytest tests/unit_tests/ --ignore=tests/unit_tests/test_configuration.py` → **203/203 passed** (187 existing + 16 new; the configuration test is pre-existing broken on `main` due to an unrelated `agent` import path issue).
+
+Reference: [PHASE_F_STATISTICAL_RIGOR.md](./PHASE_F_STATISTICAL_RIGOR.md).
 
 ---
 
