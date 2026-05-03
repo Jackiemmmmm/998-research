@@ -145,7 +145,10 @@ class ReasoningJudge:
         if self._llm is None:
             # Local import to avoid pulling LangChain into test paths
             # that monkey-patch the judge.
-            from src.llm_config import get_judge_llm
+            try:
+                from src.llm_config import get_judge_llm
+            except ImportError:
+                from llm_config import get_judge_llm
             self._llm = get_judge_llm()
         return self._llm
 

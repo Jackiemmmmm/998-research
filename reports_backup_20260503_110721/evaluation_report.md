@@ -1,6 +1,6 @@
 # Agentic Pattern Evaluation Report
 
-**Generated:** 2026-05-03 13:13:11
+**Generated:** 2026-04-04 00:15:39
 **Patterns Evaluated:** Baseline, ReAct, ReAct_Enhanced, CoT, Reflex, ToT
 
 > This report evaluates 6 agentic design patterns across a 3-layer, 7-dimension
@@ -12,12 +12,12 @@
 
 | Pattern | Strict | Lenient | Gap | Avg Latency (s) | Avg Tokens | Degradation (%) | Controllability |
 |---------|--------|---------|-----|-----------------|------------|-----------------|-----------------|
-| Baseline     |  81.2% |   81.2% | 0.0% |            2.52 |        196 |            34.6 |           81.2% |
-| ReAct        |  62.5% |   62.5% | 0.0% |            6.74 |        998 |            45.0 |           70.8% |
-| ReAct_Enhanced |  75.0% |   87.5% | 12.5% |           16.30 |       2577 |            62.5 |           89.2% |
-| CoT          |  56.2% |   56.2% | 0.0% |           38.61 |       1704 |            33.3 |           56.2% |
-| Reflex       |  75.0% |   75.0% | 0.0% |            3.94 |        300 |            33.3 |           83.3% |
-| ToT          |  68.8% |   68.8% | 0.0% |           55.90 |        289 |            31.8 |           77.1% |
+| Baseline     |  81.2% |   81.2% | 0.0% |            2.56 |        196 |            34.6 |           81.2% |
+| ReAct        |  62.5% |   62.5% | 0.0% |            6.88 |        957 |            45.0 |           70.8% |
+| ReAct_Enhanced |  75.0% |   87.5% | 12.5% |           19.45 |       2630 |            62.5 |           89.2% |
+| CoT          |  56.2% |   56.2% | 0.0% |           39.20 |       1704 |            33.3 |           56.2% |
+| Reflex       |  75.0% |   75.0% | 0.0% |            4.24 |        300 |            33.3 |           83.3% |
+| ToT          |  81.2% |   81.2% | 0.0% |           60.35 |        289 |            42.3 |           89.6% |
 
 ## 1. Success Dimension
 
@@ -33,43 +33,43 @@
 - **ReAct_Enhanced**: 75.0%
 - **CoT**: 56.2%
 - **Reflex**: 75.0%
-- **ToT**: 68.8%
+- **ToT**: 81.2%
 
 #### Baseline - By Category
   - tool: 25.0%
-  - planning: 100.0%
   - baseline: 100.0%
   - reasoning: 100.0%
+  - planning: 100.0%
 
 #### ReAct - By Category
   - tool: 50.0%
-  - planning: 75.0%
   - baseline: 50.0%
   - reasoning: 75.0%
+  - planning: 75.0%
 
 #### ReAct_Enhanced - By Category
   - tool: 75.0%
-  - planning: 75.0%
   - baseline: 50.0%
   - reasoning: 100.0%
+  - planning: 75.0%
 
 #### CoT - By Category
   - tool: 25.0%
-  - planning: 50.0%
   - baseline: 75.0%
   - reasoning: 75.0%
+  - planning: 50.0%
 
 #### Reflex - By Category
   - tool: 50.0%
-  - planning: 100.0%
   - baseline: 75.0%
   - reasoning: 75.0%
+  - planning: 100.0%
 
 #### ToT - By Category
   - tool: 100.0%
-  - planning: 50.0%
-  - baseline: 50.0%
+  - baseline: 75.0%
   - reasoning: 75.0%
+  - planning: 75.0%
 
 ## 2. Efficiency Dimension
 
@@ -77,44 +77,44 @@
 > time per task) and token consumption. Lower is better. This captures the
 > efficiency vs. capability trade-off central to pattern selection.
 
-**Fastest Pattern:** Baseline (2.52s)
-**Slowest Pattern:** ToT (55.90s)
+**Fastest Pattern:** Baseline (2.56s)
+**Slowest Pattern:** ToT (60.35s)
 
 ### Average Latency by Pattern
-- **Baseline**: 2.52s
-- **ReAct**: 6.74s
-- **ReAct_Enhanced**: 16.30s
-- **CoT**: 38.61s
-- **Reflex**: 3.94s
-- **ToT**: 55.90s
+- **Baseline**: 2.56s
+- **ReAct**: 6.88s
+- **ReAct_Enhanced**: 19.45s
+- **CoT**: 39.20s
+- **Reflex**: 4.24s
+- **ToT**: 60.35s
 
 #### Baseline - Detailed Efficiency
-  - Median Latency: 1.11s
+  - Median Latency: 1.08s
   - Token Usage: 196 avg
   - Avg Steps: 2.0
 
 #### ReAct - Detailed Efficiency
-  - Median Latency: 4.95s
-  - Token Usage: 998 avg
+  - Median Latency: 5.07s
+  - Token Usage: 957 avg
   - Avg Steps: 4.9
 
 #### ReAct_Enhanced - Detailed Efficiency
-  - Median Latency: 5.17s
-  - Token Usage: 2577 avg
+  - Median Latency: 8.26s
+  - Token Usage: 2630 avg
   - Avg Steps: 6.4
 
 #### CoT - Detailed Efficiency
-  - Median Latency: 28.09s
+  - Median Latency: 28.52s
   - Token Usage: 1704 avg
   - Avg Steps: 4.0
 
 #### Reflex - Detailed Efficiency
-  - Median Latency: 1.03s
+  - Median Latency: 1.04s
   - Token Usage: 300 avg
   - Avg Steps: 3.0
 
 #### ToT - Detailed Efficiency
-  - Median Latency: 38.61s
+  - Median Latency: 39.98s
   - Token Usage: 289 avg
   - Avg Steps: 5.0
 
@@ -125,7 +125,7 @@
 > metrics also measure stability across prompt variants and performance scaling
 > from simple to complex tasks.
 
-**Most Robust:** ToT (31.8% degradation)
+**Most Robust:** CoT (33.3% degradation)
 **Least Robust:** ReAct_Enhanced (62.5% degradation)
 
 ### Performance Degradation by Pattern
@@ -134,7 +134,7 @@
 - **ReAct_Enhanced**: 62.5%
 - **CoT**: 33.3%
 - **Reflex**: 33.3%
-- **ToT**: 31.8%
+- **ToT**: 42.3%
 
 ## 4. Controllability Dimension
 
@@ -143,7 +143,7 @@
 > consistency, and trace completeness (proportion of complete think-act-observe
 > cycles).
 
-**Most Controllable:** ReAct_Enhanced (89.2%)
+**Most Controllable:** ToT (89.6%)
 
 ### Controllability Scores by Pattern
 - **Baseline**: 81.2%
@@ -151,7 +151,7 @@
 - **ReAct_Enhanced**: 89.2%
 - **CoT**: 56.2%
 - **Reflex**: 83.3%
-- **ToT**: 77.1%
+- **ToT**: 89.6%
 
 #### Baseline - Detailed Controllability
   - Schema Compliance: 62.5%
@@ -169,7 +169,7 @@
   - Unauthorized Tool Uses: 0
   - Trace Completeness: 0.556
   - Policy Flag Rate: 0.000
-  - Resource Efficiency: 0.663
+  - Resource Efficiency: 0.687
 
 #### ReAct_Enhanced - Detailed Controllability
   - Schema Compliance: 87.5%
@@ -187,7 +187,7 @@
   - Unauthorized Tool Uses: 3
   - Trace Completeness: 0.000
   - Policy Flag Rate: 0.250
-  - Resource Efficiency: 0.367
+  - Resource Efficiency: 0.381
 
 #### Reflex - Detailed Controllability
   - Schema Compliance: 75.0%
@@ -196,16 +196,16 @@
   - Unauthorized Tool Uses: 0
   - Trace Completeness: 0.000
   - Policy Flag Rate: 0.000
-  - Resource Efficiency: 0.956
+  - Resource Efficiency: 0.957
 
 #### ToT - Detailed Controllability
-  - Schema Compliance: 62.5%
+  - Schema Compliance: 87.5%
   - Tool Policy Compliance: 100.0%
-  - Format Compliance: 68.8%
+  - Format Compliance: 81.2%
   - Unauthorized Tool Uses: 0
   - Trace Completeness: 0.000
   - Policy Flag Rate: 0.000
-  - Resource Efficiency: 0.961
+  - Resource Efficiency: 0.962
 
 ## 4b. Action-Decision Alignment (Dim 3)
 
@@ -292,15 +292,15 @@ Dim4 = mean(success_rate, norm_latency, norm_tokens)
 
 | Pattern | success_rate | avg_latency (s) | norm_latency | avg_tokens | norm_tokens | Dim 4 |
 |---------|-------------|-----------------|-------------|-----------|------------|-------|
-| Baseline     | 0.812       |            2.52 |        1.000 |       196 |      1.000 | 0.938 |
-| ReAct        | 0.625       |            6.74 |        0.921 |       998 |      0.663 | 0.736 |
-| ReAct_Enhanced | 0.750       |           16.30 |        0.742 |      2577 |      0.000 | 0.497 |
-| CoT          | 0.562       |           38.61 |        0.324 |      1704 |      0.367 | 0.418 |
-| Reflex       | 0.750       |            3.94 |        0.973 |       300 |      0.956 | 0.893 |
-| ToT          | 0.688       |           55.90 |        0.000 |       289 |      0.961 | 0.549 |
+| Baseline     | 0.812       |            2.56 |        1.000 |       196 |      1.000 | 0.938 |
+| ReAct        | 0.625       |            6.88 |        0.925 |       957 |      0.687 | 0.746 |
+| ReAct_Enhanced | 0.750       |           19.45 |        0.708 |      2630 |      0.000 | 0.486 |
+| CoT          | 0.562       |           39.20 |        0.366 |      1704 |      0.381 | 0.436 |
+| Reflex       | 0.750       |            4.24 |        0.971 |       300 |      0.957 | 0.893 |
+| ToT          | 0.812       |           60.35 |        0.000 |       289 |      0.962 | 0.591 |
 
-- Latency range: min = 2.52s, max = 55.90s
-- Token range: min = 196, max = 2577
+- Latency range: min = 2.56s, max = 60.35s
+- Token range: min = 196, max = 2630
 
 #### Dim 6 — Robustness & Scalability (D1)
 
@@ -323,7 +323,7 @@ Dim6 = mean(norm_degradation, stability_index, scaling_score)
 | ReAct_Enhanced |         62.5 |     0.469 |      0.375 |    0.333 |   1.000 |       32 | 0.569 |
 | CoT          |         33.3 |     0.188 |      0.667 |    0.722 |   0.750 |       32 | 0.713 |
 | Reflex       |         33.3 |     0.250 |      0.667 |    0.556 |   1.000 |       32 | 0.741 |
-| ToT          |         31.8 |     0.219 |      0.682 |    0.556 |   1.000 |       32 | 0.746 |
+| ToT          |         42.3 |     0.344 |      0.577 |    0.444 |   1.000 |       32 | 0.674 |
 
 **Success by complexity:**
 
@@ -332,7 +332,7 @@ Dim6 = mean(norm_degradation, stability_index, scaling_score)
 - **ReAct_Enhanced**: simple: 0.500, medium: 0.875, complex: 0.750 (decline=0.000)
 - **CoT**: simple: 0.750, medium: 0.500, complex: 0.500 (decline=0.250)
 - **Reflex**: simple: 0.750, medium: 0.625, complex: 1.000 (decline=0.000)
-- **ToT**: simple: 0.500, medium: 0.875, complex: 0.500 (decline=0.000)
+- **ToT**: simple: 0.750, medium: 0.875, complex: 0.750 (decline=0.000)
 
 > **Key finding**: Baseline is the most robust pattern (Dim 6 = 0.774), while ReAct_Enhanced is the least robust (Dim 6 = 0.569).
 
@@ -356,11 +356,11 @@ Dim7 = mean(trace_completeness, 1 − policy_flag_rate, resource_efficiency,
 | Pattern | trace_comp | policy_comp | resource_eff | schema_comp | format_comp | Dim 7 |
 |---------|-----------|------------|-------------|------------|------------|-------|
 | Baseline     |     0.000 |      1.000 |       1.000 |      0.625 |      0.812 | 0.688 |
-| ReAct        |     0.556 |      1.000 |       0.663 |      0.500 |      0.625 | 0.669 |
+| ReAct        |     0.556 |      1.000 |       0.687 |      0.500 |      0.625 | 0.674 |
 | ReAct_Enhanced |     0.000 |      1.000 |       0.000 |      0.875 |      0.800 | 0.535 |
-| CoT          |     0.000 |      0.750 |       0.367 |      0.375 |      0.562 | 0.411 |
-| Reflex       |     0.000 |      1.000 |       0.956 |      0.750 |      0.750 | 0.691 |
-| ToT          |     0.000 |      1.000 |       0.961 |      0.625 |      0.688 | 0.655 |
+| CoT          |     0.000 |      0.750 |       0.381 |      0.375 |      0.562 | 0.414 |
+| Reflex       |     0.000 |      1.000 |       0.957 |      0.750 |      0.750 | 0.691 |
+| ToT          |     0.000 |      1.000 |       0.962 |      0.875 |      0.812 | 0.730 |
 
 #### Composite Score
 
@@ -399,42 +399,6 @@ Dim3 = mean(plan_adherence_rate, avg_tool_coverage, avg_tool_precision)
 | Reflex       |         4 |       N/A |      N/A |       N/A | N/A (no tool use) |
 | ToT          |         4 |       N/A |      N/A |       N/A | N/A (no tool use) |
 
-#### Dim 1 -- Reasoning Quality
-
-> **What this measures**: How coherent and well-grounded the agent's
-> reasoning trace is. Combines four sub-indicators: trace_coverage (does the
-> agent show its work?), coherence (does the chain hold together, judged by a
-> separate local LLM), final-answer agreement (does the conclusion match the
-> reasoning?), and self-consistency (do repeated runs converge on the same
-> answer; only filled in when --num-runs > 1).
->
-> **Note**: Patterns with zero usable THINK steps (e.g. Baseline) are still
-> evaluable but score 0 on coverage and coherence; their Dim1 is dominated by
-> the renormalised final-answer agreement.
-
-```
-Dim1 = 0.15*coverage + 0.40*coherence + 0.20*answer_agreement + 0.25*self_consistency
-Dim1 = renorm(coverage, coherence, answer_agreement)   [single-run]
-```
-
-| Sub-indicator | Source | Normalisation |
-|---------------|--------|---------------|
-| `trace_coverage` | min(1, think_steps / 2) | Already in [0, 1] |
-| `coherence_score` | judge LLM mean(logical_progression, internal_consistency) | Already in [0, 1] |
-| `final_answer_agreement` | strict=1.0 / lenient=0.5 / fail=0.0 | Already in [0, 1] |
-| `self_consistency_score` | largest equivalence class / total runs | Already in [0, 1]; None when single-run |
-
-**Dim 1 computation detail:**
-
-| Pattern | Tasks w/ Reason. | Coverage | Coherence | Agreement | Self-Cons. | Fallbacks | Dim 1 |
-|---------|------------------|----------|-----------|-----------|------------|-----------|-------|
-| Baseline     |                0 |    0.000 |     0.000 |     0.812 |        N/A |         0 |   N/A |
-| ReAct        |                0 |    0.000 |     0.000 |     0.625 |        N/A |         0 |   N/A |
-| ReAct_Enhanced |                0 |    0.000 |     0.000 |     0.812 |        N/A |         0 |   N/A |
-| CoT          |               16 |    0.594 |     0.934 |     0.562 |        N/A |         0 | 0.767 |
-| Reflex       |               16 |    0.500 |     0.822 |     0.750 |        N/A |         0 | 0.738 |
-| ToT          |               16 |    1.000 |     0.828 |     0.688 |        N/A |         0 | 0.825 |
-
 #### Dim 5 -- Behavioural Safety
 
 > **What this measures**: Whether agents respect safety boundaries -- tool whitelist
@@ -467,14 +431,14 @@ Dim5 = domain_safety_score                              [when tool calls == 0]
 
 ### Dimension Score Summary
 
-| Pattern | Dim 1 (Reason) | Dim 3 (Align) | Dim 4 (Success) | Dim 5 (Safety) | Dim 6 (Robust) | Dim 7 (Control) | Composite |
-|---------|----------------|--------------|----------------|----------------|----------------|-----------------|-----------|
-| Baseline     | N/A            | N/A          | 0.938          | 1.000          | 0.774          | 0.688           | 0.850     |
-| ReAct        | N/A            | 1.000        | 0.736          | 1.000          | 0.720          | 0.669           | 0.825     |
-| ReAct_Enhanced | N/A            | 1.000        | 0.497          | 1.000          | 0.569          | 0.535           | 0.720     |
-| CoT          | 0.767          | 0.950        | 0.418          | 0.812          | 0.713          | 0.411           | 0.679     |
-| Reflex       | 0.738          | N/A          | 0.893          | 1.000          | 0.741          | 0.691           | 0.813     |
-| ToT          | 0.825          | N/A          | 0.549          | 1.000          | 0.746          | 0.655           | 0.755     |
+| Pattern | Dim 3 (Align) | Dim 4 (Success) | Dim 5 (Safety) | Dim 6 (Robust) | Dim 7 (Control) | Composite |
+|---------|--------------|----------------|----------------|----------------|-----------------|-----------|
+| Baseline     | N/A          | 0.938          | 1.000          | 0.774          | 0.688           | 0.850     |
+| ReAct        | 1.000        | 0.746          | 1.000          | 0.720          | 0.674           | 0.828     |
+| ReAct_Enhanced | 1.000        | 0.486          | 1.000          | 0.569          | 0.535           | 0.718     |
+| CoT          | 0.950        | 0.436          | 0.812          | 0.713          | 0.414           | 0.665     |
+| Reflex       | N/A          | 0.893          | 1.000          | 0.741          | 0.691           | 0.831     |
+| ToT          | N/A          | 0.591          | 1.000          | 0.674          | 0.730           | 0.749     |
 
 ### Reserve Indicators (★)
 
@@ -496,11 +460,11 @@ Dim5 = domain_safety_score                              [when tool calls == 0]
 > trade-offs that a single number cannot capture.
 
 1. **Baseline**: 0.8496 (4 dimensions)
-2. **ReAct**: 0.8251 (5 dimensions)
-3. **Reflex**: 0.8127 (5 dimensions)
-4. **ToT**: 0.7550 (5 dimensions)
-5. **ReAct_Enhanced**: 0.7203 (5 dimensions)
-6. **CoT**: 0.6785 (6 dimensions)
+2. **Reflex**: 0.8312 (4 dimensions)
+3. **ReAct**: 0.8280 (5 dimensions)
+4. **ToT**: 0.7488 (4 dimensions)
+5. **ReAct_Enhanced**: 0.7181 (5 dimensions)
+6. **CoT**: 0.6651 (5 dimensions)
 
 ## 6. Recommendations
 
@@ -508,11 +472,11 @@ Dim5 = domain_safety_score                              [when tool calls == 0]
 
 - **Complex Reasoning Tasks:** Baseline (highest success rate)
 - **Real-time/Low-latency Scenarios:** Baseline (fastest response)
-- **Noisy/Unreliable Environments:** ToT (most robust)
-- **Enterprise/Compliance-critical:** Reflex (most controllable)
+- **Noisy/Unreliable Environments:** CoT (most robust)
+- **Enterprise/Compliance-critical:** ToT (most controllable)
 
 ### Key Trade-offs Observed
 
-- **Tool-using patterns (ReAct, ReAct_Enhanced, CoT) vs Non-tool patterns (Baseline, Reflex, ToT)**: Tool-using patterns average 64.6% success vs 75.0% for non-tool patterns. Tool-using patterns can be evaluated on Dim 3 (alignment), while non-tool patterns receive N/A for that dimension.
+- **Tool-using patterns (ReAct, ReAct_Enhanced, CoT) vs Non-tool patterns (Baseline, Reflex, ToT)**: Tool-using patterns average 64.6% success vs 79.2% for non-tool patterns. Tool-using patterns can be evaluated on Dim 3 (alignment), while non-tool patterns receive N/A for that dimension.
 - **Robustness vs Complexity handling**: CoT shows the highest prompt stability (index=0.722).
   However, patterns with notable complexity decline: CoT (25.0%).

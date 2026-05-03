@@ -307,7 +307,7 @@ class TestSpecVerificationCases:
             judge_success=False,
             lenient_judge_success=True,
         )
-        judge = _ScriptedJudge(raise_on_call=True)
+        judge = ReasoningJudge(llm=_RaisingLLM())
         rq = compute_task_reasoning_quality(task, result, judge=judge)
 
         assert rq.trace_coverage == 1.0  # 2/2
