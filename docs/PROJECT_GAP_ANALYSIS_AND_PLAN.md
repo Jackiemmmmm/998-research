@@ -1,7 +1,7 @@
 # Project Gap Analysis & Implementation Plan
 
 > Generated: 2026-03-03
-> Last Updated: 2026-04-01 (Week 3-4 P1 Dim3 implementation + P3 Dim5 Spec)
+> Last Updated: 2026-05-03 (Week 5-6 P1 Phase B1 Dim1 implementation)
 > Based on: Group-1.pdf (Project Proposal) + CLAUDE.md + Current Codebase Review
 
 ## Phase Implementation Status
@@ -9,7 +9,7 @@
 | Phase | Description | Status | Spec (P2/P3 → P1) | Implementation Doc (P1) |
 |-------|-------------|--------|-------------------|------------------------|
 | **A** | Unified Telemetry & Adapter Layer | **COMPLETED** | — | [PHASE_A_UNIFIED_TELEMETRY.md](./PHASE_A_UNIFIED_TELEMETRY.md) |
-| **B1** | Cognitive Layer — Reasoning Quality (Dim 1) | NOT STARTED | — (P1 self-drives, Week 5–6) | — |
+| **B1** | Cognitive Layer — Reasoning Quality (Dim 1) | **COMPLETED** | [week5-6_phase-b1_reasoning-quality.md](./specs/week5-6_phase-b1_reasoning-quality.md) (P1 self-authored) | — (inline in `reasoning_quality.py`, `evaluator.py`, `scoring.py`, `metrics.py`) |
 | **B2** | Cognitive Layer — Cognitive Safety (Dim 2) | NOT STARTED | [week5-6_phase-b2_cognitive-safety.md](./specs/week5-6_phase-b2_cognitive-safety.md) (P3, PENDING) | — |
 | **C1** | Action–Decision Alignment (Dim 3) | **COMPLETED** | — (P1 self-drives) | — (inline in evaluator.py, scoring.py) |
 | **C3** | Behavioural Safety (Dim 5) | **COMPLETED** | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) (P3) | — (inline in safety.py, evaluator.py, scoring.py) |
@@ -29,7 +29,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 
 | # | Dimension | Layer | Status | Completion | Phase A Impact |
 |---|-----------|-------|--------|------------|---------------|
-| 1 | Reasoning Quality | Cognitive | NOT IMPLEMENTED | 0% | Trace foundation ready |
+| 1 | Reasoning Quality | Cognitive | **B1 COMPLETED** | ~70% | Phase B1 completed (2026-05-03): ReasoningExtractor + ReasoningJudge (separate local LLM via `LLMConfig.get_judge_llm()`) + 4-sub-indicator weighted scoring + self-consistency hook for Phase F |
 | 2 | Cognitive Safety & Constraint Adherence | Cognitive | NOT IMPLEMENTED | 0% | Trace foundation ready |
 | 3 | Action-Decision Alignment | Behavioural | **COMPLETED** | ~70% | AlignmentMetrics + verb-tool mapping + LCS sequence matching (2026-04-01) |
 | 4 | Success & Efficiency | Behavioural | PARTIALLY DONE | ~75% | Token accuracy improved; Reflex token tracking fixed (2026-03-12) |
@@ -37,13 +37,13 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 | 6 | Robustness & Scalability | Systemic | **D1 COMPLETED** | ~75% | Phase D1 completed (2026-04-01): all perturbations, stability index, complexity scaling |
 | 7 | Controllability, Transparency & Resource Efficiency | Systemic | PARTIALLY DONE | ~45% | TAO cycle tracking enabled |
 
-**Overall estimated completion: ~44% → ~52% of the 7-dimension framework** (Phase C1 Dim3, Phase D1 Dim6, Phase C3 Dim5 all completed)
+**Overall estimated completion: ~44% → ~52% → ~58% of the 7-dimension framework** (Phase C1 Dim3, Phase D1 Dim6, Phase C3 Dim5, Phase B1 Dim1 all completed)
 
 ---
 
 ### Detailed Gap Analysis
 
-#### Dimension 1: Reasoning Quality (Cognitive) - 0%
+#### Dimension 1: Reasoning Quality (Cognitive) - 0% → ~70%
 
 **Proposal requires:**
 - Extract reasoning traces from structured logs
@@ -52,12 +52,16 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 - Structural alignment via Levenshtein distance for step accuracy
 - Final-answer agreement as proxy indicator
 
-**Current status:**
-- No reasoning trace extraction mechanism exists
-- No coherence scoring implemented
-- No self-consistency analysis (no repeated runs)
-- No step-level alignment evaluation
-- `LLMJudge` class exists in `judge.py` but only evaluates relevance/accuracy/completeness/conciseness, not reasoning coherence
+**Current status (DONE — Phase B1, 2026-05-03):**
+- ~~No reasoning trace extraction mechanism exists~~ **RESOLVED**: `ReasoningExtractor.extract_reasoning_steps()` filters `THINK` steps from `AgentTrace`, dropping `[implicit reasoning]` placeholders and empty content
+- ~~No coherence scoring implemented~~ **RESOLVED**: `ReasoningJudge.evaluate_coherence()` uses a separate local Judge-LLM (via `LLMConfig.get_judge_llm()`, env var `JUDGE_OLLAMA_MODEL`) to rate `logical_progression` and `internal_consistency` from a strict-JSON prompt; rule-based fallback (0.5) when judge fails
+- ~~No self-consistency analysis (no repeated runs)~~ **INTERFACE READY**: `inject_self_consistency_scores()` and `compute_self_consistency_score()` ship as part of B1; activated when Phase F multi-run pipeline is in place
+- ~~No step-level alignment evaluation~~ **PARTIALLY ADDRESSED**: `final_answer_agreement` reuses `Judge.evaluate()`'s strict + lenient outcome (`1.0 / 0.5 / 0.0`); embedding-level alignment deferred per Stage 1 plan
+- ~~`LLMJudge` class only evaluates relevance/accuracy/completeness/conciseness~~ **NEW**: `ReasoningJudge` is a dedicated cognitive judge with its own structured prompt and result schema
+- **Aggregation**: `reasoning_quality_score = 0.15·trace_coverage + 0.40·coherence + 0.20·answer_agreement + 0.25·self_consistency` (with single-run renormalisation when `self_consistency` is unavailable)
+- **Spec**: [week5-6_phase-b1_reasoning-quality.md](./specs/week5-6_phase-b1_reasoning-quality.md) (DONE 2026-05-03)
+- **Files**: `src/evaluation/reasoning_quality.py` (NEW), `src/evaluation/metrics.py` (added `CognitiveMetrics`), `src/evaluation/scoring.py` (`compute_dim1_scores`), `src/evaluation/evaluator.py` (`_collect_cognitive_metrics`), `src/llm_config.py` (`get_judge_llm`), `tests/unit_tests/test_reasoning_quality.py` (30 tests)
+- **Status**: Dim1 produces scores for 3/6 patterns (CoT 0.78 / Reflex 0.82 / ToT 0.86); 3/6 patterns return `None` because their traces have zero usable THINK content (Baseline has none by design; ReAct's THINK content is filled with the synthetic placeholder under llama3.1)
 
 ---
 
@@ -457,7 +461,7 @@ Given the project timeline (Figure 1 in proposal: Stage 3 Full Evaluation is ~Ma
 | **P0** | A | Unified Telemetry & Adapter | High (foundation) | **COMPLETED** → [details](./PHASE_A_UNIFIED_TELEMETRY.md) |
 | **P1** | E | Normalization & Composite Scoring | Medium | NOT STARTED |
 | **P1** | F | Statistical Rigor (multi-run, CI) | Medium | NOT STARTED |
-| **P2** | B1 | Reasoning Quality | Medium-High | NOT STARTED |
+| **P2** | B1 | Reasoning Quality | Medium-High | **COMPLETED** (2026-05-03, P1 self-driven) |
 | **P2** | C1 | Action-Decision Alignment | Medium | **COMPLETED** (2026-04-01) |
 | **P2** | C2 | Complete Success & Efficiency | Low | NOT STARTED |
 | **P3** | D1 | Enhance Robustness | Medium | **COMPLETED** (2026-04-01) |

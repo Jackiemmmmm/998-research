@@ -14,7 +14,7 @@
 
 ---
 
-## 1. Current Status (~52% Complete)
+## 1. Current Status (~58% Complete)
 
 > Completion assessment source: [PROJECT_GAP_ANALYSIS_AND_PLAN.md § Summary Table](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#part-1-current-completion-status-gap-analysis)
 
@@ -25,7 +25,11 @@
 | Agent Patterns | Five patterns implemented: Baseline (raw LLM control group), Reflex, ReAct, CoT, ToT | `src/agent/pattern_*.py` |
 | Unified Telemetry | [Phase A](./PHASE_A_UNIFIED_TELEMETRY.md) — StepType, ToolCallRecord, StepRecord, AgentTrace, TraceExtractor | `src/evaluation/trace.py` |
 | Base Evaluation Framework | Judge (3 modes), TestSuite (16 tasks), ReportGenerator, Visualization | `src/evaluation/` |
-| Test Coverage | 28 unit tests (Phase A trace extraction) | `tests/unit_tests/test_trace.py` |
+| Action-Decision Alignment (Dim 3) | [Phase C1](./PROJECT_GAP_ANALYSIS_AND_PLAN.md) — AlignmentMetrics + verb-tool mapping + LCS sequence matching | `src/evaluation/metrics.py`, `src/evaluation/evaluator.py` |
+| Behavioural Safety (Dim 5) | [Phase C3 spec](./specs/week3-4_phase-c3_behavioural-safety.md) — tool whitelist + content safety regex | `src/evaluation/safety.py` |
+| Enhanced Robustness (Dim 6) | [Phase D1 spec](./specs/week3-4_phase-d1_robustness.md) — all perturbations, stability index, scaling | `src/evaluation/evaluator.py`, `src/evaluation/metrics.py` |
+| Reasoning Quality (Dim 1) | [Phase B1 spec](./specs/week5-6_phase-b1_reasoning-quality.md) — ReasoningExtractor + ReasoningJudge (separate local LLM via `LLMConfig.get_judge_llm()`) + 4-sub-indicator weighted scoring; 30 unit tests | `src/evaluation/reasoning_quality.py`, `src/llm_config.py` |
+| Test Coverage | 187+ unit tests (trace + alignment + safety + robustness + reasoning quality) | `tests/unit_tests/` |
 | CI/CD | GitHub Actions (unit tests, integration tests, lint, type check) | `.github/` |
 
 ### 1.2 Evaluation Framework Completion (7 Dimensions)
@@ -34,7 +38,7 @@
 
 | # | Dimension | Layer | Completion | Notes | Gap Details |
 |---|-----------|-------|------------|-------|-------------|
-| 1 | Reasoning Quality | Cognitive | 0% | Not implemented | [Dim1 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-1-reasoning-quality-cognitive---0) |
+| 1 | Reasoning Quality | Cognitive | ~70% | **Phase B1 COMPLETED** (2026-05-03): ReasoningExtractor + ReasoningJudge + 4-sub-indicator weighted scoring; 3/6 patterns score Dim1 (CoT 0.78 / Reflex 0.82 / ToT 0.86); self-consistency hook ready for Phase F | [Dim1 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-1-reasoning-quality-cognitive---0--70) |
 | 2 | Cognitive Safety & Constraint Adherence | Cognitive | 0% | Not implemented | [Dim2 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-2-cognitive-safety--constraint-adherence-cognitive---0) |
 | 3 | Action–Decision Alignment | Behavioural | ~70% | **Phase C1 COMPLETED** (2026-04-01): AlignmentMetrics + verb-tool mapping + LCS sequence matching + Dim3 scoring | [Dim3 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-3-actiondecision-alignment-behavioural---0--10--70) |
 | 4 | Success & Efficiency | Behavioural | ~75% | Basic judge + metrics exist; missing normalised cost score | [Dim4 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-4-success--efficiency-behavioural---70--75) |
@@ -137,7 +141,7 @@ Update the `Status` field in the spec header as it progresses.
 | [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) | P3 | Phase D2 | READY FOR IMPLEMENTATION |
 | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) | P2 | Phase D1 | READY FOR IMPLEMENTATION |
 | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) | P3 | Phase C3 | READY FOR IMPLEMENTATION |
-| [week5-6_phase-b1_reasoning-quality.md](./specs/week5-6_phase-b1_reasoning-quality.md) | P1 | Phase B1 | READY FOR IMPLEMENTATION |
+| [week5-6_phase-b1_reasoning-quality.md](./specs/week5-6_phase-b1_reasoning-quality.md) | P1 | Phase B1 | **DONE (2026-05-03)** |
 
 ---
 
@@ -277,6 +281,47 @@ Update the `Status` field in the spec header as it progresses.
 | P3 | [Phase B2](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-b-cognitive-layer-implementation-dimensions-1--2): Cognitive Safety (Dim2) | Write Implementation Spec (`docs/specs/week5-6_phase-b2_cognitive-safety.md`) defining toxicity keyword list, unsupported claim detection rules, constraint adherence checks, hallucination proxy formula, and verification cases. P1 implements after spec is READY. Ref: [Proposal § 2.2.1 Dim2](../Group-1.pdf) | Completed spec → P1 delivers cognitive safety scoring module |
 
 **Acceptance Criteria**: All 7 dimensions produce scores; multi-run and CI calculation supported
+
+#### P1 Progress Log (2026-05-03)
+
+**Completed: Phase B1 — Reasoning Quality (Dim1)**
+
+| # | Component | Details | Modified Files |
+|---|-----------|---------|----------------|
+| 1 | `ReasoningExtractor` | Static extractor that filters `StepType.THINK` from `AgentTrace`, drops empty content and the synthetic `[implicit reasoning]` placeholder, normalises whitespace, preserves order | `src/evaluation/reasoning_quality.py` (NEW) |
+| 2 | `ReasoningJudge` | Uses a separate local Judge-LLM (`LLMConfig.get_judge_llm()`, env var `JUDGE_OLLAMA_MODEL`) to rate logical_progression + internal_consistency from a strict-JSON prompt; rule-based fallback (0.5) on judge failure or malformed output; lazy LLM init; 8 KB chain truncation cap | `src/evaluation/reasoning_quality.py` |
+| 3 | `LLMConfig.get_judge_llm()` | New factory: reads `JUDGE_OLLAMA_MODEL`, returns `ChatOllama` (temperature=0); falls back to `get_model()` with one-time `logger.warning` when env var unset | `src/llm_config.py` |
+| 4 | `ReasoningQualityResult` + `CognitiveMetrics` | Per-task dataclass + per-pattern aggregate; `avg_self_consistency_score` is `None` in single-run mode | `src/evaluation/reasoning_quality.py`, `src/evaluation/metrics.py` |
+| 5 | `compute_task_reasoning_quality()` | Per-task scoring with single-run renormalisation: weights `{0.20, 0.5333, 0.2667}` over `(coverage, coherence, agreement)` when `self_consistency` is None; full `{0.15, 0.40, 0.20, 0.25}` otherwise | `src/evaluation/reasoning_quality.py` |
+| 6 | `_collect_cognitive_metrics()` | Async hook in `evaluate_pattern()`; one shared `ReasoningJudge` per pattern run; per-task judge calls run via `asyncio.gather` + `asyncio.to_thread` | `src/evaluation/evaluator.py` |
+| 7 | `compute_dim1_scores()` | Returns `None` when `tasks_with_reasoning == 0`; otherwise returns `cognitive.avg_reasoning_quality`. Wired into `compute_all_scores()` so `NormalizedDimensionScores.dim1_reasoning_quality` is populated | `src/evaluation/scoring.py` |
+| 8 | `inject_self_consistency_scores()` | Phase F integration hook (no-op in single-run); equivalence-class partitioning via `Judge._extract_answer` + `Judge._values_match_lenient` so two runs the evaluator already calls "equivalent answers" are also counted as agreeing | `src/evaluation/reasoning_quality.py`, `run_evaluation.py` |
+| 9 | Report & visualisation | New "Dim 1 — Reasoning Quality" section in Markdown report; Dim1 column in dimension summary + CSV; Dim1 row in normalised heatmap | `src/evaluation/report_generator.py`, `src/evaluation/visualization.py` |
+| 10 | Unit tests | 30 tests covering: extractor filtering, aggregation renormalisation, all 7 spec verification cases, `compute_dim1_scores`, judge fallback path, self-consistency injection, `CognitiveMetrics` aggregation, constants | `tests/unit_tests/test_reasoning_quality.py` (NEW) |
+
+**Aggregation Formula:**
+- `reasoning_quality_score = 0.15·trace_coverage + 0.40·coherence + 0.20·answer_agreement + 0.25·self_consistency` (multi-run)
+- `reasoning_quality_score = 0.20·trace_coverage + 0.5333·coherence + 0.2667·answer_agreement` (single-run renormalised)
+
+**Latest evaluation (2026-05-03, llama3.1 agents + llama3.1 judge fallback):**
+
+| Pattern | Tasks w/ Reason. | Coverage | Coherence | Agreement | Dim 1 |
+|---------|------------------|----------|-----------|-----------|-------|
+| Baseline | 0 | 0.000 | 0.000 | 0.812 | N/A (no THINK) |
+| ReAct | 0 | 0.000 | 0.000 | 0.625 | N/A (THINK content placeholder-only under llama3.1) |
+| ReAct_Enhanced | 0 | 0.000 | 0.000 | 0.812 | N/A |
+| CoT | 16 | 0.594 | 0.962 | 0.562 | **0.782** |
+| Reflex | 16 | 0.500 | 0.975 | 0.750 | **0.820** |
+| ToT | 16 | 1.000 | 0.869 | 0.750 | **0.863** |
+
+**Known limitation**: `JUDGE_OLLAMA_MODEL` not yet set, so the judge currently reuses the agent model (llama3.1) — the high coherence values reflect a self-evaluation bias warned about in the spec. Pull `qwen2.5:7b` and set `JUDGE_OLLAMA_MODEL=qwen2.5:7b` before producing the data used in the final report.
+
+**Phase F readiness**: `inject_self_consistency_scores()` is in place but dormant; once P2's multi-run loop lands, it activates automatically.
+
+**Week 5-6 Status: P1 task COMPLETE** ✓
+- [x] P1: Phase B1 — Reasoning Quality (Dim1)
+- [ ] P2: Phase F — Statistical Rigor (multi-run + CI)
+- [ ] P3: Phase B2 — Cognitive Safety (Dim2)
 
 ---
 

@@ -5,7 +5,7 @@
 > **Week**: 5–6
 > **Phase**: [B1 — Reasoning Quality (Dim 1)](../PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-1-reasoning-quality-cognitive---0)
 > **Proposal Ref**: [Group-1.pdf § 2.2.1 Dim1](../Group-1.pdf) — "trace coverage, internal coherence, final-answer alignment, self-consistency across repeats"
-> **Status**: READY FOR IMPLEMENTATION
+> **Status**: DONE (2026-05-03) — Code merged, unit tests (30) pass, full evaluation report generated, Gap Analysis updated.
 
 ---
 

@@ -1,11 +1,12 @@
 # Phase B: Cognitive Layer Implementation Plan
 
-> Status: Planned
+> Status: **B1 DONE (2026-05-03)** / **B2 Planned**
 > Project Phase Alignment: Phase 3 - Evaluation
 > Priority: P2
 > Related Documents:
 > - [PROJECT_GAP_ANALYSIS_AND_PLAN.md](./PROJECT_GAP_ANALYSIS_AND_PLAN.md)
 > - [PHASE_A_UNIFIED_TELEMETRY.md](./PHASE_A_UNIFIED_TELEMETRY.md)
+> - [week5-6_phase-b1_reasoning-quality.md](./specs/week5-6_phase-b1_reasoning-quality.md) — **B1 implementation spec (DONE)**
 
 ---
 
