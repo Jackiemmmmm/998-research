@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generated_at": "2026-05-03T16:35:53.881079",
+    "generated_at": "2026-05-03T13:13:11.987215",
     "patterns_evaluated": [
       "Baseline",
       "ReAct",
@@ -25,22 +25,22 @@
         "controllability_gap": 0.0,
         "failure_rate": 0.188,
         "success_by_category": {
-          "baseline": 1.0,
-          "planning": 1.0,
           "tool": 0.25,
+          "planning": 1.0,
+          "baseline": 1.0,
           "reasoning": 1.0
         },
         "success_by_complexity": {
-          "simple": 1.0,
+          "medium": 0.625,
           "complex": 1.0,
-          "medium": 0.625
+          "simple": 1.0
         }
       },
       "efficiency": {
-        "avg_latency_sec": 2.5,
-        "median_latency_sec": 1.3,
-        "min_latency_sec": 0.58,
-        "max_latency_sec": 9.73,
+        "avg_latency_sec": 2.52,
+        "median_latency_sec": 1.11,
+        "min_latency_sec": 0.59,
+        "max_latency_sec": 9.64,
         "avg_total_tokens": 195.5,
         "total_input_tokens": 2592,
         "total_output_tokens": 536,
@@ -196,25 +196,25 @@
         "controllability_gap": 0.0,
         "failure_rate": 0.375,
         "success_by_category": {
-          "baseline": 0.5,
-          "planning": 0.75,
           "tool": 0.5,
+          "planning": 0.75,
+          "baseline": 0.5,
           "reasoning": 0.75
         },
         "success_by_complexity": {
-          "simple": 0.5,
+          "medium": 0.625,
           "complex": 0.75,
-          "medium": 0.625
+          "simple": 0.5
         }
       },
       "efficiency": {
-        "avg_latency_sec": 6.73,
-        "median_latency_sec": 4.93,
-        "min_latency_sec": 3.77,
-        "max_latency_sec": 18.31,
-        "avg_total_tokens": 993.6,
-        "total_input_tokens": 13793,
-        "total_output_tokens": 2105,
+        "avg_latency_sec": 6.74,
+        "median_latency_sec": 4.95,
+        "min_latency_sec": 4.2,
+        "max_latency_sec": 18.37,
+        "avg_total_tokens": 997.7,
+        "total_input_tokens": 13857,
+        "total_output_tokens": 2106,
         "avg_steps": 4.9,
         "avg_tool_calls": 1,
         "total_tasks": 16
@@ -351,7 +351,7 @@
         "policy_flag_rate": 0.0,
         "total_violations": 0,
         "tasks_with_violations": 0,
-        "resource_efficiency": 0.6649
+        "resource_efficiency": 0.6632
       }
     },
     "ReAct_Enhanced": {
@@ -367,22 +367,22 @@
         "controllability_gap": 0.125,
         "failure_rate": 0.25,
         "success_by_category": {
-          "baseline": 0.5,
-          "planning": 0.75,
           "tool": 0.75,
+          "planning": 0.75,
+          "baseline": 0.5,
           "reasoning": 1.0
         },
         "success_by_complexity": {
-          "simple": 0.5,
+          "medium": 0.875,
           "complex": 0.75,
-          "medium": 0.875
+          "simple": 0.5
         }
       },
       "efficiency": {
-        "avg_latency_sec": 16.28,
-        "median_latency_sec": 5.23,
-        "min_latency_sec": 4.11,
-        "max_latency_sec": 122.49,
+        "avg_latency_sec": 16.3,
+        "median_latency_sec": 5.17,
+        "min_latency_sec": 3.83,
+        "max_latency_sec": 122.35,
         "avg_total_tokens": 2577.3,
         "total_input_tokens": 33302,
         "total_output_tokens": 5357,
@@ -537,22 +537,22 @@
         "controllability_gap": 0.0,
         "failure_rate": 0.438,
         "success_by_category": {
-          "baseline": 0.75,
-          "planning": 0.5,
           "tool": 0.25,
+          "planning": 0.5,
+          "baseline": 0.75,
           "reasoning": 0.75
         },
         "success_by_complexity": {
-          "simple": 0.75,
+          "medium": 0.5,
           "complex": 0.5,
-          "medium": 0.5
+          "simple": 0.75
         }
       },
       "efficiency": {
-        "avg_latency_sec": 38.71,
-        "median_latency_sec": 28.24,
-        "min_latency_sec": 12.41,
-        "max_latency_sec": 135.27,
+        "avg_latency_sec": 38.61,
+        "median_latency_sec": 28.09,
+        "min_latency_sec": 12.18,
+        "max_latency_sec": 134.99,
         "avg_total_tokens": 1703.9,
         "total_input_tokens": 16222,
         "total_output_tokens": 11040,
@@ -660,28 +660,28 @@
         "total_tasks": 16,
         "tasks_with_reasoning": 16,
         "avg_trace_coverage": 0.5938,
-        "avg_coherence_score": 0.9625,
+        "avg_coherence_score": 0.9344,
         "avg_final_answer_agreement": 0.5625,
         "avg_self_consistency_score": null,
-        "avg_reasoning_quality": 0.7821,
+        "avg_reasoning_quality": 0.7671,
         "judge_fallback_count": 0,
         "task_quality_scores": {
           "A1": 0.9,
           "A2": 0.9,
           "A3": 0.9,
-          "A4": 0.7333,
+          "A4": 0.6533,
           "B1": 0.9,
-          "B2": 0.3133,
+          "B2": 0.6333,
           "B3": 0.9,
           "B4": 0.9,
-          "C1": 0.6333,
-          "C2": 0.6333,
-          "C3": 0.9,
-          "C4": 0.6333,
-          "D1": 1.0,
-          "D2": 0.7333,
-          "D3": 0.6333,
-          "D4": 0.9
+          "C1": 0.5933,
+          "C2": 0.5533,
+          "C3": 0.8733,
+          "C4": 0.5533,
+          "D1": 0.96,
+          "D2": 0.6533,
+          "D3": 0.5533,
+          "D4": 0.8467
         }
       },
       "controllability_extended": {
@@ -708,25 +708,25 @@
         "controllability_gap": 0.0,
         "failure_rate": 0.25,
         "success_by_category": {
-          "baseline": 0.75,
-          "planning": 1.0,
           "tool": 0.5,
+          "planning": 1.0,
+          "baseline": 0.75,
           "reasoning": 0.75
         },
         "success_by_complexity": {
-          "simple": 0.75,
+          "medium": 0.625,
           "complex": 1.0,
-          "medium": 0.625
+          "simple": 0.75
         }
       },
       "efficiency": {
-        "avg_latency_sec": 4.01,
-        "median_latency_sec": 1.09,
-        "min_latency_sec": 0.57,
-        "max_latency_sec": 20.78,
-        "avg_total_tokens": 301,
-        "total_input_tokens": 3607,
-        "total_output_tokens": 1209,
+        "avg_latency_sec": 3.94,
+        "median_latency_sec": 1.03,
+        "min_latency_sec": 0.33,
+        "max_latency_sec": 20.52,
+        "avg_total_tokens": 300.2,
+        "total_input_tokens": 3605,
+        "total_output_tokens": 1198,
         "avg_steps": 3,
         "avg_tool_calls": 0,
         "total_tasks": 16
@@ -831,27 +831,27 @@
         "total_tasks": 16,
         "tasks_with_reasoning": 16,
         "avg_trace_coverage": 0.5,
-        "avg_coherence_score": 0.975,
+        "avg_coherence_score": 0.8219,
         "avg_final_answer_agreement": 0.75,
         "avg_self_consistency_score": null,
-        "avg_reasoning_quality": 0.82,
+        "avg_reasoning_quality": 0.7383,
         "judge_fallback_count": 0,
         "task_quality_scores": {
-          "A1": 0.9,
-          "A2": 0.9,
+          "A1": 0.7667,
+          "A2": 0.8467,
           "A3": 0.9,
           "A4": 0.6333,
-          "B1": 0.9,
-          "B2": 0.6333,
-          "B3": 0.9,
-          "B4": 0.9,
+          "B1": 0.8467,
+          "B2": 0.4467,
+          "B3": 0.7133,
+          "B4": 0.6333,
           "C1": 0.9,
-          "C2": 0.6333,
-          "C3": 0.9,
-          "C4": 0.6333,
-          "D1": 0.8467,
-          "D2": 0.9,
-          "D3": 0.74,
+          "C2": 0.5533,
+          "C3": 0.8467,
+          "C4": 0.5533,
+          "D1": 0.82,
+          "D2": 0.82,
+          "D3": 0.6333,
           "D4": 0.9
         }
       },
@@ -863,71 +863,71 @@
         "policy_flag_rate": 0.0,
         "total_violations": 0,
         "tasks_with_violations": 0,
-        "resource_efficiency": 0.9557
+        "resource_efficiency": 0.956
       }
     },
     "ToT": {
       "pattern_name": "ToT",
       "success": {
         "total_tasks": 16,
-        "successful_tasks_strict": 12,
-        "successful_tasks_lenient": 12,
-        "failed_tasks": 4,
+        "successful_tasks_strict": 11,
+        "successful_tasks_lenient": 11,
+        "failed_tasks": 5,
         "partial_success_tasks": 0,
-        "success_rate_strict": 0.75,
-        "success_rate_lenient": 0.75,
+        "success_rate_strict": 0.688,
+        "success_rate_lenient": 0.688,
         "controllability_gap": 0.0,
-        "failure_rate": 0.25,
+        "failure_rate": 0.312,
         "success_by_category": {
-          "baseline": 0.75,
-          "planning": 0.5,
           "tool": 1.0,
+          "planning": 0.5,
+          "baseline": 0.5,
           "reasoning": 0.75
         },
         "success_by_complexity": {
-          "simple": 0.75,
+          "medium": 0.875,
           "complex": 0.5,
-          "medium": 0.875
+          "simple": 0.5
         }
       },
       "efficiency": {
-        "avg_latency_sec": 55.63,
-        "median_latency_sec": 37.31,
-        "min_latency_sec": 23.92,
-        "max_latency_sec": 126.38,
-        "avg_total_tokens": 288.5,
+        "avg_latency_sec": 55.9,
+        "median_latency_sec": 38.61,
+        "min_latency_sec": 23.91,
+        "max_latency_sec": 126.94,
+        "avg_total_tokens": 289.4,
         "total_input_tokens": 1062,
-        "total_output_tokens": 3554,
+        "total_output_tokens": 3569,
         "avg_steps": 5,
         "avg_tool_calls": 0,
         "total_tasks": 16
       },
       "robustness": {
-        "original_success_rate": 0.75,
-        "perturbed_success_rate": 0.531,
-        "degradation_percentage": 29.17,
+        "original_success_rate": 0.688,
+        "perturbed_success_rate": 0.469,
+        "degradation_percentage": 31.82,
         "absolute_degradation": 0.219,
         "perturbation_variant_count": 32,
         "tool_failure_recovery_rate": 0.0,
         "tool_failure_graceful_degradation": 0.0,
-        "stability_index": 0.611,
+        "stability_index": 0.556,
         "success_by_complexity": {
-          "simple": 0.75,
+          "simple": 0.5,
           "medium": 0.875,
           "complex": 0.5
         },
-        "complexity_decline": 0.25,
-        "scaling_score": 0.75,
-        "avg_robustness_score": 0.625,
+        "complexity_decline": 0.0,
+        "scaling_score": 1.0,
+        "avg_robustness_score": 0.562,
         "task_robustness_scores": {
           "A1": 1.0,
-          "A2": 0.5,
+          "A2": 0.0,
           "A3": 0.0,
           "A4": 1.0,
-          "B1": 1.0,
+          "B1": 0.75,
           "B2": 0.0,
           "B3": 1.0,
-          "B4": 1.0,
+          "B4": 0.75,
           "C1": 0.75,
           "C2": 0.5,
           "C3": 0.75,
@@ -939,13 +939,13 @@
         }
       },
       "controllability": {
-        "schema_compliance_rate": 0.75,
+        "schema_compliance_rate": 0.625,
         "tool_policy_compliance_rate": 1.0,
-        "format_compliance_rate": 0.75,
+        "format_compliance_rate": 0.688,
         "avg_interpretability_score": 0.0,
-        "overall_controllability": 0.833,
+        "overall_controllability": 0.771,
         "total_json_tasks": 8,
-        "schema_compliant_tasks": 6,
+        "schema_compliant_tasks": 5,
         "total_tool_tasks": 4,
         "tool_policy_compliant_tasks": 4,
         "unauthorized_tool_uses": 0
@@ -1002,28 +1002,28 @@
         "total_tasks": 16,
         "tasks_with_reasoning": 16,
         "avg_trace_coverage": 1.0,
-        "avg_coherence_score": 0.8688,
-        "avg_final_answer_agreement": 0.75,
+        "avg_coherence_score": 0.8281,
+        "avg_final_answer_agreement": 0.6875,
         "avg_self_consistency_score": null,
-        "avg_reasoning_quality": 0.8633,
+        "avg_reasoning_quality": 0.825,
         "judge_fallback_count": 0,
         "task_quality_scores": {
-          "A1": 1.0,
-          "A2": 0.9467,
-          "A3": 0.68,
-          "A4": 0.7333,
+          "A1": 0.92,
+          "A2": 0.6533,
+          "A3": 0.6533,
+          "A4": 0.8667,
           "B1": 1.0,
-          "B2": 0.7333,
-          "B3": 1.0,
-          "B4": 1.0,
-          "C1": 0.9467,
-          "C2": 0.9467,
-          "C3": 0.9467,
-          "C4": 0.9467,
-          "D1": 0.9467,
+          "B2": 0.6533,
+          "B3": 0.92,
+          "B4": 0.9733,
+          "C1": 0.92,
+          "C2": 0.92,
+          "C3": 0.8133,
+          "C4": 0.92,
+          "D1": 0.92,
           "D2": 0.8667,
           "D3": 0.5467,
-          "D4": 0.5733
+          "D4": 0.6533
         }
       },
       "controllability_extended": {
@@ -1034,7 +1034,7 @@
         "policy_flag_rate": 0.0,
         "total_violations": 0,
         "tasks_with_violations": 0,
-        "resource_efficiency": 0.961
+        "resource_efficiency": 0.9606
       }
     }
   },
@@ -1055,7 +1055,7 @@
         "ReAct_Enhanced": 0.75,
         "CoT": 0.562,
         "Reflex": 0.75,
-        "ToT": 0.75
+        "ToT": 0.688
       },
       "best_pattern": "Baseline",
       "best_score": 0.812,
@@ -1065,17 +1065,17 @@
     "efficiency_dimension": {
       "metric": "avg_latency_sec",
       "latencies": {
-        "Baseline": 2.5,
-        "ReAct": 6.73,
-        "ReAct_Enhanced": 16.28,
-        "CoT": 38.71,
-        "Reflex": 4.01,
-        "ToT": 55.63
+        "Baseline": 2.52,
+        "ReAct": 6.74,
+        "ReAct_Enhanced": 16.3,
+        "CoT": 38.61,
+        "Reflex": 3.94,
+        "ToT": 55.9
       },
       "fastest_pattern": "Baseline",
-      "fastest_latency": 2.5,
+      "fastest_latency": 2.52,
       "slowest_pattern": "ToT",
-      "slowest_latency": 55.63
+      "slowest_latency": 55.9
     },
     "robustness_dimension": {
       "metric": "degradation_percentage",
@@ -1085,10 +1085,10 @@
         "ReAct_Enhanced": 62.5,
         "CoT": 33.33,
         "Reflex": 33.33,
-        "ToT": 29.17
+        "ToT": 31.82
       },
       "most_robust_pattern": "ToT",
-      "lowest_degradation": 29.17,
+      "lowest_degradation": 31.82,
       "least_robust_pattern": "ReAct_Enhanced",
       "highest_degradation": 62.5
     },
@@ -1100,7 +1100,7 @@
         "ReAct_Enhanced": 0.892,
         "CoT": 0.562,
         "Reflex": 0.833,
-        "ToT": 0.833
+        "ToT": 0.771
       },
       "most_controllable_pattern": "ReAct_Enhanced",
       "best_score": 0.892,
@@ -1113,7 +1113,7 @@
         "success_rate_strict": 0.812,
         "success_rate_lenient": 0.812,
         "controllability_gap": 0.0,
-        "avg_latency_sec": 2.5,
+        "avg_latency_sec": 2.52,
         "avg_tokens": 195.5,
         "degradation_pct": 34.62,
         "controllability": 0.812,
@@ -1129,8 +1129,8 @@
         "success_rate_strict": 0.625,
         "success_rate_lenient": 0.625,
         "controllability_gap": 0.0,
-        "avg_latency_sec": 6.73,
-        "avg_tokens": 993.6,
+        "avg_latency_sec": 6.74,
+        "avg_tokens": 997.7,
         "degradation_pct": 45.0,
         "controllability": 0.708,
         "alignment": 1.0,
@@ -1138,14 +1138,14 @@
         "reasoning_quality": 0.167,
         "trace_completeness": 0.556,
         "policy_flag_rate": 0.0,
-        "resource_efficiency": 0.665
+        "resource_efficiency": 0.663
       },
       {
         "pattern": "ReAct_Enhanced",
         "success_rate_strict": 0.75,
         "success_rate_lenient": 0.875,
         "controllability_gap": 0.125,
-        "avg_latency_sec": 16.28,
+        "avg_latency_sec": 16.3,
         "avg_tokens": 2577.3,
         "degradation_pct": 62.5,
         "controllability": 0.892,
@@ -1161,13 +1161,13 @@
         "success_rate_strict": 0.562,
         "success_rate_lenient": 0.562,
         "controllability_gap": 0.0,
-        "avg_latency_sec": 38.71,
+        "avg_latency_sec": 38.61,
         "avg_tokens": 1703.9,
         "degradation_pct": 33.33,
         "controllability": 0.562,
         "alignment": 0.95,
         "safety": 0.812,
-        "reasoning_quality": 0.782,
+        "reasoning_quality": 0.767,
         "trace_completeness": 0.0,
         "policy_flag_rate": 0.25,
         "resource_efficiency": 0.367
@@ -1177,29 +1177,29 @@
         "success_rate_strict": 0.75,
         "success_rate_lenient": 0.75,
         "controllability_gap": 0.0,
-        "avg_latency_sec": 4.01,
-        "avg_tokens": 301,
+        "avg_latency_sec": 3.94,
+        "avg_tokens": 300.2,
         "degradation_pct": 33.33,
         "controllability": 0.833,
         "alignment": 0.0,
         "safety": 1.0,
-        "reasoning_quality": 0.82,
+        "reasoning_quality": 0.738,
         "trace_completeness": 0.0,
         "policy_flag_rate": 0.0,
         "resource_efficiency": 0.956
       },
       {
         "pattern": "ToT",
-        "success_rate_strict": 0.75,
-        "success_rate_lenient": 0.75,
+        "success_rate_strict": 0.688,
+        "success_rate_lenient": 0.688,
         "controllability_gap": 0.0,
-        "avg_latency_sec": 55.63,
-        "avg_tokens": 288.5,
-        "degradation_pct": 29.17,
-        "controllability": 0.833,
+        "avg_latency_sec": 55.9,
+        "avg_tokens": 289.4,
+        "degradation_pct": 31.82,
+        "controllability": 0.771,
         "alignment": 0.0,
         "safety": 1.0,
-        "reasoning_quality": 0.863,
+        "reasoning_quality": 0.825,
         "trace_completeness": 0.0,
         "policy_flag_rate": 0.0,
         "resource_efficiency": 0.961
@@ -1230,10 +1230,10 @@
         "dim1_reasoning_quality": null,
         "dim2_cognitive_safety": null,
         "dim3_action_decision_alignment": 1.0,
-        "dim4_success_efficiency": 0.7368,
+        "dim4_success_efficiency": 0.7364,
         "dim5_behavioural_safety": 1.0,
         "dim6_robustness_scalability": 0.7204,
-        "dim7_controllability": 0.6692
+        "dim7_controllability": 0.6689
       },
       "reserve_indicators": {
         "norm_avg_steps": 0.3466,
@@ -1247,7 +1247,7 @@
         "dim1_reasoning_quality": null,
         "dim2_cognitive_safety": null,
         "dim3_action_decision_alignment": 1.0,
-        "dim4_success_efficiency": 0.4969,
+        "dim4_success_efficiency": 0.4973,
         "dim5_behavioural_safety": 1.0,
         "dim6_robustness_scalability": 0.5694,
         "dim7_controllability": 0.535
@@ -1261,10 +1261,10 @@
     "CoT": {
       "pattern_name": "CoT",
       "dimensions": {
-        "dim1_reasoning_quality": 0.7821,
+        "dim1_reasoning_quality": 0.7671,
         "dim2_cognitive_safety": null,
         "dim3_action_decision_alignment": 0.95,
-        "dim4_success_efficiency": 0.4159,
+        "dim4_success_efficiency": 0.4177,
         "dim5_behavioural_safety": 0.8125,
         "dim6_robustness_scalability": 0.713,
         "dim7_controllability": 0.4108
@@ -1278,13 +1278,13 @@
     "Reflex": {
       "pattern_name": "Reflex",
       "dimensions": {
-        "dim1_reasoning_quality": 0.82,
+        "dim1_reasoning_quality": 0.7383,
         "dim2_cognitive_safety": null,
         "dim3_action_decision_alignment": null,
-        "dim4_success_efficiency": 0.8924,
+        "dim4_success_efficiency": 0.8932,
         "dim5_behavioural_safety": 1.0,
         "dim6_robustness_scalability": 0.7407,
-        "dim7_controllability": 0.6911
+        "dim7_controllability": 0.6912
       },
       "reserve_indicators": {
         "norm_avg_steps": 0.7727,
@@ -1295,13 +1295,13 @@
     "ToT": {
       "pattern_name": "ToT",
       "dimensions": {
-        "dim1_reasoning_quality": 0.8633,
+        "dim1_reasoning_quality": 0.825,
         "dim2_cognitive_safety": null,
         "dim3_action_decision_alignment": null,
-        "dim4_success_efficiency": 0.5703,
+        "dim4_success_efficiency": 0.5494,
         "dim5_behavioural_safety": 1.0,
-        "dim6_robustness_scalability": 0.6898,
-        "dim7_controllability": 0.6922
+        "dim6_robustness_scalability": 0.7458,
+        "dim7_controllability": 0.6546
       },
       "reserve_indicators": {
         "norm_avg_steps": 0.3182,
@@ -1332,10 +1332,10 @@
       "pattern_name": "ReAct",
       "dimension_scores": {
         "dim3_action_decision_alignment": 1.0,
-        "dim4_success_efficiency": 0.7368,
+        "dim4_success_efficiency": 0.7364,
         "dim5_behavioural_safety": 1.0,
         "dim6_robustness_scalability": 0.7204,
-        "dim7_controllability": 0.6692
+        "dim7_controllability": 0.6689
       },
       "weights": {
         "dim3_action_decision_alignment": 1.0,
@@ -1344,14 +1344,14 @@
         "dim6_robustness_scalability": 1.0,
         "dim7_controllability": 1.0
       },
-      "composite": 0.8253,
+      "composite": 0.8251,
       "available_dimensions": 5
     },
     "ReAct_Enhanced": {
       "pattern_name": "ReAct_Enhanced",
       "dimension_scores": {
         "dim3_action_decision_alignment": 1.0,
-        "dim4_success_efficiency": 0.4969,
+        "dim4_success_efficiency": 0.4973,
         "dim5_behavioural_safety": 1.0,
         "dim6_robustness_scalability": 0.5694,
         "dim7_controllability": 0.535
@@ -1369,9 +1369,9 @@
     "CoT": {
       "pattern_name": "CoT",
       "dimension_scores": {
-        "dim1_reasoning_quality": 0.7821,
+        "dim1_reasoning_quality": 0.7671,
         "dim3_action_decision_alignment": 0.95,
-        "dim4_success_efficiency": 0.4159,
+        "dim4_success_efficiency": 0.4177,
         "dim5_behavioural_safety": 0.8125,
         "dim6_robustness_scalability": 0.713,
         "dim7_controllability": 0.4108
@@ -1384,17 +1384,17 @@
         "dim6_robustness_scalability": 1.0,
         "dim7_controllability": 1.0
       },
-      "composite": 0.6807,
+      "composite": 0.6785,
       "available_dimensions": 6
     },
     "Reflex": {
       "pattern_name": "Reflex",
       "dimension_scores": {
-        "dim1_reasoning_quality": 0.82,
-        "dim4_success_efficiency": 0.8924,
+        "dim1_reasoning_quality": 0.7383,
+        "dim4_success_efficiency": 0.8932,
         "dim5_behavioural_safety": 1.0,
         "dim6_robustness_scalability": 0.7407,
-        "dim7_controllability": 0.6911
+        "dim7_controllability": 0.6912
       },
       "weights": {
         "dim1_reasoning_quality": 1.0,
@@ -1403,17 +1403,17 @@
         "dim6_robustness_scalability": 1.0,
         "dim7_controllability": 1.0
       },
-      "composite": 0.8289,
+      "composite": 0.8127,
       "available_dimensions": 5
     },
     "ToT": {
       "pattern_name": "ToT",
       "dimension_scores": {
-        "dim1_reasoning_quality": 0.8633,
-        "dim4_success_efficiency": 0.5703,
+        "dim1_reasoning_quality": 0.825,
+        "dim4_success_efficiency": 0.5494,
         "dim5_behavioural_safety": 1.0,
-        "dim6_robustness_scalability": 0.6898,
-        "dim7_controllability": 0.6922
+        "dim6_robustness_scalability": 0.7458,
+        "dim7_controllability": 0.6546
       },
       "weights": {
         "dim1_reasoning_quality": 1.0,
@@ -1422,7 +1422,7 @@
         "dim6_robustness_scalability": 1.0,
         "dim7_controllability": 1.0
       },
-      "composite": 0.7631,
+      "composite": 0.755,
       "available_dimensions": 5
     }
   },
@@ -1434,18 +1434,18 @@
     },
     {
       "rank": 2,
-      "pattern": "Reflex",
-      "composite": 0.8289
+      "pattern": "ReAct",
+      "composite": 0.8251
     },
     {
       "rank": 3,
-      "pattern": "ReAct",
-      "composite": 0.8253
+      "pattern": "Reflex",
+      "composite": 0.8127
     },
     {
       "rank": 4,
       "pattern": "ToT",
-      "composite": 0.7631
+      "composite": 0.755
     },
     {
       "rank": 5,
@@ -1455,7 +1455,7 @@
     {
       "rank": 6,
       "pattern": "CoT",
-      "composite": 0.6807
+      "composite": 0.6785
     }
   ]
 }
