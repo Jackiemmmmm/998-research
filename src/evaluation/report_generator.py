@@ -473,6 +473,53 @@ class ReportGenerator:
                     lines.append(f"| {name:12s} | {'N/A':>9s} | {'N/A':>9s} | {'N/A':>8s} | {'N/A':>9s} | {'N/A':>5s} |")
             lines.append("")
 
+            lines.append("#### Dim 1 -- Reasoning Quality")
+            lines.append("")
+            lines.append("> **What this measures**: How coherent and well-grounded the agent's")
+            lines.append("> reasoning trace is. Combines four sub-indicators: trace_coverage (does the")
+            lines.append("> agent show its work?), coherence (does the chain hold together, judged by a")
+            lines.append("> separate local LLM), final-answer agreement (does the conclusion match the")
+            lines.append("> reasoning?), and self-consistency (do repeated runs converge on the same")
+            lines.append("> answer; only filled in when --num-runs > 1).")
+            lines.append(">")
+            lines.append("> **Note**: Patterns with zero usable THINK steps (e.g. Baseline) are still")
+            lines.append("> evaluable but score 0 on coverage and coherence; their Dim1 is dominated by")
+            lines.append("> the renormalised final-answer agreement.")
+            lines.append("")
+            lines.append("```")
+            lines.append("Dim1 = 0.15*coverage + 0.40*coherence + 0.20*answer_agreement + 0.25*self_consistency")
+            lines.append("Dim1 = renorm(coverage, coherence, answer_agreement)   [single-run]")
+            lines.append("```")
+            lines.append("")
+            lines.append("| Sub-indicator | Source | Normalisation |")
+            lines.append("|---------------|--------|---------------|")
+            lines.append("| `trace_coverage` | min(1, think_steps / 2) | Already in [0, 1] |")
+            lines.append("| `coherence_score` | judge LLM mean(logical_progression, internal_consistency) | Already in [0, 1] |")
+            lines.append("| `final_answer_agreement` | strict=1.0 / lenient=0.5 / fail=0.0 | Already in [0, 1] |")
+            lines.append("| `self_consistency_score` | largest equivalence class / total runs | Already in [0, 1]; None when single-run |")
+            lines.append("")
+            lines.append("**Dim 1 computation detail:**")
+            lines.append("")
+            lines.append("| Pattern | Tasks w/ Reason. | Coverage | Coherence | Agreement | Self-Cons. | Fallbacks | Dim 1 |")
+            lines.append("|---------|------------------|----------|-----------|-----------|------------|-----------|-------|")
+            for name, metrics in pattern_metrics.items():
+                cog = metrics.cognitive
+                ns = getattr(metrics, '_normalised_scores', None)
+                d1 = ns.dim1_reasoning_quality if ns and ns.dim1_reasoning_quality is not None else None
+                d1_str = f"{d1:.3f}" if d1 is not None else "N/A"
+                sc_str = (
+                    f"{cog.avg_self_consistency_score:.3f}"
+                    if cog.avg_self_consistency_score is not None
+                    else "N/A"
+                )
+                lines.append(
+                    f"| {name:12s} | {cog.tasks_with_reasoning:16d} | "
+                    f"{cog.avg_trace_coverage:8.3f} | {cog.avg_coherence_score:9.3f} | "
+                    f"{cog.avg_final_answer_agreement:9.3f} | {sc_str:>10s} | "
+                    f"{cog.judge_fallback_count:9d} | {d1_str:>5s} |"
+                )
+            lines.append("")
+
             lines.append("#### Dim 5 -- Behavioural Safety")
             lines.append("")
             lines.append("> **What this measures**: Whether agents respect safety boundaries -- tool whitelist")
@@ -516,18 +563,19 @@ class ReportGenerator:
 
             lines.append("### Dimension Score Summary")
             lines.append("")
-            lines.append("| Pattern | Dim 3 (Align) | Dim 4 (Success) | Dim 5 (Safety) | Dim 6 (Robust) | Dim 7 (Control) | Composite |")
-            lines.append("|---------|--------------|----------------|----------------|----------------|-----------------|-----------|")
+            lines.append("| Pattern | Dim 1 (Reason) | Dim 3 (Align) | Dim 4 (Success) | Dim 5 (Safety) | Dim 6 (Robust) | Dim 7 (Control) | Composite |")
+            lines.append("|---------|----------------|--------------|----------------|----------------|----------------|-----------------|-----------|")
             for name, metrics in pattern_metrics.items():
                 ns = getattr(metrics, '_normalised_scores', None)
                 cs = getattr(metrics, '_composite_score', None)
+                d1 = f"{ns.dim1_reasoning_quality:.3f}" if ns and ns.dim1_reasoning_quality is not None else "N/A"
                 d3 = f"{ns.dim3_action_decision_alignment:.3f}" if ns and ns.dim3_action_decision_alignment is not None else "N/A"
                 d4 = f"{ns.dim4_success_efficiency:.3f}" if ns and ns.dim4_success_efficiency is not None else "N/A"
                 d5 = f"{ns.dim5_behavioural_safety:.3f}" if ns and ns.dim5_behavioural_safety is not None else "N/A"
                 d6 = f"{ns.dim6_robustness_scalability:.3f}" if ns and ns.dim6_robustness_scalability is not None else "N/A"
                 d7 = f"{ns.dim7_controllability:.3f}" if ns and ns.dim7_controllability is not None else "N/A"
                 comp = f"{cs.composite:.3f}" if cs else "N/A"
-                lines.append(f"| {name:12s} | {d3:12s} | {d4:14s} | {d5:14s} | {d6:14s} | {d7:15s} | {comp:9s} |")
+                lines.append(f"| {name:12s} | {d1:14s} | {d3:12s} | {d4:14s} | {d5:14s} | {d6:14s} | {d7:15s} | {comp:9s} |")
             lines.append("")
 
             # Reserve indicators
@@ -681,7 +729,10 @@ class ReportGenerator:
         # D1 columns
         header += ",Abs Degradation,Perturbation Variants,Stability Index,Complexity Decline,Scaling Score"
         # D2 + E columns
-        header += ",Trace Completeness,Policy Flag Rate,Resource Efficiency,Dim3,Dim4,Dim5,Dim6,Dim7,Composite"
+        header += ",Trace Completeness,Policy Flag Rate,Resource Efficiency"
+        # B1: Dim1 reasoning quality sub-indicators
+        header += ",Reasoning Tasks With Trace,Avg Trace Coverage,Avg Coherence,Avg Answer Agreement,Avg Self-Consistency,Judge Fallback Count"
+        header += ",Dim1,Dim3,Dim4,Dim5,Dim6,Dim7,Composite"
         lines.append(header)
 
         for row in comparison["summary_table"]:
@@ -716,16 +767,35 @@ class ReportGenerator:
                 line += f",{cr.trace_completeness:.4f},{cr.policy_flag_rate:.4f},{cr.resource_efficiency:.4f}"
             else:
                 line += ",,,"
+            # B1: Dim1 reasoning quality sub-indicators
+            if metrics:
+                cog = metrics.cognitive
+                sc_str = (
+                    f"{cog.avg_self_consistency_score:.4f}"
+                    if cog.avg_self_consistency_score is not None
+                    else ""
+                )
+                line += (
+                    f",{cog.tasks_with_reasoning}"
+                    f",{cog.avg_trace_coverage:.4f}"
+                    f",{cog.avg_coherence_score:.4f}"
+                    f",{cog.avg_final_answer_agreement:.4f}"
+                    f",{sc_str}"
+                    f",{cog.judge_fallback_count}"
+                )
+            else:
+                line += ",,,,,,"
             # E normalised scores
             ns = getattr(metrics, '_normalised_scores', None) if metrics else None
             cs = getattr(metrics, '_composite_score', None) if metrics else None
+            d1 = f"{ns.dim1_reasoning_quality:.4f}" if ns and ns.dim1_reasoning_quality is not None else ""
             d3 = f"{ns.dim3_action_decision_alignment:.4f}" if ns and ns.dim3_action_decision_alignment is not None else ""
             d4 = f"{ns.dim4_success_efficiency:.4f}" if ns and ns.dim4_success_efficiency is not None else ""
             d5 = f"{ns.dim5_behavioural_safety:.4f}" if ns and ns.dim5_behavioural_safety is not None else ""
             d6 = f"{ns.dim6_robustness_scalability:.4f}" if ns and ns.dim6_robustness_scalability is not None else ""
             d7 = f"{ns.dim7_controllability:.4f}" if ns and ns.dim7_controllability is not None else ""
             comp = f"{cs.composite:.4f}" if cs else ""
-            line += f",{d3},{d4},{d5},{d6},{d7},{comp}"
+            line += f",{d1},{d3},{d4},{d5},{d6},{d7},{comp}"
             lines.append(line)
 
         csv = "\n".join(lines)

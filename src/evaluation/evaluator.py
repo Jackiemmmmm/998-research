@@ -20,6 +20,13 @@ from .metrics import (
     RobustnessMetrics,
     SuccessMetrics,
 )
+from .reasoning_quality import (
+    CognitiveMetrics,
+    ReasoningJudge,
+    ReasoningQualityResult,
+    aggregate_cognitive_metrics,
+    compute_task_reasoning_quality,
+)
 from .safety import check_tool_compliance, check_content_safety, compute_task_safety
 from .trace import AgentTrace, TraceExtractor
 from .test_suite import TEST_SUITE, TestTask
@@ -151,6 +158,9 @@ class PatternEvaluator:
         self._collect_controllability_metrics(metrics.controllability, original_results, test_tasks)
         self._collect_alignment_metrics(metrics.alignment, original_results, test_tasks)
         self._collect_safety_metrics(metrics.safety, original_results, test_tasks)
+        await self._collect_cognitive_metrics(
+            metrics.cognitive, original_results, test_tasks
+        )
 
         # Calculate original success rate for robustness
         metrics.robustness.original_success_rate = metrics.success.success_rate()
@@ -850,6 +860,72 @@ class PatternEvaluator:
             safety_metrics.domain_safety_score = 1.0 - (tasks_flagged_unsafe / total_tasks_scanned)
         else:
             safety_metrics.domain_safety_score = 1.0
+
+    async def _collect_cognitive_metrics(
+        self,
+        cognitive_metrics: CognitiveMetrics,
+        results: List[TaskResult],
+        tasks: List[TestTask],
+    ):
+        """Collect Dim1 Reasoning Quality metrics.
+
+        For each task we extract THINK steps from the trace, ask the
+        ReasoningJudge to score coherence (skipped when there are no
+        usable THINK steps), reuse the strict / lenient judge result for
+        final-answer agreement, and aggregate via spec section 4.5
+        (single-run renormalisation; self-consistency is filled in by
+        Phase F).
+
+        Judge calls are blocking I/O against Ollama, so we run them in
+        parallel via ``asyncio.gather`` + ``asyncio.to_thread``.
+        """
+        task_lookup = {t.id: t for t in tasks}
+
+        # Build a single ReasoningJudge so the underlying chat model
+        # client is shared across tasks for one pattern run.
+        judge = ReasoningJudge()
+
+        async def _eval_one(result: TaskResult) -> Optional[ReasoningQualityResult]:
+            task = task_lookup.get(result.task_id)
+            if task is None:
+                return None
+            return await asyncio.to_thread(
+                compute_task_reasoning_quality, task, result, judge
+            )
+
+        gathered = await asyncio.gather(*(_eval_one(r) for r in results))
+        per_task = [rq for rq in gathered if rq is not None]
+
+        aggregated = aggregate_cognitive_metrics(per_task)
+
+        # Copy aggregated fields into the live CognitiveMetrics object so
+        # the in-place reference held by PatternMetrics stays valid.
+        cognitive_metrics.total_tasks = aggregated.total_tasks
+        cognitive_metrics.tasks_with_reasoning = aggregated.tasks_with_reasoning
+        cognitive_metrics.avg_trace_coverage = aggregated.avg_trace_coverage
+        cognitive_metrics.avg_coherence_score = aggregated.avg_coherence_score
+        cognitive_metrics.avg_final_answer_agreement = (
+            aggregated.avg_final_answer_agreement
+        )
+        cognitive_metrics.avg_self_consistency_score = (
+            aggregated.avg_self_consistency_score
+        )
+        cognitive_metrics.avg_reasoning_quality = aggregated.avg_reasoning_quality
+        cognitive_metrics.judge_fallback_count = aggregated.judge_fallback_count
+        cognitive_metrics.task_quality_scores = dict(
+            aggregated.task_quality_scores
+        )
+
+        # Stash the raw per-task results on each TaskResult so the Phase F
+        # multi-run hook can pick them up (one ReasoningQualityResult per
+        # (pattern, task, run)).  Use setattr because TaskResult is a
+        # dataclass and we don't want to declare this private cache as a
+        # formal field.
+        for rq in per_task:
+            for r in results:
+                if r.task_id == rq.task_id:
+                    setattr(r, "_reasoning_quality_result", rq)
+                    break
 
 
 def _compute_success_by_complexity(

@@ -3,10 +3,18 @@
 Supports: Ollama, Groq, Cerebras, Google Gemini.
 """
 
+import logging
 import os
 from typing import Optional
 
 from langchain.chat_models import init_chat_model
+
+logger = logging.getLogger(__name__)
+
+# Module-level flag so the "judge model env var unset" warning fires at most
+# once per process. Phase B1 spec section 4.2: emit a one-time warning when
+# JUDGE_OLLAMA_MODEL is not set and we fall back to the agent model.
+_JUDGE_FALLBACK_WARNED = False
 
 
 class LLMConfig:
@@ -127,6 +135,64 @@ class LLMConfig:
         }
 
     @staticmethod
+    def get_judge_llm():
+        """Get the LLM used by the reasoning-quality (Dim1) judge.
+
+        Phase B1 spec section 4.2: a separate local judge model removes
+        self-evaluation bias.  Strategy:
+
+        - If ``JUDGE_OLLAMA_MODEL`` env var is set, build a ``ChatOllama``
+          using that model name with the same Ollama base URL / determinism
+          settings as ``get_model()`` (temperature=0, num_ctx=16384,
+          num_predict=2048, 120 s timeout).
+        - Otherwise, log a one-time warning and fall back to
+          ``LLMConfig.get_model()`` so the code still runs end-to-end on
+          machines that have not pulled a second model.
+
+        Returns:
+            An initialised chat model suitable for judge-style invocations.
+        """
+        global _JUDGE_FALLBACK_WARNED
+
+        judge_model = os.getenv("JUDGE_OLLAMA_MODEL")
+
+        if judge_model:
+            base_url = os.getenv(
+                "OLLAMA_BASE_URL",
+                str(LLMConfig.PROVIDERS["ollama"]["base_url"]),
+            )
+            try:
+                from langchain_ollama import ChatOllama
+                return ChatOllama(
+                    model=judge_model,
+                    base_url=base_url,
+                    temperature=0,
+                    num_ctx=16384,
+                    num_predict=2048,
+                    client_kwargs={"timeout": 120.0},
+                )
+            except ImportError:
+                # Fallback: use init_chat_model with the ollama provider.
+                return init_chat_model(
+                    f"ollama:{judge_model}",
+                    model_provider="ollama",
+                    base_url=base_url,
+                )
+
+        # Env var not set -> fall back to the agent model.
+        if not _JUDGE_FALLBACK_WARNED:
+            logger.warning(
+                "JUDGE_OLLAMA_MODEL is not set; reasoning-quality judge will "
+                "reuse the agent model from LLMConfig.get_model(). This "
+                "reintroduces self-evaluation bias on Dim1. Set "
+                "JUDGE_OLLAMA_MODEL (e.g. 'qwen2.5:7b') to silence this "
+                "warning."
+            )
+            _JUDGE_FALLBACK_WARNED = True
+
+        return LLMConfig.get_model()
+
+    @staticmethod
     def list_providers() -> list:
         """List all available providers."""
         return list(LLMConfig.PROVIDERS.keys())
@@ -200,6 +266,14 @@ class LLMConfig:
 def get_llm(provider: Optional[str] = None):
     """Shorthand to get LLM model."""
     return LLMConfig.get_model(provider)
+
+
+def get_judge_llm():
+    """Shorthand to get the reasoning-quality judge LLM.
+
+    See ``LLMConfig.get_judge_llm`` for the selection rules.
+    """
+    return LLMConfig.get_judge_llm()
 
 
 if __name__ == "__main__":

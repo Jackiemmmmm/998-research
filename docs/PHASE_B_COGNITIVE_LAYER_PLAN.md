@@ -184,6 +184,38 @@ reasoning_quality_score =
 
 If `self_consistency_score` is unavailable, weights should be renormalized over the available fields.
 
+#### 6.3.1 Rationale for the weight assignment
+
+The weights are not uniform. They reflect three explicit design priorities: (a) the qualitative signal that most directly measures reasoning quality should dominate; (b) saturating or coarse-grained signals should be down-weighted; (c) sub-indicators that overlap with other dimensions should be reduced to avoid double counting. The four weights are justified as follows.
+
+**`reasoning_coherence_score = 0.40` — dominant weight**
+
+Coherence is the only sub-indicator that produces a continuous, semantic-level evaluation of the reasoning chain itself, and it is the indicator most directly aligned with the wording of Dimension 1 in the proposal. The other three sub-indicators are structural or comparative proxies. Because Dimension 1 is named "Reasoning Quality", the qualitative judgement of the chain should carry the largest single share of the score. The weight is set at `0.40` rather than `0.50` or higher because LLM-as-Judge outputs are known to carry non-trivial variance even on identical inputs; placing more than 40 percent of the dimension on a noisy signal would make Dimension 1 unstable across repeated evaluations and weaken cross-pattern comparisons.
+
+**`self_consistency_score = 0.25` — second weight**
+
+Self-consistency captures a property that coherence cannot detect: a reasoning chain may look internally consistent in one run yet drift to different conclusions across repeated runs. This is widely used in the chain-of-thought literature as a robustness signal for reasoning. Its weight is the second highest because it adds information that no other sub-indicator provides, but it is kept below coherence because answer agreement across runs measures stability, not the quality of the reasoning itself. A pattern can be highly self-consistent and consistently wrong; weighting it above coherence would conflate stability with quality.
+
+**`final_answer_agreement = 0.20` — moderate weight**
+
+Final-answer agreement measures whether the conclusion stated in the trace matches the agent's final output. This is necessary to penalise patterns whose reasoning looks coherent but whose final answer is disconnected from it. The weight is held at `0.20` because the same correctness signal is already a primary input to Dimension 4 (Success and Efficiency). Giving it a higher weight in Dimension 1 would cause Dimension 1 and Dimension 4 to move together and reduce the discriminative power of the composite score across patterns.
+
+**`reasoning_trace_coverage = 0.15` — lowest weight**
+
+Trace coverage is a gating indicator rather than a quality indicator. Once an agent produces enough THINK steps to support evaluation, the score saturates at `1.0`, and additional reasoning content produces no further increase. This makes the indicator coarse-grained: across the current pattern set most non-Baseline patterns will reach `1.0` quickly, and the indicator chiefly distinguishes "no usable reasoning trace" from "reasoning trace exists". The weight is non-zero so that patterns with no trace (such as the Baseline control group) are correctly penalised, and is low so that the saturation behaviour does not dominate the overall score.
+
+#### 6.3.2 Why not uniform weights
+
+A uniform weighting of `0.25` per sub-indicator was considered and rejected for two reasons. First, it would over-weight `trace_coverage`, which is a saturating signal with limited discriminative range, and would therefore reduce the dimension's ability to differentiate patterns once all of them reach the minimum coverage threshold. Second, it would dilute `coherence_score`, which is the only sub-indicator that performs a semantic evaluation of the reasoning chain and is therefore the only indicator that directly answers the question Dimension 1 is intended to measure. The four sub-indicators do not carry equal information content, and their weights should reflect that asymmetry.
+
+#### 6.3.3 Renormalisation rule when `self_consistency_score` is unavailable
+
+When repeated runs are not available, the three remaining weights `{0.15, 0.40, 0.20}` sum to `0.75` and are rescaled by dividing each by `0.75`, producing `{0.20, 0.5333, 0.2667}`. This preserves the relative ordering and ratios of the available indicators rather than redistributing the missing weight uniformly or assigning it to a single indicator. The chosen scheme keeps coherence as the dominant signal in single-run mode and avoids introducing a discontinuity between the single-run and multi-run formulations.
+
+#### 6.3.4 Status of the weight values
+
+The numerical weights given above are initial values intended for the first complete evaluation run. They are not treated as fixed. Phase E records dimension weights as configurable inputs to the composite scoring pipeline, and Week 7-8 of the project plan includes a sensitivity analysis that varies these weights and reports the impact on conclusions. The values may be revised after the first full multi-run dataset is available, provided that any revision is documented and justified by the observed data.
+
 ### 6.4 Proposed module structure
 
 Recommended structures:

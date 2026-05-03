@@ -137,6 +137,7 @@ Update the `Status` field in the spec header as it progresses.
 | [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) | P3 | Phase D2 | READY FOR IMPLEMENTATION |
 | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) | P2 | Phase D1 | READY FOR IMPLEMENTATION |
 | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) | P3 | Phase C3 | READY FOR IMPLEMENTATION |
+| [week5-6_phase-b1_reasoning-quality.md](./specs/week5-6_phase-b1_reasoning-quality.md) | P1 | Phase B1 | READY FOR IMPLEMENTATION |
 
 ---
 

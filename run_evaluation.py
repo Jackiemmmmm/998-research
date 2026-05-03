@@ -27,10 +27,36 @@ from pattern_tree_of_thoughts import graph_pattern_tree_of_thoughts
 
 from src.evaluation import (
     ReportGenerator,
+    inject_self_consistency_scores,
     load_test_suite,
 )
 from src.evaluation.evaluator import evaluate_multiple_patterns
 from src.evaluation.visualization import EvaluationVisualizer
+
+
+def _maybe_inject_self_consistency(
+    pattern_metrics,
+    per_pattern_runs=None,
+    task_outputs=None,
+    task_specs=None,
+):
+    """Phase F hook: refresh Dim1 self-consistency on the latest run.
+
+    No-op when multi-run aggregation is not active (the typical
+    single-run path in this script).  Phase F's multi-run loop should
+    populate ``per_pattern_runs`` (``{pattern: [run1_results, ...]}``),
+    ``task_outputs`` (``{(pattern, task_id): [out1, ...]}``) and
+    ``task_specs`` (``{task_id: TestTask}``) and call this helper before
+    the report generators run.
+    """
+    if not per_pattern_runs or not task_outputs or not task_specs:
+        return
+    inject_self_consistency_scores(
+        per_pattern_runs=per_pattern_runs,
+        task_outputs=task_outputs,
+        task_specs=task_specs,
+        pattern_metrics=pattern_metrics,
+    )
 
 async def run_full_evaluation(delay: float = 1.0, task_timeout: float = 180.0, parallel: bool = True, max_concurrency: int = 2):
     """Run complete evaluation on all patterns (including baseline)."""

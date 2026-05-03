@@ -9,7 +9,12 @@
       "Bash(timeout 60 python:*)",
       "Bash(uv run ruff:*)",
       "Bash(uv run mypy:*)",
-      "Bash(uv pip install:*)"
+      "Bash(uv pip install:*)",
+      "Bash(uvx ruff *)",
+      "Bash(uvx --with mypy --with types-requests mypy src/)",
+      "Bash(uvx --with mypy --with types-requests mypy src/evaluation/evaluator.py src/evaluation/reasoning_quality.py src/llm_config.py src/evaluation/scoring.py src/evaluation/metrics.py)",
+      "Bash(mkdir -p /tmp/b1-smoke)",
+      "Bash(python run_evaluation.py --mode quick --concurrency 2 --timeout 120)"
     ],
     "deny": [],
     "ask": []

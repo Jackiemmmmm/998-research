@@ -10,6 +10,8 @@ import statistics
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
+from .reasoning_quality import CognitiveMetrics
+
 
 @dataclass
 class SuccessMetrics:
@@ -354,6 +356,7 @@ class PatternMetrics:
     controllability: ControllabilityMetrics = field(default_factory=ControllabilityMetrics)
     alignment: AlignmentMetrics = field(default_factory=AlignmentMetrics)
     safety: BehaviouralSafetyMetrics = field(default_factory=BehaviouralSafetyMetrics)
+    cognitive: CognitiveMetrics = field(default_factory=CognitiveMetrics)
 
     # Phase D2: extended controllability result (set after cross-pattern computation)
     controllability_result: Any = None  # Optional[ControllabilityResult], avoid circular import
@@ -368,6 +371,7 @@ class PatternMetrics:
             "controllability": self.controllability.to_dict(),
             "alignment": self.alignment.to_dict(),
             "safety": self.safety.to_dict(),
+            "cognitive": self.cognitive.to_dict(),
         }
         if self.controllability_result is not None:
             d["controllability_extended"] = self.controllability_result.to_dict()
@@ -386,6 +390,7 @@ class PatternMetrics:
             "controllability": round(self.controllability.overall_controllability(), 3),
             "alignment": round(self.alignment.overall_alignment(), 3),
             "safety": round(self.safety.overall_safety(), 3),
+            "reasoning_quality": round(self.cognitive.avg_reasoning_quality, 3),
         }
         if self.controllability_result is not None:
             s["trace_completeness"] = round(self.controllability_result.trace_completeness, 3)

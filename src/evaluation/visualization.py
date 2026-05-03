@@ -387,6 +387,7 @@ class EvaluationVisualizer:
         patterns = list(pattern_metrics.keys())
 
         dim_keys = [
+            ('dim1_reasoning_quality', 'Dim 1\nReasoning'),
             ('dim3_action_decision_alignment', 'Dim 3\nAlignment'),
             ('dim4_success_efficiency', 'Dim 4\nSuccess'),
             ('dim5_behavioural_safety', 'Dim 5\nSafety'),
