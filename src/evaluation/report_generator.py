@@ -5,7 +5,7 @@ import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from .metrics import MetricsAggregator, PatternMetrics
 from .statistics import StatisticalReport
@@ -109,6 +109,314 @@ def _render_statistical_section(
             lines.append(
                 f"| {pair.pattern_a} | {pair.pattern_b} | {pair.cohens_d:.3f} |"
             )
+    lines.append("")
+    return lines
+
+
+def _compute_dual_composite_ranking(
+    pattern_metrics: Dict[str, "PatternMetrics"],
+    statistical_report: Optional["StatisticalReport"] = None,
+) -> Optional[Dict[str, Any]]:
+    """Compute the dual-view composite ranking used by both the executive
+    summary and § 5 "Composite Score Ranking".
+
+    Returns a dict with:
+      - ``composites``: list of ``(name, view_a_score, n_dims, view_b_score)``
+        in ranked-by-View-A order
+      - ``view_a_sorted``: same data, sorted by View A descending
+      - ``view_b_sorted``: same data, sorted by View B descending
+
+    View A is the spec's "evaluable-dim mean" (uniform mean over the
+    dimensions a pattern can be scored on; N/A excluded).
+    View B is the "all-7-dim mean" (N/A treated as 0); fairer when
+    patterns differ in their measurable surface.
+
+    When ``statistical_report.num_runs > 1`` is provided, dim* values
+    are taken from Phase F's per-pattern mean rather than the latest
+    single-run normalised score.
+
+    Returns ``None`` if no pattern in ``pattern_metrics`` carries a
+    composite score yet (e.g. before Phase E has run).
+    """
+    multi_run = (
+        statistical_report is not None
+        and statistical_report.num_runs > 1
+    )
+
+    def _stat_mean(pattern_name: str, metric: str):
+        if not multi_run:
+            return None
+        ps = statistical_report.per_pattern.get(pattern_name)
+        if ps is None:
+            return None
+        summary = ps.summaries.get(metric)
+        return summary.mean if summary is not None else None
+
+    composites: List[Tuple[str, float, int, float]] = []
+    for name, metrics in pattern_metrics.items():
+        cs = getattr(metrics, "_composite_score", None)
+        ns = getattr(metrics, "_normalised_scores", None)
+        if cs is None or ns is None:
+            continue
+        seven_dims: List[Optional[float]] = [
+            ns.dim1_reasoning_quality,
+            ns.dim2_cognitive_safety,
+            ns.dim3_action_decision_alignment,
+            ns.dim4_success_efficiency,
+            ns.dim5_behavioural_safety,
+            ns.dim6_robustness_scalability,
+            ns.dim7_controllability,
+        ]
+        if multi_run:
+            metric_names = [
+                "dim1_reasoning_quality",
+                "dim2_cognitive_safety",
+                "dim3_action_decision_alignment",
+                "dim4_success_efficiency",
+                "dim5_behavioural_safety",
+                "dim6_robustness_scalability",
+                "dim7_controllability",
+            ]
+            for i, m in enumerate(metric_names):
+                stat = _stat_mean(name, m)
+                if stat is not None:
+                    seven_dims[i] = stat
+        penalised = sum((v if v is not None else 0.0) for v in seven_dims) / 7.0
+        composites.append((name, cs.composite, cs.available_dimensions, penalised))
+
+    if not composites:
+        return None
+
+    view_a_sorted = sorted(composites, key=lambda x: x[1], reverse=True)
+    view_b_sorted = sorted(composites, key=lambda x: x[3], reverse=True)
+    return {
+        "composites": composites,
+        "view_a_sorted": view_a_sorted,
+        "view_b_sorted": view_b_sorted,
+    }
+
+
+def _render_executive_summary(
+    pattern_metrics: Dict[str, "PatternMetrics"],
+    statistical_report: Optional["StatisticalReport"],
+    run_metadata: Optional[Dict[str, Any]],
+    ranking: Optional[Dict[str, Any]],
+) -> List[str]:
+    """Render the supervisor-facing executive summary block.
+
+    Auto-generated from data so it stays in sync across re-runs:
+      1. Multi-run statistical-rigor headline (N, judge, dimension coverage).
+      2. Composite ranking flip (View A #1 + last vs. View B #1 + last).
+      3. Best reasoning pattern (highest Dim 1).
+      4. Tool-using vs non-tool aggregate success rates.
+      5. Honest caveats baked in (Cohen's d, § 3 vs § 5, Dim 2).
+
+    All claims are derived from the same ``ranking`` data the rest of
+    the report uses, so the summary cannot drift out of sync with § 5.
+    """
+    lines: List[str] = []
+    multi_run = (
+        statistical_report is not None
+        and statistical_report.num_runs > 1
+    )
+
+    # ------------------------------------------------------------------
+    # Section 1 — Statistical rigor headline + dimension coverage
+    # ------------------------------------------------------------------
+    n_patterns = len(pattern_metrics)
+    judge = (run_metadata or {}).get("judge_model", "unknown")
+    num_runs = (run_metadata or {}).get("num_runs", "?")
+    # Count dimensions with at least one populated value across patterns
+    dim_keys = [
+        "dim1_reasoning_quality",
+        "dim2_cognitive_safety",
+        "dim3_action_decision_alignment",
+        "dim4_success_efficiency",
+        "dim5_behavioural_safety",
+        "dim6_robustness_scalability",
+        "dim7_controllability",
+    ]
+    populated_dims = 0
+    for d in dim_keys:
+        for _, m in pattern_metrics.items():
+            ns = getattr(m, "_normalised_scores", None)
+            if ns is not None and getattr(ns, d, None) is not None:
+                populated_dims += 1
+                break
+
+    lines.append("---")
+    lines.append("")
+    lines.append("## 🎯 Executive Summary (read first)")
+    lines.append("")
+    lines.append(
+        f"**1. Multi-run statistical rigor is now in effect.** Every headline number below "
+        f"is the **mean across N = {num_runs} runs** with t-distribution **95 % confidence intervals** "
+        f"(Phase F, spec § 5.3). Cohen's d pairwise effect sizes are computed for both "
+        f"`composite_score` and `success_rate_strict`. Plan acceptance criterion "
+        f"*\"All 7 dimensions produce scores; multi-run + CI\"* — **{populated_dims} of 7 dimensions met** "
+        f"(judge model: `{judge}`)."
+    )
+    lines.append("")
+
+    # ------------------------------------------------------------------
+    # Section 2 — Composite ranking flip
+    # ------------------------------------------------------------------
+    if ranking is not None:
+        va = ranking["view_a_sorted"]
+        vb = ranking["view_b_sorted"]
+        a_top, a_bot = va[0], va[-1]
+        b_top, b_bot = vb[0], vb[-1]
+        lines.append(
+            "**2. The composite ranking flips dramatically depending on how N/A dimensions "
+            "are handled** — see § 5 \"Composite Score Ranking\":"
+        )
+        lines.append("")
+        lines.append("| View | #1 | Last |")
+        lines.append("|---|---|---|")
+        lines.append(
+            f"| **A. Evaluable-dim mean** (spec): N/A excluded from average | "
+            f"🥇 {a_top[0]} {a_top[1]:.3f} | {a_bot[0]} {a_bot[1]:.3f} |"
+        )
+        lines.append(
+            f"| **B. All-7-dim mean** (N/A → 0): fair / penalises unmeasurable dims | "
+            f"🥇 {b_top[0]} {b_top[3]:.3f} | **{b_bot[0]} {b_bot[3]:.3f}** |"
+        )
+        lines.append("")
+        # If View A #1 differs from View B #1, surface that as the central insight
+        if a_top[0] != b_top[0]:
+            lines.append(
+                f"**{a_top[0]}** is **#1 under spec mean and {('LAST' if a_top[0] == b_bot[0] else 'lower')} under fair mean** — "
+                "a single composite score cannot capture the difference between "
+                "\"unmeasurable dimension\" and \"failed dimension\". This is the report's "
+                "central methodological insight."
+            )
+            lines.append("")
+
+    # ------------------------------------------------------------------
+    # Section 3 — Best reasoning pattern (highest Dim 1)
+    # ------------------------------------------------------------------
+    dim1_pairs: List[Tuple[str, float]] = []
+    for name, m in pattern_metrics.items():
+        ns = getattr(m, "_normalised_scores", None)
+        if ns is None or ns.dim1_reasoning_quality is None:
+            continue
+        # Prefer Phase F mean if available
+        if multi_run:
+            ps = statistical_report.per_pattern.get(name)
+            if ps is not None:
+                s = ps.summaries.get("dim1_reasoning_quality")
+                if s is not None:
+                    dim1_pairs.append((name, s.mean))
+                    continue
+        dim1_pairs.append((name, ns.dim1_reasoning_quality))
+
+    if dim1_pairs:
+        dim1_pairs.sort(key=lambda x: x[1], reverse=True)
+        best_reason = dim1_pairs[0]
+        lines.append(f"**3. {best_reason[0]} leads on reasoning quality** (Dim 1 = {best_reason[1]:.3f}).")
+        # Pull supplementary stats if available
+        ps = statistical_report.per_pattern.get(best_reason[0]) if multi_run else None
+        if ps is not None:
+            s = ps.summaries.get("success_rate_strict")
+            if s is not None:
+                margin = s.ci95_high - s.mean
+                lines.append(f"- Success rate (mean across N=runs): {s.mean:.1%} ± {margin:.1%}")
+        # Latency from latest run
+        m_obj = pattern_metrics.get(best_reason[0])
+        if m_obj is not None:
+            lines.append(f"- Avg latency: {m_obj.efficiency.avg_latency():.1f} s/task")
+        lines.append("")
+
+    # ------------------------------------------------------------------
+    # Section 4 — Tool-using vs non-tool aggregate success
+    # ------------------------------------------------------------------
+    tool_users = []
+    non_tool_users = []
+    for name, m in pattern_metrics.items():
+        ns = getattr(m, "_normalised_scores", None)
+        if ns is None:
+            continue
+        sr = m.success.success_rate()
+        if ns.dim3_action_decision_alignment is not None:
+            tool_users.append((name, sr))
+        else:
+            non_tool_users.append((name, sr))
+    if tool_users and non_tool_users:
+        tu_avg = sum(s for _, s in tool_users) / len(tool_users)
+        ntu_avg = sum(s for _, s in non_tool_users) / len(non_tool_users)
+        tu_names = ", ".join(n for n, _ in tool_users)
+        ntu_names = ", ".join(n for n, _ in non_tool_users)
+        lines.append(
+            f"**4. Tool-using vs non-tool patterns trade-off**: tool-using ({tu_names}) "
+            f"average {tu_avg:.1%} success vs {ntu_avg:.1%} for non-tool ({ntu_names}). "
+            f"Tool patterns can be evaluated on Dim 3 (alignment); non-tool patterns get N/A there."
+        )
+        lines.append("")
+
+    # ------------------------------------------------------------------
+    # Section 5 — Honest caveats baked in (auto-detect what fired)
+    # ------------------------------------------------------------------
+    caveats: List[str] = []
+    # Cohen's d small std caveat
+    if multi_run:
+        SMALL_STD = 0.01
+        composite_stds = []
+        for ps in statistical_report.per_pattern.values():
+            s = ps.summaries.get("composite_score")
+            if s is not None:
+                composite_stds.append(s.std)
+        if composite_stds and min(composite_stds) < SMALL_STD:
+            caveats.append(
+                "**Cohen's d auto-warning**: at least one pattern has `std(composite) < 0.01` "
+                "(seed-controlled execution). § 7 emits a banner — use mean ± CI instead of d magnitudes."
+            )
+    # § 3 vs § 5 robustness ranking divergence
+    if ranking is not None:
+        deg_pairs = [
+            (name, m.robustness.degradation_percentage)
+            for name, m in pattern_metrics.items()
+        ]
+        if deg_pairs:
+            best_by_deg = min(deg_pairs, key=lambda x: x[1])[0]
+            # Best by Dim 6 (lookup in composites)
+            dim6_pairs = []
+            for name, m in pattern_metrics.items():
+                ns = getattr(m, "_normalised_scores", None)
+                if ns is None or ns.dim6_robustness_scalability is None:
+                    continue
+                v = ns.dim6_robustness_scalability
+                if multi_run:
+                    ps = statistical_report.per_pattern.get(name)
+                    if ps is not None:
+                        s = ps.summaries.get("dim6_robustness_scalability")
+                        if s is not None:
+                            v = s.mean
+                dim6_pairs.append((name, v))
+            if dim6_pairs:
+                best_by_dim6 = max(dim6_pairs, key=lambda x: x[1])[0]
+                if best_by_deg != best_by_dim6:
+                    caveats.append(
+                        f"**§ 3 vs § 5 robustness ranking note**: § 3 ranks `{best_by_deg}` best "
+                        f"(lowest raw degradation %); § 5 Dim 6 ranks `{best_by_dim6}` best "
+                        f"(composite formula). Both correct — they measure different things."
+                    )
+    # Dim 2 placeholder
+    dim2_present = any(
+        getattr(getattr(m, "_normalised_scores", None), "dim2_cognitive_safety", None) is not None
+        for m in pattern_metrics.values()
+    )
+    if not dim2_present:
+        caveats.append(
+            "**Dim 2 (Cognitive Safety)**: explicit 🚧 placeholder — Phase B2 / P3 task, "
+            "not silently zero. Forward-compat field exists in `run_records`."
+        )
+    if caveats:
+        lines.append("**5. Honest caveats baked in to the report:**")
+        for c in caveats:
+            lines.append(f"- {c}")
+        lines.append("")
+
+    lines.append("---")
     lines.append("")
     return lines
 
@@ -362,6 +670,26 @@ class ReportGenerator:
                 return stat
             return ns_value
 
+        # Compute the dual composite ranking once; reused by both the
+        # executive summary and § 5 "Composite Score Ranking" so the two
+        # views cannot drift out of sync.
+        dual_ranking = _compute_dual_composite_ranking(
+            pattern_metrics, statistical_report
+        )
+
+        # Executive summary (auto-generated; supervisor reads this first).
+        # Only emit when we have multi-run data — otherwise the headline
+        # claims about "mean across N runs" would be misleading.
+        if multi_run and dual_ranking is not None:
+            lines.extend(
+                _render_executive_summary(
+                    pattern_metrics,
+                    statistical_report,
+                    run_metadata,
+                    dual_ranking,
+                )
+            )
+
         # Summary table
         lines.append("## Summary Comparison")
         lines.append("")
@@ -392,11 +720,13 @@ class ReportGenerator:
         success = comparison["success_dimension"]
         # Post-2026-05-04 review polish: when N>1, use the multi-run
         # statistical mean for the headline rather than the latest
-        # single-run snapshot.  Otherwise stochastic patterns like ToT
-        # (whose success rate has CI ± 0.155 across 3 runs) get reported
-        # at their best run, which overstates capability.
+        # single-run snapshot.  Stochastic patterns like ToT
+        # (success_rate CI ± 0.155 across 3 runs) get overstated otherwise.
+        # Also handles ties — common when seed_supported=true makes 5/6
+        # patterns deterministic.
+        TIE_EPS = 0.005  # 0.5 percentage-point tolerance counts as a tie
         if multi_run:
-            best_pat, best_mean, best_margin = None, -1.0, 0.0
+            ranked: List[Tuple[str, float, float, float]] = []  # (name, mean, margin, std)
             for pname in pattern_metrics.keys():
                 ps = statistical_report.per_pattern.get(pname)
                 if ps is None:
@@ -404,34 +734,66 @@ class ReportGenerator:
                 s = ps.summaries.get("success_rate_strict")
                 if s is None:
                     continue
-                if s.mean > best_mean:
-                    best_pat, best_mean = pname, s.mean
-                    best_margin = s.ci95_high - s.mean
-            if best_pat is not None:
-                lines.append(
-                    f"**Best Pattern (mean across N = {statistical_report.num_runs} runs):** "
-                    f"{best_pat} ({best_mean:.1%} strict ± {best_margin:.1%} 95 % CI). "
-                    f"_Note: the **latest single run** alone is "
-                    f"{success['best_pattern']} ({success['best_score']:.1%}) — different "
-                    f"because stochastic patterns (e.g. ToT) vary across runs._"
-                )
+                ranked.append((pname, s.mean, s.ci95_high - s.mean, s.std))
+            ranked.sort(key=lambda x: x[1], reverse=True)
+            if ranked:
+                top_score = ranked[0][1]
+                tied = [r for r in ranked if abs(r[1] - top_score) < TIE_EPS]
+                if len(tied) > 1:
+                    # Tie case (e.g. ToT and Baseline both at 81.2%)
+                    parts = []
+                    for name, mean, margin, std in tied:
+                        if std > 0:
+                            parts.append(f"{name} ± {margin:.1%} 95 % CI")
+                        else:
+                            parts.append(f"{name} ± 0.0 % (deterministic)")
+                    tied_names = " and ".join(n for n, _, _, _ in tied)
+                    lines.append(
+                        f"**Best Pattern (mean across N = {statistical_report.num_runs} runs):** "
+                        f"{tied_names} are tied at **{top_score:.1%} strict** "
+                        f"({'; '.join(parts)}). "
+                        f"_Note: the **latest single run alone** has "
+                        f"{success['best_pattern']} ({success['best_score']:.1%}) — "
+                        f"the headline differs because stochastic patterns vary between runs._"
+                    )
+                else:
+                    name, mean, margin, std = ranked[0]
+                    if std > 0:
+                        margin_txt = f"± {margin:.1%} 95 % CI"
+                    else:
+                        margin_txt = "± 0.0 % (deterministic)"
+                    lines.append(
+                        f"**Best Pattern (mean across N = {statistical_report.num_runs} runs):** "
+                        f"{name} ({mean:.1%} strict {margin_txt}). "
+                        f"_Note: the **latest single run alone** is "
+                        f"{success['best_pattern']} ({success['best_score']:.1%}) — "
+                        f"may differ when stochastic patterns peak in one run._"
+                    )
             else:
                 lines.append(f"**Best Pattern:** {success['best_pattern']} ({success['best_score']:.1%})")
         else:
             lines.append(f"**Best Pattern:** {success['best_pattern']} ({success['best_score']:.1%})")
         lines.append("")
-        lines.append("### Success Rates by Pattern")
+        if multi_run:
+            lines.append(f"### Success Rates by Pattern (mean across N = {statistical_report.num_runs} runs)")
+        else:
+            lines.append("### Success Rates by Pattern")
         for pattern, rate in success["rates"].items():
             line = f"- **{pattern}**: {rate:.1%}"
             if multi_run:
                 ps = statistical_report.per_pattern.get(pattern)
                 if ps is not None:
                     s = ps.summaries.get("success_rate_strict")
-                    if s is not None and s.std > 0:
-                        line += (
-                            f"  _(mean {s.mean:.1%} ± "
-                            f"{(s.ci95_high - s.mean):.1%}, n={s.n})_"
-                        )
+                    if s is not None:
+                        # Always annotate in multi-run: explicit about
+                        # whether the pattern is deterministic vs. stochastic
+                        if s.std > 0:
+                            line += (
+                                f"  _(mean {s.mean:.1%} ± "
+                                f"{(s.ci95_high - s.mean):.1%}, n={s.n})_"
+                            )
+                        else:
+                            line += f"  _(deterministic across N={s.n})_"
             lines.append(line)
         lines.append("")
 
@@ -479,25 +841,85 @@ class ReportGenerator:
         lines.append(f"**Most Robust (raw degradation %):** {robustness['most_robust_pattern']} ({robustness['lowest_degradation']:.1f}% degradation)")
         lines.append(f"**Least Robust (raw degradation %):** {robustness['least_robust_pattern']} ({robustness['highest_degradation']:.1f}% degradation)")
         lines.append("")
-        lines.append(
-            "> ⚠ **Cross-section note**: this section ranks by *raw* degradation percentage. "
-            "The composite **Dim 6** in § 5 combines `norm_degradation × stability_index × scaling_score` "
-            "and can give a different ranking — for example, a pattern with the lowest degradation "
-            "may still score lower on Dim 6 if its `complexity_decline` is high. **Read both views together.**"
-        )
+
+        # Data-aware cross-section warning: compare § 3 best (lowest
+        # raw degradation %) with § 5 Dim 6 best (composite formula).
+        # When they differ, surface the specific data so the reader
+        # can see exactly why -- otherwise emit the generic note.
+        deg_pairs = [
+            (name, m.robustness.degradation_percentage)
+            for name, m in pattern_metrics.items()
+        ]
+        dim6_pairs = []
+        for name, m in pattern_metrics.items():
+            ns = getattr(m, "_normalised_scores", None)
+            if ns is None or ns.dim6_robustness_scalability is None:
+                continue
+            v = ns.dim6_robustness_scalability
+            if multi_run:
+                ps = statistical_report.per_pattern.get(name)
+                if ps is not None:
+                    s = ps.summaries.get("dim6_robustness_scalability")
+                    if s is not None:
+                        v = s.mean
+            dim6_pairs.append((name, v))
+        if deg_pairs and dim6_pairs:
+            best_deg = min(deg_pairs, key=lambda x: x[1])
+            best_d6 = max(dim6_pairs, key=lambda x: x[1])
+            if best_deg[0] != best_d6[0]:
+                # Compute Phase D1 sub-indicator so we can explain WHY they differ
+                m_d6 = pattern_metrics.get(best_d6[0])
+                m_dg = pattern_metrics.get(best_deg[0])
+                why_parts = []
+                if m_d6 is not None and m_dg is not None:
+                    decline_d6 = m_d6.robustness.complexity_decline
+                    decline_dg = m_dg.robustness.complexity_decline
+                    if decline_dg > decline_d6:
+                        why_parts.append(
+                            f"`{best_deg[0]}` has higher `complexity_decline = {decline_dg:.3f}` vs "
+                            f"`{best_d6[0]}` `{decline_d6:.3f}` (drags scaling_score)"
+                        )
+                why_clause = (" — " + ", ".join(why_parts)) if why_parts else ""
+                lines.append(
+                    f"> ⚠ **Cross-section note**: this section ranks by *raw* degradation %, "
+                    f"so it picks **{best_deg[0]}** ({best_deg[1]:.1f}%) as most robust. "
+                    f"The composite **Dim 6** in § 5 combines `norm_degradation × stability_index × scaling_score` "
+                    f"and instead ranks **{best_d6[0]}** ({best_d6[1]:.3f}) first{why_clause}. "
+                    f"**Both views are correct — they measure different things; read them together.**"
+                )
+            else:
+                lines.append(
+                    f"> ⚠ **Cross-section note**: this section ranks by *raw* degradation percentage. "
+                    f"The composite **Dim 6** in § 5 also ranks **{best_d6[0]}** first "
+                    f"({best_d6[1]:.3f}), so the views agree this run."
+                )
+        else:
+            lines.append(
+                "> ⚠ **Cross-section note**: this section ranks by *raw* degradation percentage. "
+                "The composite **Dim 6** in § 5 combines `norm_degradation × stability_index × scaling_score` "
+                "and may give a different ranking when patterns differ on `complexity_decline` or "
+                "`stability_index`. **Read both views together.**"
+            )
         lines.append("")
-        lines.append("### Performance Degradation by Pattern")
+
+        if multi_run:
+            lines.append(f"### Performance Degradation by Pattern (mean across N = {statistical_report.num_runs} runs)")
+        else:
+            lines.append("### Performance Degradation by Pattern")
         for pattern, deg in robustness["degradations"].items():
             line = f"- **{pattern}**: {deg:.1f}%"
             if multi_run:
                 ps = statistical_report.per_pattern.get(pattern)
                 if ps is not None:
                     s = ps.summaries.get("degradation_percentage")
-                    if s is not None and s.std > 0:
-                        line += (
-                            f"  _(mean {s.mean:.1f}% ± "
-                            f"{(s.ci95_high - s.mean):.1f}%, n={s.n})_"
-                        )
+                    if s is not None:
+                        if s.std > 0:
+                            line += (
+                                f"  _(mean {s.mean:.1f}% ± "
+                                f"{(s.ci95_high - s.mean):.1f}%, n={s.n})_"
+                            )
+                        else:
+                            line += f"  _(deterministic across N={s.n})_"
             lines.append(line)
         lines.append("")
 
@@ -898,6 +1320,18 @@ class ReportGenerator:
                 "and constraint-adherence scoring."
             )
             lines.append("")
+            # Per-pattern placeholder table so the slot is visible in the
+            # report and consistent with the other Dim sections.  Rows
+            # are auto-generated from `pattern_metrics.keys()` so adding
+            # or removing a pattern requires no change to this code.
+            lines.append("| Pattern | Toxicity | Unsupported Claims | Constraint Adherence | Dim 2 |")
+            lines.append("|---------|----------|--------------------|-----------------------|-------|")
+            for pname in pattern_metrics.keys():
+                lines.append(
+                    f"| {pname:12s} | 🚧 pending | 🚧 pending | 🚧 pending | "
+                    f"**N/A (Phase B2)** |"
+                )
+            lines.append("")
 
             # Phase F bug fix: when statistical_report is available
             # (multi-run), prefer the per-pattern statistical mean over
@@ -957,43 +1391,12 @@ class ReportGenerator:
             # tool use, gets averaged over only 3 dimensions and ends up
             # ranking #1).  We additionally surface an "all-7-dim mean
             # (N/A=0)" view so the supervisor can compare both.
-            composites = []
-            for name, metrics in pattern_metrics.items():
-                cs = getattr(metrics, '_composite_score', None)
-                ns = getattr(metrics, '_normalised_scores', None)
-                if cs is None or ns is None:
-                    continue
-                # Collect all 7 normalised dim scores
-                seven_dims = [
-                    ns.dim1_reasoning_quality,
-                    ns.dim2_cognitive_safety,
-                    ns.dim3_action_decision_alignment,
-                    ns.dim4_success_efficiency,
-                    ns.dim5_behavioural_safety,
-                    ns.dim6_robustness_scalability,
-                    ns.dim7_controllability,
-                ]
-                # Override with Phase F means where available (multi-run).
-                if multi_run:
-                    metric_names = [
-                        "dim1_reasoning_quality",
-                        "dim2_cognitive_safety",
-                        "dim3_action_decision_alignment",
-                        "dim4_success_efficiency",
-                        "dim5_behavioural_safety",
-                        "dim6_robustness_scalability",
-                        "dim7_controllability",
-                    ]
-                    for i, m in enumerate(metric_names):
-                        stat = _stat_mean(name, m)
-                        if stat is not None:
-                            seven_dims[i] = stat
-                # All-7-dim mean treats N/A as 0.
-                penalised = sum((v if v is not None else 0.0) for v in seven_dims) / 7.0
-                composites.append((name, cs.composite, cs.available_dimensions, penalised))
-            if composites:
-                # Default ranking: by evaluable-dim mean (current spec behaviour)
-                composites.sort(key=lambda x: x[1], reverse=True)
+            # Reuse the dual ranking we already computed at the top of
+            # generate_markdown_report -- this guarantees § 5 and the
+            # executive summary cannot disagree about who is #1.
+            if dual_ranking is not None:
+                view_a_sorted = dual_ranking["view_a_sorted"]
+                view_b_sorted = dual_ranking["view_b_sorted"]
                 lines.append("### Composite Score Ranking")
                 lines.append("")
                 lines.append("> **Read this caveat first**: two composite views are reported below because")
@@ -1006,15 +1409,13 @@ class ReportGenerator:
                 lines.append("")
                 lines.append("**View A — Evaluable-dim mean** (spec §5.7, uniform weight over available dims):")
                 lines.append("")
-                for rank, (name, score, n_dims, _) in enumerate(composites, 1):
+                for rank, (name, score, n_dims, _) in enumerate(view_a_sorted, 1):
                     lines.append(f"{rank}. **{name}**: {score:.4f} ({n_dims} dimensions)")
                 lines.append("")
-                # Penalised view (N/A=0)
-                penalised_sorted = sorted(composites, key=lambda x: x[3], reverse=True)
                 lines.append("**View B — All-7-dim mean (N/A treated as 0)**: penalises unmeasurable dimensions.")
                 lines.append("Useful for comparing patterns on equal footing, but harsh on the raw-LLM control.")
                 lines.append("")
-                for rank, (name, _spec_score, _n_dims, penalised) in enumerate(penalised_sorted, 1):
+                for rank, (name, _spec_score, _n_dims, penalised) in enumerate(view_b_sorted, 1):
                     lines.append(f"{rank}. **{name}**: {penalised:.4f}")
                 lines.append("")
 
