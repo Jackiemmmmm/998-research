@@ -10,7 +10,7 @@
 |-------|-------------|--------|-------------------|------------------------|
 | **A** | Unified Telemetry & Adapter Layer | **COMPLETED** | — | [PHASE_A_UNIFIED_TELEMETRY.md](./PHASE_A_UNIFIED_TELEMETRY.md) |
 | **B1** | Cognitive Layer — Reasoning Quality (Dim 1) | **COMPLETED** | [week5-6_phase-b1_reasoning-quality.md](./specs/week5-6_phase-b1_reasoning-quality.md) (P1 self-authored) | — (inline in `reasoning_quality.py`, `evaluator.py`, `scoring.py`, `metrics.py`) |
-| **B2** | Cognitive Layer — Cognitive Safety (Dim 2) | **COMPLETED** | [week5-6_phase-b2_cognitive-safety.md](./specs/week5-6_phase-b2_cognitive-safety.md) (P3, READY FOR IMPLEMENTATION) | [PHASE_B2_COGNITIVE_SAFETY.md](./PHASE_B2_COGNITIVE_SAFETY.md) |
+| **B2** | Cognitive Layer — Cognitive Safety (Dim 2) | **COMPLETED + N=3 VALIDATED** | [week5-6_phase-b2_cognitive-safety.md](./specs/week5-6_phase-b2_cognitive-safety.md) (P3 → P1, DONE 2026-05-08) | [PHASE_B2_COGNITIVE_SAFETY.md](./PHASE_B2_COGNITIVE_SAFETY.md) (§ 10 has N=3 live results 2026-05-09) |
 | **C1** | Action–Decision Alignment (Dim 3) | **COMPLETED** | — (P1 self-drives) | — (inline in evaluator.py, scoring.py) |
 | **C3** | Behavioural Safety (Dim 5) | **COMPLETED** | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) (P3) | — (inline in safety.py, evaluator.py, scoring.py) |
 | **D1** | Enhanced Robustness (Dim 6) | **COMPLETED** | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) (P2) | — (inline in evaluator.py, metrics.py, scoring.py) |
@@ -30,7 +30,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 | # | Dimension | Layer | Status | Completion | Phase A Impact |
 |---|-----------|-------|--------|------------|---------------|
 | 1 | Reasoning Quality | Cognitive | **B1 COMPLETED** | ~70% | Phase B1 completed (2026-05-03): ReasoningExtractor + ReasoningJudge (separate local LLM via `LLMConfig.get_judge_llm()`) + 4-sub-indicator weighted scoring + self-consistency hook for Phase F |
-| 2 | Cognitive Safety & Constraint Adherence | Cognitive | **B2 COMPLETED** | ~70% | Phase B2 completed (2026-05-04): LDNOOBW toxicity screen + output-only grounding (hallucination proxy) + numeric-drift / confident-but-wrong consistency + max_steps / forbidden_topics / required_tools constraint adherence; 3 new tasks (A5/B5/D5); 36 unit tests; suite size 16 → 19 |
+| 2 | Cognitive Safety & Constraint Adherence | Cognitive | **B2 COMPLETED + N=3 VALIDATED** | ~70% | Phase B2 completed (2026-05-04 impl, 2026-05-08 v2 task redesign, 2026-05-09 N=3 final run): LDNOOBW toxicity screen + output-only grounding (hallucination proxy) + numeric-drift / confident-but-wrong consistency + max_steps / forbidden_topics / required_tools constraint adherence; 3 new tasks (A5/B5/D5 v2); 36 unit tests; suite size 16 → 19. N=3 results: ReAct_Enhanced 0.957, ReAct 0.924, Baseline 0.911, Reflex 0.909, ToT 0.890, CoT 0.812. Dominant differentiator: `consistency_score` (CoT/ToT numeric drift). |
 | 3 | Action-Decision Alignment | Behavioural | **COMPLETED** | ~70% | AlignmentMetrics + verb-tool mapping + LCS sequence matching (2026-04-01) |
 | 4 | Success & Efficiency | Behavioural | PARTIALLY DONE | ~75% | Token accuracy improved; Reflex token tracking fixed (2026-03-12) |
 | 5 | Behavioural Safety | Behavioural | **COMPLETED** | ~70% | Phase C3 completed (2026-04-01): tool whitelist validation + domain safety regex + Dim5 scoring |
@@ -65,7 +65,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 
 ---
 
-#### Dimension 2: Cognitive Safety & Constraint Adherence (Cognitive) - 0%
+#### Dimension 2: Cognitive Safety & Constraint Adherence (Cognitive) - 0% → ~70%
 
 **Proposal requires:**
 - Automated lexical/semantic screening for toxicity or unsupported claims
@@ -73,11 +73,20 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 - Hallucination detection (proportion of traces with unverifiable claims)
 - Keyword-based anomaly detection as Stage 1 proxy
 
-**Current status:**
-- No toxicity/bias screening exists
-- No hallucination detection mechanism
-- No factual grounding verification
-- No safety-related evaluation metrics collected
+**Current status (DONE — Phase B2, 2026-05-04 implementation, 2026-05-09 N=3 final validation):**
+- ~~No toxicity/bias screening exists~~ **RESOLVED**: LDNOOBW (~400 EN keywords, CC-BY-4.0) word-bounded screen across THINK + OBSERVE + output segments
+- ~~No hallucination detection mechanism~~ **RESOLVED**: output-only `grounding_score` (unsupported numeric claims vs prompt + ground_truth + observations); Q4 Patch 1 surfaces `tasks_with_grounding_evidence` denominator; Q4 Patch 2 returns `None` below `MIN_GROUNDING_TASKS = 3` threshold
+- ~~No factual grounding verification~~ **RESOLVED via numeric proxy**: deterministic Stage-1 screener; LLM-as-judge factual grounding deferred to Stage 2
+- ~~No safety-related evaluation metrics collected~~ **RESOLVED**: 4 sub-indicators (toxicity / grounding / consistency / constraint_adherence) aggregated to Dim 2 score; integrated into composite ranking via Phase E
+- **Spec**: [week5-6_phase-b2_cognitive-safety.md](./specs/week5-6_phase-b2_cognitive-safety.md) (DONE 2026-05-08, post-implementation alignment 2026-05-08)
+- **Implementation doc**: [PHASE_B2_COGNITIVE_SAFETY.md](./PHASE_B2_COGNITIVE_SAFETY.md)
+- **Files**: `src/evaluation/cognitive_safety.py` (NEW), `src/evaluation/_resources/ldnoobw_en.txt` (NEW), `src/evaluation/metrics.py` (added `cognitive_safety` field to PatternMetrics), `src/evaluation/scoring.py` (`compute_dim2_scores`), `src/evaluation/evaluator.py` (`_collect_cognitive_safety_metrics`), `src/evaluation/judge.py` (new `lenient` mode for B5), `src/evaluation/test_suite.py` (3 new tasks A5/B5/D5; suite 16 → 19), `tests/unit_tests/test_cognitive_safety.py` (36 tests)
+- **N=3 final results (2026-05-09)**: Dim 2 produces meaningful scores for all 6 patterns (Baseline 0.911 / ReAct 0.924 / ReAct_Enhanced 0.957 / CoT 0.812 / Reflex 0.909 / ToT 0.890). The dominant differentiator is `consistency_score` (CoT 0.693, ToT 0.842 — numeric drift between THINK and output); `constraint_adherence` isolates ReAct (0.921 vs 1.000 elsewhere — ReAct's interleaved chain leaks forbidden topics). Phase F at temperature=0 produced `std=0.000` for 4 of 6 patterns — the framework is reproducible but does not capture stochastic variance under the current configuration
+
+**Stage 2 future work:**
+- LLM-as-judge subtle-toxicity classifier behind a feature flag
+- Non-numeric contradiction detection (NLI-style entity / attribution drift)
+- Seeded multi-run evaluation with temperature > 0 to capture true run-to-run variance
 
 ---
 

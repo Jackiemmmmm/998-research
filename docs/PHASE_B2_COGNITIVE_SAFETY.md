@@ -298,10 +298,11 @@ to Phase B2.)
 
 ## 9. Next steps
 
-- **Q5 follow-up**: regenerate the latest full evaluation report once
+- ~~**Q5 follow-up**: regenerate the latest full evaluation report once
   Ollama-driven multi-pattern runs converge so the composite ranking
   picks up Dim 2 across all 6 patterns (Baseline / ReAct /
-  ReAct_Enhanced / CoT / Reflex / ToT) at N = 3 runs each.
+  ReAct_Enhanced / CoT / Reflex / ToT) at N = 3 runs each.~~
+  **DONE 2026-05-09** — see § 10 below for the live N = 3 data.
 - **Stage 2 ideas (out of scope for B2)**:
   - Replace the LDNOOBW keyword screen with an LLM-as-judge classifier
     behind a feature flag for subtle-toxicity false-negative recovery.
@@ -309,3 +310,118 @@ to Phase B2.)
     (entity mismatch, attribution drift) with an NLI-style helper.
   - Evaluate `tea/water` perturbation handling in D5 to surface
     prompt-injection robustness on the cognitive surface.
+
+---
+
+## 10. Live N = 3 Results (2026-05-09)
+
+Final evaluation: **6 patterns × 19 tasks × 3 runs**, llama3.1 agent +
+qwen2.5:7b judge, `--robustness-once` cost control, total wall-clock
+**3 h 55 m**. Output: `reports/phase_b2_final_n3_2026-05-08/`.
+
+### 10.1 Run-level stability
+
+| Pattern | Dim 2 mean | Dim 2 std | Verdict |
+|---------|------------|-----------|---------|
+| Baseline | 0.911 | 0.0000 | DETERMINISTIC across 3 runs |
+| ReAct | 0.924 | 0.0060 | small variance (constraint-violation churn) |
+| ReAct_Enhanced | 0.957 | 0.0000 | DETERMINISTIC |
+| CoT | 0.812 | 0.0000 | DETERMINISTIC |
+| Reflex | 0.909 | 0.0000 | DETERMINISTIC |
+| ToT | 0.890 | 0.0038 | small variance (ToT tree expansion) |
+
+**Key Phase F finding**: under llama3.1 + temperature = 0, the framework
+is **near-deterministic**. 4 of 6 patterns produce identical Dim 2
+scores across all 3 runs. Phase F therefore confirmed reproducibility
+rather than capturing stochastic variance — `metadata.seed = None` and
+the report carries the spec-mandated `small-variance inflation` caveat
+on pairwise Cohen's d (most are ±999.0 placeholders due to zero pooled
+std). To capture true run-to-run variance for Stage 2, future runs
+should set `EVAL_SEED` per run AND/OR enable temperature > 0 on agent
+calls.
+
+### 10.2 Dim 2 sub-indicator breakdown (run 3, representative)
+
+| Pattern | Tox | Ground | n(g) | Cons | Constr | Dim 2 | Constraint flags |
+|---------|-----|--------|------|------|--------|-------|------------------|
+| Baseline | 1.000 | 0.645 | 12 | 1.000 | **1.000** | 0.911 | (none) |
+| ReAct | **0.982** | 0.777 | 14 | 1.000 | **0.921** | 0.920 | server, internet, water + LDNOOBW `hardcore` (in tool result) |
+| ReAct_Enhanced | 1.000 | 0.829 | 11 | 1.000 | 1.000 | **0.957** | (none) |
+| CoT | 1.000 | 0.555 | 13 | **0.693** | 1.000 | 0.812 | (none — drops are consistency-driven) |
+| Reflex | 1.000 | 0.637 | 12 | 1.000 | 1.000 | 0.909 | (none) |
+| ToT | 1.000 | 0.730 | 12 | 0.842 | 1.000 | 0.890 | (none — drops are consistency-driven) |
+
+**Two real differentiators surfaced**:
+- **Constraint adherence** isolates ReAct (0.921 vs 1.000 for everyone
+  else). ReAct's interleaved THINK / ACT chain produces enough verbose
+  intermediate text to leak `server` + `internet` (A5) and `water` (D5).
+  Other patterns either follow the constraint (CoT, ReAct_Enhanced) or
+  stay terse enough to avoid the trap honestly (Baseline, Reflex, ToT).
+- **Consistency** isolates CoT (0.693) and ToT (0.842). Verbose chains
+  produce more numeric drift between THINK conclusions and final
+  outputs. This signal is independent of the new A5 / B5 / D5 tasks
+  and is the most stable Dim 2 differentiator across runs.
+
+**Q6 design validated** — ReAct's toxicity score 0.982 (one
+LDNOOBW `"hardcore"` hit) came from a **tool-result** content
+(web-search blog title), not the agent's own text. This confirms
+that scanning OBSERVE step content for toxicity is meaningful.
+
+### 10.3 Composite ranking (mean of N = 3)
+
+**View A** (evaluable-dim mean — spec § 5.7, uniform weight over
+available dims; favours patterns with more N/A dims):
+
+1. Baseline 0.873 (5 dims)
+2. Reflex 0.848 (6 dims)
+3. ReAct 0.839 (6 dims)
+4. ToT 0.788 (6 dims)
+5. ReAct_Enhanced 0.771 (6 dims)
+6. CoT 0.704 (7 dims — only fully-evaluable pattern)
+
+**View B** (all-7-dim mean, N/A = 0):
+
+1. Reflex 0.727
+2. ReAct 0.718
+3. CoT 0.704
+4. ToT 0.679
+5. ReAct_Enhanced 0.661
+6. Baseline 0.624
+
+The two views give different #1s (Baseline vs Reflex) — exactly the
+caveat the spec calls out: a single composite cannot capture
+"unmeasurable on a dim" vs "fails the dim". The final report must
+present both.
+
+### 10.4 Honest caveats for the final report
+
+1. **Phase F effectively confirms determinism, not statistical
+   variance.** Under llama3.1 + temperature = 0, runs are
+   reproducible bit-for-bit on most metrics. The mean ± 95 % CI
+   table reports `± 0.000` for 4 of 6 patterns. Pairwise Cohen's d
+   on composite is dominated by ±999.0 placeholders. Read these as
+   **point-estimate confirmation**, not as stochastic-variance
+   bounds. Future work should enable seeded-but-temperature-bumped
+   runs to surface real run-to-run variance.
+2. **Dim 2 `constraint_adherence` has limited cross-pattern
+   resolution under llama3.1.** The model is genuinely competent at
+   single-word negative constraints; only ReAct's interleaved
+   ACT-loops produce enough text to leak forbidden tokens. This is
+   itself a research finding (architectural verbosity → leakage
+   propensity), not a metric failure.
+3. **The dominant Dim 2 signal is `consistency_score`.** It captures
+   numeric drift between THINK and output, isolates CoT (0.693) and
+   ToT (0.842), and is robust to the choice of forbidden-topic
+   tasks. The forbidden-topic axis is a secondary differentiator
+   that catches one pattern (ReAct) per run.
+4. **Composite View A favours Baseline by giving it credit for
+   missing dims (Dim 1 N/A, Dim 3 N/A).** View B exposes the gap.
+   The supervisor demo should show both rankings.
+
+### 10.5 Phase B2 status
+
+Phase B2 is **DONE for the project's purposes**. The framework is
+correct, deterministic, integrated end-to-end across all reports,
+and the new Dim 2 column populates a meaningful signal for the
+final report. No further code changes scheduled before Week 7-8
+data-collection wave.
