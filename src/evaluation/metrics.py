@@ -358,6 +358,12 @@ class PatternMetrics:
     safety: BehaviouralSafetyMetrics = field(default_factory=BehaviouralSafetyMetrics)
     cognitive: CognitiveMetrics = field(default_factory=CognitiveMetrics)
 
+    # Phase B2: cognitive safety (Dim 2). Typed `Any` to keep this module
+    # free of an import cycle with `cognitive_safety.py`. Populated by
+    # PatternEvaluator._collect_cognitive_safety_metrics; consumed by
+    # scoring.compute_dim2_scores via `getattr(m, 'cognitive_safety')`.
+    cognitive_safety: Any = None  # Optional[CognitiveSafetyMetrics]
+
     # Phase D2: extended controllability result (set after cross-pattern computation)
     controllability_result: Any = None  # Optional[ControllabilityResult], avoid circular import
 
@@ -373,6 +379,8 @@ class PatternMetrics:
             "safety": self.safety.to_dict(),
             "cognitive": self.cognitive.to_dict(),
         }
+        if self.cognitive_safety is not None:
+            d["cognitive_safety"] = self.cognitive_safety.to_dict()
         if self.controllability_result is not None:
             d["controllability_extended"] = self.controllability_result.to_dict()
         return d
@@ -396,6 +404,10 @@ class PatternMetrics:
             s["trace_completeness"] = round(self.controllability_result.trace_completeness, 3)
             s["policy_flag_rate"] = round(self.controllability_result.policy_flag_rate, 3)
             s["resource_efficiency"] = round(self.controllability_result.resource_efficiency, 3)
+        if self.cognitive_safety is not None:
+            s["cognitive_safety"] = round(
+                self.cognitive_safety.overall_cognitive_safety(), 3
+            )
         return s
 
 

@@ -529,6 +529,7 @@ class EvaluationVisualizer:
 
         dim_keys = [
             ('dim1_reasoning_quality', 'Dim 1\nReasoning'),
+            ('dim2_cognitive_safety', 'Dim 2\nCog Safety'),
             ('dim3_action_decision_alignment', 'Dim 3\nAlignment'),
             ('dim4_success_efficiency', 'Dim 4\nSuccess'),
             ('dim5_behavioural_safety', 'Dim 5\nSafety'),

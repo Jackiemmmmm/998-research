@@ -45,6 +45,16 @@ class Judge:
             return Judge._judge_json(output, ground_truth, judge_config, schema, lenient=lenient)
         elif mode == "regex":
             return Judge._judge_regex(output, judge_config)
+        elif mode == "lenient":
+            # Phase B2: numeric-tolerant judge for tasks like B5 where
+            # the ground truth is a signed number and we want to accept
+            # surface variants like "-3.0", "−3" (Unicode U+2212),
+            # "the answer is -3", etc. The key difference from exact +
+            # lenient is: this mode normalises Unicode minus to ASCII
+            # before extracting/comparing the *last* signed numeric
+            # token in the output, instead of trusting the model to
+            # emit a clean string.
+            return Judge._judge_lenient_numeric(output, ground_truth)
         else:
             return False, f"Unknown judge mode: {mode}"
 
@@ -298,6 +308,72 @@ class Judge:
                 return False, f"Regex mismatch: pattern '{pattern}' not found in '{output}'"
         except re.error as e:
             return False, f"Regex error: {str(e)}"
+
+    @staticmethod
+    def _judge_lenient_numeric(output: str, ground_truth: Any) -> Tuple[bool, str]:
+        """Lenient numeric judge -- extract last signed number, compare.
+
+        Used by Phase B2 tasks (e.g. B5 ``"5 - 8"`` with ground truth
+        ``"-3"``) where the model may answer with surface variants like
+        ``"-3.0"``, ``"−3"`` (U+2212 minus), or ``"the answer is -3"``.
+
+        Algorithm:
+            1. Normalise Unicode minus signs (U+2212, U+FE63, U+FF0D)
+               to ASCII ``-`` in both output and ground truth.
+            2. Parse ground truth as a float; bail to a string compare
+               if it isn't numeric.
+            3. Extract the *last* signed integer/float token from the
+               output (last because trailing numbers are usually the
+               final answer in conversational replies).
+            4. Compare with absolute tolerance ``1e-6``.
+        """
+        if output is None:
+            return False, "Lenient: output is None"
+        if not isinstance(output, str):
+            output = str(output)
+
+        # Normalise common non-ASCII minus signs.
+        UNICODE_MINUS = {
+            "−": "-",   # MINUS SIGN
+            "‐": "-",   # HYPHEN
+            "‑": "-",   # NON-BREAKING HYPHEN
+            "–": "-",   # EN DASH
+            "—": "-",   # EM DASH
+            "﹣": "-",   # SMALL HYPHEN-MINUS
+            "－": "-",   # FULLWIDTH HYPHEN-MINUS
+        }
+        out_norm = output
+        for ch, repl in UNICODE_MINUS.items():
+            out_norm = out_norm.replace(ch, repl)
+
+        gt_str = str(ground_truth).strip() if ground_truth is not None else ""
+        for ch, repl in UNICODE_MINUS.items():
+            gt_str = gt_str.replace(ch, repl)
+
+        try:
+            gt_val = float(gt_str)
+        except (ValueError, TypeError):
+            # Fall back to case-insensitive substring match.
+            return Judge._judge_exact(out_norm, gt_str, lenient=True)
+
+        # Find every signed number; pick the last one as the final answer.
+        nums = re.findall(r"-?\d+(?:\.\d+)?", out_norm)
+        if not nums:
+            return False, f"Lenient: no numeric token in '{output[:80]}'"
+        try:
+            candidate = float(nums[-1])
+        except ValueError:  # pragma: no cover - regex guarantees float
+            return False, f"Lenient: could not parse '{nums[-1]}'"
+
+        if abs(candidate - gt_val) <= 1e-6:
+            return True, (
+                f"Lenient match: {candidate} == {gt_val} "
+                f"(extracted from '{output[:60]}')"
+            )
+        return False, (
+            f"Lenient mismatch: extracted {candidate}, "
+            f"expected {gt_val} from '{output[:60]}'"
+        )
 
     @staticmethod
     def _extract_and_parse_json(text: str) -> Any:

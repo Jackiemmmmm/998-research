@@ -10,7 +10,7 @@
 |-------|-------------|--------|-------------------|------------------------|
 | **A** | Unified Telemetry & Adapter Layer | **COMPLETED** | — | [PHASE_A_UNIFIED_TELEMETRY.md](./PHASE_A_UNIFIED_TELEMETRY.md) |
 | **B1** | Cognitive Layer — Reasoning Quality (Dim 1) | **COMPLETED** | [week5-6_phase-b1_reasoning-quality.md](./specs/week5-6_phase-b1_reasoning-quality.md) (P1 self-authored) | — (inline in `reasoning_quality.py`, `evaluator.py`, `scoring.py`, `metrics.py`) |
-| **B2** | Cognitive Layer — Cognitive Safety (Dim 2) | NOT STARTED | [week5-6_phase-b2_cognitive-safety.md](./specs/week5-6_phase-b2_cognitive-safety.md) (P3, PENDING) | — |
+| **B2** | Cognitive Layer — Cognitive Safety (Dim 2) | **COMPLETED** | [week5-6_phase-b2_cognitive-safety.md](./specs/week5-6_phase-b2_cognitive-safety.md) (P3, READY FOR IMPLEMENTATION) | [PHASE_B2_COGNITIVE_SAFETY.md](./PHASE_B2_COGNITIVE_SAFETY.md) |
 | **C1** | Action–Decision Alignment (Dim 3) | **COMPLETED** | — (P1 self-drives) | — (inline in evaluator.py, scoring.py) |
 | **C3** | Behavioural Safety (Dim 5) | **COMPLETED** | [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) (P3) | — (inline in safety.py, evaluator.py, scoring.py) |
 | **D1** | Enhanced Robustness (Dim 6) | **COMPLETED** | [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) (P2) | — (inline in evaluator.py, metrics.py, scoring.py) |
@@ -30,7 +30,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 | # | Dimension | Layer | Status | Completion | Phase A Impact |
 |---|-----------|-------|--------|------------|---------------|
 | 1 | Reasoning Quality | Cognitive | **B1 COMPLETED** | ~70% | Phase B1 completed (2026-05-03): ReasoningExtractor + ReasoningJudge (separate local LLM via `LLMConfig.get_judge_llm()`) + 4-sub-indicator weighted scoring + self-consistency hook for Phase F |
-| 2 | Cognitive Safety & Constraint Adherence | Cognitive | NOT IMPLEMENTED | 0% | Trace foundation ready |
+| 2 | Cognitive Safety & Constraint Adherence | Cognitive | **B2 COMPLETED** | ~70% | Phase B2 completed (2026-05-04): LDNOOBW toxicity screen + output-only grounding (hallucination proxy) + numeric-drift / confident-but-wrong consistency + max_steps / forbidden_topics / required_tools constraint adherence; 3 new tasks (A5/B5/D5); 36 unit tests; suite size 16 → 19 |
 | 3 | Action-Decision Alignment | Behavioural | **COMPLETED** | ~70% | AlignmentMetrics + verb-tool mapping + LCS sequence matching (2026-04-01) |
 | 4 | Success & Efficiency | Behavioural | PARTIALLY DONE | ~75% | Token accuracy improved; Reflex token tracking fixed (2026-03-12) |
 | 5 | Behavioural Safety | Behavioural | **COMPLETED** | ~70% | Phase C3 completed (2026-04-01): tool whitelist validation + domain safety regex + Dim5 scoring |

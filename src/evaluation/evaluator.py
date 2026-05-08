@@ -27,6 +27,10 @@ from .reasoning_quality import (
     aggregate_cognitive_metrics,
     compute_task_reasoning_quality,
 )
+from .cognitive_safety import (
+    CognitiveSafetyScreener,
+    aggregate_cognitive_safety_metrics,
+)
 from .safety import check_tool_compliance, check_content_safety, compute_task_safety
 from .trace import AgentTrace, TraceExtractor
 from .test_suite import TEST_SUITE, TestTask
@@ -159,6 +163,9 @@ class PatternEvaluator:
         self._collect_alignment_metrics(metrics.alignment, original_results, test_tasks)
         self._collect_safety_metrics(metrics.safety, original_results, test_tasks)
         await self._collect_cognitive_metrics(
+            metrics, original_results, test_tasks
+        )
+        self._collect_cognitive_safety_metrics(
             metrics, original_results, test_tasks
         )
 
@@ -941,6 +948,46 @@ class PatternEvaluator:
         metrics._task_outputs_for_run = {
             r.task_id: r.output for r in results if r.output
         }
+
+    def _collect_cognitive_safety_metrics(
+        self,
+        metrics: PatternMetrics,
+        results: List[TaskResult],
+        tasks: List[TestTask],
+    ):
+        """Collect Dim 2 -- Cognitive Safety & Constraint Adherence.
+
+        Runs the deterministic ``CognitiveSafetyScreener`` over each
+        successful task result, then aggregates per-pattern via
+        ``aggregate_cognitive_safety_metrics``.  The aggregator handles
+        the Q4 None-grounding renormalisation and the
+        ``MIN_GROUNDING_TASKS`` threshold internally, so this method is
+        a thin wiring layer.
+
+        Failed tasks (``result.success == False``) are excluded from
+        scoring -- there is no signal to evaluate cognitive safety on a
+        non-result. ``total_tasks`` is reported for the full task list
+        so the report layer can show the failure rate alongside the
+        screener's denominator.
+
+        Spec: ``docs/specs/week5-6_phase-b2_cognitive-safety.md`` § 4.6.
+        """
+        task_lookup = {t.id: t for t in tasks}
+        screener = CognitiveSafetyScreener()
+
+        per_task = []
+        for result in results:
+            if not result.success:
+                continue
+            task = task_lookup.get(result.task_id)
+            if task is None:
+                continue
+            per_task.append(screener.screen_task(task, result))
+
+        aggregated = aggregate_cognitive_safety_metrics(
+            per_task, total_tasks=len(results)
+        )
+        metrics.cognitive_safety = aggregated
 
 
 def _compute_success_by_complexity(

@@ -23,9 +23,22 @@ from .reasoning_quality import (
     compute_task_reasoning_quality,
     inject_self_consistency_scores,
 )
+from .cognitive_safety import (
+    MIN_GROUNDING_TASKS,
+    CognitiveSafetyMetrics,
+    CognitiveSafetyResult,
+    CognitiveSafetyScreener,
+    FlaggedSegment,
+    aggregate_cognitive_safety_metrics,
+)
 from .report_generator import ReportGenerator
 from .safety import check_content_safety, check_tool_compliance, compute_task_safety
-from .scoring import CompositeScore, NormalizedDimensionScores, compute_dim1_scores
+from .scoring import (
+    CompositeScore,
+    NormalizedDimensionScores,
+    compute_dim1_scores,
+    compute_dim2_scores,
+)
 from .statistics import (
     PAIRWISE_EFFECT_SIZE_METRICS,
     T_CRITICAL_95,
@@ -64,7 +77,15 @@ __all__ = [
     "compute_task_safety",
     "compute_task_reasoning_quality",
     "compute_dim1_scores",
+    "compute_dim2_scores",
     "inject_self_consistency_scores",
+    # Phase B2 -- cognitive safety
+    "FlaggedSegment",
+    "CognitiveSafetyResult",
+    "CognitiveSafetyMetrics",
+    "CognitiveSafetyScreener",
+    "MIN_GROUNDING_TASKS",
+    "aggregate_cognitive_safety_metrics",
     "NormalizedDimensionScores",
     "CompositeScore",
     # Phase F — statistical rigor
