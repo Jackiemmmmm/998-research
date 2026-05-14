@@ -448,7 +448,7 @@ The fix has three parts: (a) prompts force multi-sentence output, (b) judges req
 
 | Member | Task | Details | Deliverable |
 |--------|------|---------|-------------|
-| P1 | Full experiment execution | Run 4 patterns × 16 tasks × 3–5 repeats; handle runtime bugs and edge cases; collect raw data; ensure reproducibility | Complete raw result dataset (JSON) |
+| P1 | Full experiment execution | Run **6 patterns × 19 tasks × 3 runs** (exceeded the original 4 × 16 × 3–5 scope after Phase B2 added the cognitive-safety patterns + A5/B5/D5 forbidden-topics tasks); handle runtime bugs and edge cases; collect raw data; ensure reproducibility | Complete raw result dataset (JSON) |
 | P2 | Sensitivity analysis + cross-comparison | Analyse weight variation impact on composite scores; cross-dimension analysis (e.g. reasoning depth vs efficiency trade-off); identify strengths/weaknesses per pattern | Sensitivity analysis results + trade-off analysis |
 | P3 | [Phase G](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-g-final-report--visualization-polish): Visualisation upgrade | 7-dimension radar chart; per-pattern success heatmap; trade-off scatter plot; robustness degradation bar chart; statistical significance annotations; export all figures | Complete figure set in `reports/figures/` |
 
@@ -488,7 +488,9 @@ The fix has three parts: (a) prompts force multi-sentence output, (b) judges req
 
 **Files**: `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md` (full report + reviewer patches).
 
-#### P3 Progress Log (2026-05-14, Week 7-8 P3 completion + reviewer pass) - write by P1 Yucheng Tu
+#### P3 Progress Log (2026-05-14, Week 7-8 P3 completion + reviewer pass) — written by P1 Yucheng Tu (covering for P3)
+
+**Authorship note**: This Progress Log and the underlying reviewer-pass patches (scatter plots, JSON adapter, full figure regeneration) were authored and executed by P1 (Yucheng Tu) on P3's behalf to keep the Week 7-8 deliverable on schedule; the original P3 owner remains responsible for the Week 9 follow-up items listed below.
 
 **Status**: ✅ All core P3 deliverables complete; reviewer-pass patches applied 2026-05-14 (added missing scatter plots; regenerated full figure set against the 2026-05-08 N=3 final dataset).
 
@@ -508,7 +510,7 @@ The fix has three parts: (a) prompts force multi-sentence output, (b) judges req
 
 **Upstream link**: Figures sourced from P1's N=3 final dataset (`reports/phase_b2_final_n3_2026-05-08/`); spot-checks confirm data alignment (radar 7 axes × 6 patterns; heatmap CoT Dim1 = 0.817 matches JSON; scatter values cross-validated against `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md` §§ 5.1 / 5.3).
 
-**Open follow-ups (non-blocking, deferred to Week 9)**: regenerate `composite_ci.png` via a `StatisticalReport` pathway (current JSON-only adapter cannot reconstruct it — existing 2026-05-09 version retained meanwhile); per-figure p-value asterisk overlays for the success-rate / robustness charts.
+**Open follow-ups (non-blocking, deferred to Week 9)**: regenerate `composite_ci.png` via a `StatisticalReport` pathway (current JSON-only adapter cannot reconstruct it — `reports/figures/composite_ci.png` therefore remains the **2026-05-04** version; the dataset-mirror copy at `reports/phase_b2_final_n3_2026-05-08/figures/composite_ci.png` is dated 2026-05-09 and reflects the N=3 run); per-figure p-value asterisk overlays for the success-rate / robustness charts.
 
 **Files**: `src/evaluation/visualization.py` (scatter plots + JSON adapter + CLI), `reports/figures/*.png` (10 PNGs regenerated/new), `reports/phase_b2_final_n3_2026-05-08/figures/` (mirror).
 
@@ -521,8 +523,8 @@ The fix has three parts: (a) prompts force multi-sentence output, (b) judges req
 | Member | Task | Details | Deliverable |
 |--------|------|---------|-------------|
 | P1 | Demo preparation | Prepare LangGraph Studio demonstration — show each agent's think→act→observe workflow; prepare comparison demo script (same task across 4 patterns); record/screenshot key workflows | Demo script + presentation materials |
-| P2 | Report: Results & Analysis | Write experimental results chapter; comparative analysis of all patterns across 7 dimensions; trade-off discussion (corresponding to [Proposal § 3.1](../Group-1.pdf) and [§ 3.4](../Group-1.pdf)); statistical data tables | Report core chapter |
-| P3 | Report: Methodology + Visualisation | Write methodology chapter (evaluation framework description, corresponding to [Proposal § 2](../Group-1.pdf)); embed visualisation results; compile evaluation guide (corresponding to [Proposal § 3.3](../Group-1.pdf)) | Report methodology chapter |
+| P2 | Report: Results & Analysis + W7-8 follow-ups | Write experimental results chapter; comparative analysis of all patterns across 7 dimensions; trade-off discussion (corresponding to [Proposal § 3.1](../Group-1.pdf) and [§ 3.4](../Group-1.pdf)); statistical data tables. **W7-8 deferred items** (logged in P2 Progress Log of 2026-05-14): (a) automated sensitivity script; (b) weight-scenario × pattern-rank heatmap; (c) ReAct_Enhanced redundant-tool-call diagnostic with execution-log citations; (d) per-task ±σ tables in `WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md` §§ 5.1–5.4 | Report core chapter + 4 deferred deliverables landed |
+| P3 | Report: Methodology + Visualisation + W7-8 follow-ups | Write methodology chapter (evaluation framework description, corresponding to [Proposal § 2](../Group-1.pdf)); embed visualisation results; compile evaluation guide (corresponding to [Proposal § 3.3](../Group-1.pdf)). **W7-8 deferred items** (logged in P3 Progress Log of 2026-05-14): (a) regenerate `composite_ci.png` via `StatisticalReport` pathway so `reports/figures/composite_ci.png` reflects the N=3 dataset (currently still the 2026-05-04 version); (b) per-figure p-value asterisk overlays on success-rate / robustness charts | Report methodology chapter + 2 deferred figure items landed |
 
 ---
 

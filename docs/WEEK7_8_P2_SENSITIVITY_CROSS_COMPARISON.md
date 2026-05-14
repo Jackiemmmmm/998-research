@@ -16,7 +16,9 @@ This document completes the Week 7-8 P2 task:
 
 The current evaluation pipeline already computes normalized dimension scores in `src/evaluation/scoring.py` and reports multi-run statistics in `src/evaluation/statistics.py` / `reports/evaluation_results.json`. This analysis uses those outputs rather than introducing a separate metric system.
 
-Important scope note: **Dimension 2 - Cognitive Safety & Constraint Adherence is not implemented yet**. The current comparison therefore covers the six implemented/evaluable dimensions:
+Important scope note: **the primary snapshot CSV used by §§ 3–5 below pre-dates the Phase B2 N=3 final run** and therefore tabulates only six dimensions (Dim 1, 3, 4, 5, 6, 7). Dimension 2 — Cognitive Safety & Constraint Adherence — has since been **fully implemented and evaluated** in Phase B2 (final N=3 run on 2026-05-08; per-pattern means recorded in `docs/PHASE_B2_COGNITIVE_SAFETY.md` § 10.1). The all-7 integration of those Dim 2 values is shown in § 4.2 / S1'' below.
+
+Six dimensions covered by the primary snapshot:
 
 - Dim 1: Reasoning Quality
 - Dim 3: Action-Decision Alignment
@@ -24,6 +26,8 @@ Important scope note: **Dimension 2 - Cognitive Safety & Constraint Adherence is
 - Dim 5: Behavioural Safety
 - Dim 6: Robustness & Scalability
 - Dim 7: Controllability, Transparency & Resource Efficiency
+
+Dimension 2 (cognitive safety) is integrated separately in § 4.2 / S1'' using the Phase B2 N=3 dataset.
 
 ## 2. Repository-Aligned Scoring Assumptions
 
@@ -112,7 +116,7 @@ Interpretation: Baseline wins because it is strong on the dimensions it can be e
 
 Interpretation: once non-evaluable dimensions are penalized, Baseline drops from first to last. Reflex and ReAct become the most balanced choices across the implemented dimensions. CoT also improves relative to the default ranking because it has broad dimensional coverage even though its efficiency is weak.
 
-If the currently missing Dim2 is also treated as zero for all patterns, every score above is scaled by `6/7` and the rank order remains the same. This matches the "all-7" caveat in the generated evaluation report.
+If Dim 2 were treated as zero for all patterns (worst-case bound, used here only as a baseline for comparison **before** integrating the Phase B2 results), every score above would be scaled by `6/7` and the rank order would remain the same. This matches the "all-7" caveat in the generated evaluation report. The S1'' table below substitutes the **actual** Phase B2 N=3 Dim 2 means in place of this worst-case 0.
 
 ##### S1' - All-7 Dimensions: worst-case (Dim 2 = 0) vs Phase B2 actual
 
@@ -414,7 +418,7 @@ This should be reported as an evaluation-design finding rather than a bug. It sh
 
 ## 8. Next Analysis Steps
 
-1. Add Phase B2 / Dim2 once implemented, then re-run this sensitivity analysis with all seven dimensions.
+1. ~~Add Phase B2 / Dim2 once implemented, then re-run this sensitivity analysis with all seven dimensions.~~ ✅ **Completed 2026-05-14** — see § 4.2 / S1'' for the all-7 projection using actual Phase B2 N=3 Dim 2 means (`docs/PHASE_B2_COGNITIVE_SAFETY.md` § 10.1).
 2. Add an automated sensitivity script or report section that recomputes the scenario table from `comparison_table.csv`.
 3. Add a heatmap for weight scenarios vs pattern ranks in `reports/figures/`.
 4. Extend Dim7 interpretation by separating token efficiency from wall-clock latency, since ToT is token-efficient but slow.
