@@ -469,6 +469,25 @@ The fix has three parts: (a) prompts force multi-sentence output, (b) judges req
 
 **Files**: `reports/phase_b2_final_n3_2026-05-08/` (raw JSON), `src/evaluation/test_suite.py` (A5/B5/D5 v2), `docs/PHASE_B2_COGNITIVE_SAFETY.md` (§ 10), `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md` (downstream).
 
+#### P2 Progress Log (2026-05-14, Week 7-8 P2 completion + reviewer pass)
+
+**Status**: ✅ All P2 deliverables complete; reviewer-pass patches applied 2026-05-14.
+
+| Sub-task (per row above) | Status | Evidence |
+|--------------------------|--------|----------|
+| Weight-variation sensitivity analysis | ✅ S0–S5 (6 weighting scenarios) with full 6-pattern rankings + interpretation | `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md` § 4 |
+| Cross-dimension trade-off analysis | ✅ Reasoning vs efficiency; tool alignment vs cost; robustness vs raw success; controllability/transparency | `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md` §§ 5.1–5.4 |
+| Per-pattern strengths/weaknesses + best use-case | ✅ All 6 patterns covered (Baseline, ReAct, ReAct_Enhanced, CoT, Reflex, ToT) | `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md` § 6 |
+| Reviewer-pass patches (2026-05-14) | ✅ Upstream dataset traceability; Baseline renormalization worked example; S1' / S1'' all-7 projection using PHASE_B2 actual Dim 2 means; § 5 variance methodology note | `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md` header + §§ 4.1, 4.2, 5 |
+
+**Upstream link**: Consumes P1's N=3 dataset at `reports/phase_b2_final_n3_2026-05-08/` (now explicitly cited in the report header); weight-scenario semantics aligned with `compute_composite()` in `src/evaluation/scoring.py`.
+
+**Key finding (new from reviewer pass)**: substituting **actual** Phase B2 Dim 2 means for the worst-case 0 in the all-7 projection **preserves rank order** (Reflex 1st, Baseline 6th); ReAct_Enhanced gains the most absolute lift (+0.137) but does not overtake CoT/ToT. Re-ordering would require Dim 2 spread > 0.4 across patterns, which is not observed in the N=3 run.
+
+**Open follow-ups (non-blocking, deferred to Week 9)**: automated sensitivity script; weight-scenario × pattern-rank heatmap; ReAct_Enhanced redundant-tool-call diagnostic with execution-log citations; per-task ±σ tables in §§ 5.1–5.4.
+
+**Files**: `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md` (full report + reviewer patches).
+
 ---
 
 ### Week 9: Demo Preparation + Report Writing

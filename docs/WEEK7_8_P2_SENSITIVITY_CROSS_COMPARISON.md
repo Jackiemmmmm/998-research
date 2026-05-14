@@ -3,8 +3,10 @@
 > Phase alignment: **Phase 3: Evaluation**  
 > Owner: **P2 - Yiming Wang**  
 > Source data: `reports/comparison_table.csv`, `reports/evaluation_results.json`  
-> Generated against current repository state after Phase B1, Phase C1/C3, Phase D1, Phase E, and Phase F.
-> Reporting basis: this appendix primarily uses the latest single-run snapshot in `reports/comparison_table.csv`; Phase F multi-run means are used in the Week 9 results chapter.
+> Upstream dataset: P1 final N=3 run at `reports/phase_b2_final_n3_2026-05-08/` (generated 2026-05-08, 6 patterns × 19 tasks × 3 runs, 3 h 55 m wall-clock; see `docs/PHASE_B2_COGNITIVE_SAFETY.md` § 10 and `10_WEEK_PROJECT_PLAN_EN.md` Week 5-6 P1 Progress Log of 2026-05-09).  
+> Generated against current repository state after Phase B1, Phase C1/C3, Phase D1, Phase E, and Phase F.  
+> Reporting basis: this appendix primarily uses the latest single-run snapshot in `reports/comparison_table.csv` (run 3 of the 2026-05-08 dataset); Phase F multi-run means (3 runs, llama3.1 + temperature=0) are used in the Week 9 results chapter.  
+> Last reviewer pass: 2026-05-14 — added renormalization worked example (§ 4.1), explicit Dim 2 = 0 vs actual-Dim 2 projection (§ 4.2 / S1'), and multi-run variance methodology note (§ 5).
 
 ## 1. Purpose
 
@@ -70,6 +72,18 @@ Key implication: the current composite score is not a single neutral "best agent
 
 The custom scenarios use the same mathematical behaviour as `compute_composite()`: weights are renormalized over available dimensions only.
 
+#### Worked example: weight renormalization impact
+
+Take **Baseline** as the demonstration case (only Dim4, Dim5, Dim6, Dim7 are evaluable; Dim1 and Dim3 are N/A):
+
+| Scenario | Calculation | Composite |
+|---|---|---:|
+| **S0** (evaluable-mean, code-aligned) | `(0.938 + 1.000 + 0.774 + 0.688) / 4` | **0.850** |
+| **S1** (fair all-6, N/A = 0) | `(0 + 0 + 0.938 + 1.000 + 0.774 + 0.688) / 6` | **0.567** |
+| **S2** (cognitive-heavy, code-aligned) | weights `{D4:0.15, D5:0.10, D6:0.15, D7:0.15}` renormalized to sum=1 → `0.273·0.938 + 0.182·1.000 + 0.273·0.774 + 0.273·0.688` | **0.836** |
+
+This is precisely why Baseline drops from rank 1 (S0) to rank 6 (S1) and remains high in S2: under S0/S2 the missing Dim1/Dim3 are simply excluded from the denominator (so the available 4 dims carry full weight); under S1 they contribute 0 to the numerator while the denominator stays at 6. Patterns with broader dimensional coverage (CoT covers all 6, Reflex covers 5) are penalized least by the S0→S1 transition because they have fewer N/A entries to be zeroed out.
+
 ### 4.2 Ranking Results
 
 #### S0 - Current Code: Evaluable-Dimension Mean
@@ -99,6 +113,37 @@ Interpretation: Baseline wins because it is strong on the dimensions it can be e
 Interpretation: once non-evaluable dimensions are penalized, Baseline drops from first to last. Reflex and ReAct become the most balanced choices across the implemented dimensions. CoT also improves relative to the default ranking because it has broad dimensional coverage even though its efficiency is weak.
 
 If the currently missing Dim2 is also treated as zero for all patterns, every score above is scaled by `6/7` and the rank order remains the same. This matches the "all-7" caveat in the generated evaluation report.
+
+##### S1' - All-7 Dimensions: worst-case (Dim 2 = 0) vs Phase B2 actual
+
+Worst-case (Dim 2 = 0 uniformly) is a flat ×6/7 scaling:
+
+| Rank | Pattern | S1 score (6 dims) | S1' score (Dim2=0, ×6/7) | Rank change |
+|---:|---|---:|---:|:---:|
+| 1 | Reflex | 0.690 | 0.591 | — |
+| 2 | ReAct | 0.688 | 0.590 | — |
+| 3 | CoT | 0.681 | 0.584 | — |
+| 4 | ToT | 0.664 | 0.569 | — |
+| 5 | ReAct_Enhanced | 0.600 | 0.514 | — |
+| 6 | Baseline | 0.566 | 0.485 | — |
+
+When the **actual** Phase B2 Dim 2 means (from `docs/PHASE_B2_COGNITIVE_SAFETY.md` § 10.1, N=3 final run) are substituted instead of 0, the picture changes substantially:
+
+| Rank | Pattern | Dim 2 (mean ± std) | S1'' = (S1·6 + Dim2) / 7 | Δ vs S1' worst-case |
+|---:|---|---:|---:|---:|
+| 1 | Reflex | 0.909 ± 0.000 | **0.722** | +0.131 |
+| 2 | ReAct | 0.924 ± 0.006 | **0.721** | +0.131 |
+| 3 | CoT | 0.812 ± 0.000 | **0.700** | +0.116 |
+| 4 | ToT | 0.890 ± 0.004 | **0.696** | +0.127 |
+| 5 | ReAct_Enhanced | 0.957 ± 0.000 | **0.651** | +0.137 |
+| 6 | Baseline | 0.911 ± 0.000 | **0.616** | +0.131 |
+
+Findings:
+
+- **Rank order is preserved** between S1, S1' (worst-case) and S1'' (actual): Reflex first, Baseline last.
+- **ReAct_Enhanced gains the most** in absolute terms (+0.137) because it has the highest actual Dim 2 (0.957), but the lift is not enough to overtake CoT or ToT.
+- **ReAct's leaked-token caveat matters**: although its Dim 2 mean (0.924) is high, run 3 produced constraint flags (`server`, `internet`, `water` + LDNOOBW `hardcore` from a tool result). A single-task drill-down may show ReAct's Dim 2 closer to 0.85 in adversarial subsets, which would tighten its lead over CoT.
+- The S1↔S1'' transition is therefore a **near-uniform vertical shift** under the current data, not a re-ordering. Re-ordering would require Dim 2 spread > 0.4 across patterns, which is not observed in the N=3 run.
 
 #### S2 - Cognitive-Heavy
 
@@ -153,6 +198,12 @@ Interpretation: ToT becomes more competitive because it has the highest Dim7 sco
 Interpretation: Baseline and Reflex are clearly preferred when efficiency is weighted heavily. CoT and ToT both pay a reasoning-cost penalty, with CoT especially affected by high latency and low Dim4.
 
 ## 5. Cross-Dimension Trade-Off Analysis
+
+> **Methodology note (variance basis for §§ 5.1–5.4)**: All metric values in the trade-off tables below (latency, tokens, dimension scores, success rate, degradation, stability, etc.) are taken from the **latest single-run snapshot** in `reports/comparison_table.csv` rather than from N=3 multi-run means. They are point estimates, not means with confidence intervals. Where multi-run variance matters:
+>
+> - **Dim 2 (cognitive safety)** has explicit per-run statistics in `docs/PHASE_B2_COGNITIVE_SAFETY.md` § 10.1: Baseline `0.911 ± 0.000`, ReAct `0.924 ± 0.006`, ReAct_Enhanced `0.957 ± 0.000`, CoT `0.812 ± 0.000`, Reflex `0.909 ± 0.000`, ToT `0.890 ± 0.004` (3 runs, llama3.1 + temp=0).
+> - **Other dimensions and operational metrics**: under llama3.1 + temperature=0 the framework is **near-deterministic** — 4 of 6 patterns produce identical Dim 2 across runs (std = 0.000). Per-run JSON for the remaining dimensions is in `reports/phase_b2_final_n3_2026-05-08/` and can be aggregated with `src/evaluation/statistics.py` if formal CIs are required.
+> - **For Week 9 final results chapter**: regenerate single-task means and 95 % CIs from the per-run JSON rather than reusing the snapshot CSV used here. Future runs should set `EVAL_SEED` per run and/or enable `temperature > 0` to surface real stochastic variance.
 
 ### 5.1 Reasoning Depth vs Efficiency
 
