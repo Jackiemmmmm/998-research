@@ -454,6 +454,21 @@ The fix has three parts: (a) prompts force multi-sentence output, (b) judges req
 
 **Acceptance Criteria**: Complete dataset collected; all visualisation figures generated
 
+#### P1 Progress Log (2026-05-14, Week 7-8 P1 completion)
+
+**Status**: ✅ All P1 deliverables complete; merged via PR #7 (`cfae57b`, 2026-05-10).
+
+| Sub-task (per row above) | Status | Evidence |
+|--------------------------|--------|----------|
+| Run 4 patterns × 16 tasks × 3–5 repeats | ✅ Exceeded — ran **6 patterns × 19 tasks × 3 runs** (3 h 55 m wall-clock) | `reports/phase_b2_final_n3_2026-05-08/`; see `docs/PHASE_B2_COGNITIVE_SAFETY.md` § 10 |
+| Handle runtime bugs and edge cases | ✅ A5/B5/D5 forbidden-topics v2 redesign fixed verbosity-vs-rule false positives | commit `b3048de`; `src/evaluation/test_suite.py` |
+| Collect raw data (JSON dataset) | ✅ Complete 7-dimension dataset across all 6 patterns and 3 runs | `reports/phase_b2_final_n3_2026-05-08/*.json` (consumed downstream by `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md`) |
+| Ensure reproducibility | ✅ Near-deterministic at temp=0 (4/6 patterns std=0.000); git/seed metadata captured | `docs/PHASE_B2_COGNITIVE_SAFETY.md` § 10.2; `docs/PHASE_F_STATISTICAL_RIGOR.md` |
+
+**Downstream validation**: P2's sensitivity + cross-comparison analysis (`docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md`) successfully consumes this dataset end-to-end, confirming data integrity and completeness.
+
+**Files**: `reports/phase_b2_final_n3_2026-05-08/` (raw JSON), `src/evaluation/test_suite.py` (A5/B5/D5 v2), `docs/PHASE_B2_COGNITIVE_SAFETY.md` (§ 10), `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md` (downstream).
+
 ---
 
 ### Week 9: Demo Preparation + Report Writing
