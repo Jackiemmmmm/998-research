@@ -14,8 +14,10 @@
 
 ---
 
-## 1. Current Status (~58% Complete)
+## 1. Current Status — Week 8 of 10 (Phase E integration + final report body remaining)
 
+> As of 2026-05-14: Week 7-8 deliverables landed (P1 final N=3 evaluation, P2 sensitivity + cross-comparison analysis, P3 figure regeneration + 2 new trade-off scatter plots). All 7 dimensions now produce scores end-to-end. Remaining work for Weeks 9-10: Phase E composite-scoring integration polish, Phase G report body chapters, demo preparation.
+>
 > Completion assessment source: [PROJECT_GAP_ANALYSIS_AND_PLAN.md § Summary Table](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#part-1-current-completion-status-gap-analysis)
 
 ### 1.1 Completed
@@ -39,7 +41,7 @@
 | # | Dimension | Layer | Completion | Notes | Gap Details |
 |---|-----------|-------|------------|-------|-------------|
 | 1 | Reasoning Quality | Cognitive | ~70% | **Phase B1 COMPLETED** (2026-05-03): ReasoningExtractor + ReasoningJudge + 4-sub-indicator weighted scoring; 3/6 patterns score Dim1 (CoT 0.78 / Reflex 0.82 / ToT 0.86); self-consistency hook ready for Phase F | [Dim1 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-1-reasoning-quality-cognitive---0--70) |
-| 2 | Cognitive Safety & Constraint Adherence | Cognitive | ~70% | **Phase B2 COMPLETED** (2026-05-04): LDNOOBW toxicity screen + output-only grounding (hallucination proxy) + numeric-drift / confident-but-wrong consistency + max_steps / forbidden_topics / required_tools constraint adherence; 3 new tasks (A5/B5/D5); 36 unit tests; suite size 16 → 19. See [Phase B2 doc](./PHASE_B2_COGNITIVE_SAFETY.md). | [Dim2 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-2-cognitive-safety--constraint-adherence-cognitive---0) |
+| 2 | Cognitive Safety & Constraint Adherence | Cognitive | ~70% | **Phase B2 COMPLETED + N=3 VALIDATED** (2026-05-04 impl, 2026-05-08 v2 task redesign, 2026-05-09 N=3 final run): LDNOOBW toxicity screen + output-only grounding + numeric-drift consistency + constraint adherence; A5/B5/D5 v2 tasks; 36 unit tests; suite size 16 → 19. **N=3 means**: ReAct_Enhanced 0.957, ReAct 0.924, Baseline 0.911, Reflex 0.909, ToT 0.890, CoT 0.812. See [Phase B2 doc § 10](./PHASE_B2_COGNITIVE_SAFETY.md). | [Dim2 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-2-cognitive-safety--constraint-adherence-cognitive---0) |
 | 3 | Action–Decision Alignment | Behavioural | ~70% | **Phase C1 COMPLETED** (2026-04-01): AlignmentMetrics + verb-tool mapping + LCS sequence matching + Dim3 scoring | [Dim3 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-3-actiondecision-alignment-behavioural---0--10--70) |
 | 4 | Success & Efficiency | Behavioural | ~75% | Basic judge + metrics exist; missing normalised cost score | [Dim4 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-4-success--efficiency-behavioural---70--75) |
 | 5 | Behavioural Safety | Behavioural | ~70% | **Phase C3 COMPLETED** (2026-04-01): tool whitelist validation + domain safety regex + Dim5 scoring | [Dim5 Gap](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#dimension-5-behavioural-safety-behavioural---5--15--70) |
@@ -50,13 +52,13 @@
 
 > Each item below is explicitly promised in the Proposal but not yet implemented in the codebase
 
-| Missing Module | Proposal Source | Corresponding Phase |
-|----------------|----------------|---------------------|
-| Normalisation (0–1) + Composite Scoring | [Group-1.pdf § 2.2](../Group-1.pdf) p5: "each sub-indicator is normalised to the 0–1 range...composite results are computed" | [Phase E](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-e-normalization-aggregation--composite-scoring) |
-| Statistical Rigor (3–5 repeats, mean ± 95% CI) | [Group-1.pdf § 2.3 Table 2 C4](../Group-1.pdf) p8: "3–5 repeats; report mean ± 95% CI" | [Phase F](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-f-statistical-rigor--reproducibility) |
-| Sensitivity Analysis (weight variation impact on conclusions) | [Group-1.pdf § 2.2](../Group-1.pdf) p5: "sensitivity analysis of weight variation...in the appendix" | [Phase F](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-f-statistical-rigor--reproducibility) |
-| Complete Visualisation Suite (7-dim radar, trade-off scatter) | [Group-1.pdf § 3.3](../Group-1.pdf) p10: "Reusable scripts or tools that automate data collection and analysis" | [Phase G](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-g-final-report--visualization-polish) |
-| Final Report | [Group-1.pdf § 3.4](../Group-1.pdf) p10: "comprehensive comparison report...quantitative results and qualitative observations" | [Phase G](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-g-final-report--visualization-polish) |
+| Missing Module | Proposal Source | Corresponding Phase | Status (as of 2026-05-14) |
+|----------------|----------------|---------------------|---------------------------|
+| Normalisation (0–1) + Composite Scoring | [Group-1.pdf § 2.2](../Group-1.pdf) p5: "each sub-indicator is normalised to the 0–1 range...composite results are computed" | [Phase E](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-e-normalization-aggregation--composite-scoring) | **PARTIAL** — `compute_composite()` operational and consumed by sensitivity analysis; full integration polish deferred to Week 9-10 |
+| Statistical Rigor (3–5 repeats, mean ± 95% CI) | [Group-1.pdf § 2.3 Table 2 C4](../Group-1.pdf) p8: "3–5 repeats; report mean ± 95% CI" | [Phase F](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-f-statistical-rigor--reproducibility) | **DONE (2026-05-03)** — exercised end-to-end by N=3 final run on 2026-05-08/09 |
+| Sensitivity Analysis (weight variation impact on conclusions) | [Group-1.pdf § 2.2](../Group-1.pdf) p5: "sensitivity analysis of weight variation...in the appendix" | [Phase F](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-f-statistical-rigor--reproducibility) | **DONE (2026-05-14)** — see [`WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md`](./WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md) (S0–S5 weight scenarios + S1' / S1'' all-7 projection) |
+| Complete Visualisation Suite (7-dim radar, trade-off scatter) | [Group-1.pdf § 3.3](../Group-1.pdf) p10: "Reusable scripts or tools that automate data collection and analysis" | [Phase G](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-g-final-report--visualization-polish) | **DONE (2026-05-14)** — 10 PNGs in `reports/figures/` (radar, heatmap, 2 trade-off scatter plots, robustness, etc.); JSON-adapter CLI in `src/evaluation/visualization.py` |
+| Final Report | [Group-1.pdf § 3.4](../Group-1.pdf) p10: "comprehensive comparison report...quantitative results and qualitative observations" | [Phase G](./PROJECT_GAP_ANALYSIS_AND_PLAN.md#phase-g-final-report--visualization-polish) | **IN PROGRESS** — Results & Analysis chapter (P2) and Methodology chapter (P3) scheduled for Week 9 |
 
 ---
 
@@ -137,11 +139,13 @@ Update the `Status` field in the spec header as it progresses.
 
 | Spec | Owner | Phase | Status |
 |------|-------|-------|--------|
-| [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) | P2 | Phase E | READY FOR IMPLEMENTATION |
+| [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) | P2 | Phase E | READY FOR IMPLEMENTATION (composite-scoring functions operational; full integration polish deferred to Week 9-10) |
 | [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) | P3 | Phase D2 | READY FOR IMPLEMENTATION |
-| [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) | P2 | Phase D1 | READY FOR IMPLEMENTATION |
-| [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) | P3 | Phase C3 | READY FOR IMPLEMENTATION |
+| [week3-4_phase-d1_robustness.md](./specs/week3-4_phase-d1_robustness.md) | P2 | Phase D1 | **DONE (2026-04-01)** |
+| [week3-4_phase-c3_behavioural-safety.md](./specs/week3-4_phase-c3_behavioural-safety.md) | P3 | Phase C3 | **DONE (2026-04-01)** |
 | [week5-6_phase-b1_reasoning-quality.md](./specs/week5-6_phase-b1_reasoning-quality.md) | P1 | Phase B1 | **DONE (2026-05-03)** |
+| [week5-6_phase-b2_cognitive-safety.md](./specs/week5-6_phase-b2_cognitive-safety.md) | P3 → P1 | Phase B2 | **DONE (2026-05-08, v2 task redesign + N=3 validation 2026-05-09)** |
+| [week5-6_phase-f_statistical-rigor.md](./specs/week5-6_phase-f_statistical-rigor.md) | P2 | Phase F | **DONE (2026-05-03)** |
 
 ---
 

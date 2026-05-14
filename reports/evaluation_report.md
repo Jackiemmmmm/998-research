@@ -1,5 +1,15 @@
 # Agentic Pattern Evaluation Report
 
+> ⚠️ **SUPERSEDED — see notice below.** This report is the 2026-05-04 snapshot from the W5-6 wave. A newer **N=3 final evaluation** was completed on 2026-05-08 → 2026-05-09 with the **A5/B5/D5 v2 task redesign** (Phase B2 cognitive-safety), and a full **figure regeneration** ran on 2026-05-14.
+>
+> **For the current canonical results**, prefer:
+> - **Raw dataset**: `reports/phase_b2_final_n3_2026-05-08/evaluation_results.json` (N=3, 6 patterns × 19 tasks)
+> - **Aggregated per-run report**: `reports/phase_b2_final_n3_2026-05-08/evaluation_report.md`
+> - **Figures (latest)**: `reports/figures/` (regenerated 2026-05-14, 10 PNGs incl. 2 trade-off scatter plots)
+> - **Sensitivity & cross-comparison appendix**: `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md`
+>
+> This file is retained for historical comparison only; do not cite for final-report numbers.
+
 **Generated:** 2026-05-04 03:45:24
 **Patterns Evaluated:** Baseline, ReAct, ReAct_Enhanced, CoT, Reflex, ToT
 **Number of Runs:** 3

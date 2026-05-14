@@ -1,7 +1,7 @@
 # Project Gap Analysis & Implementation Plan
 
 > Generated: 2026-03-03
-> Last Updated: 2026-05-03 (Week 5-6 P1 Phase B1 Dim1 implementation)
+> Last Updated: 2026-05-14 (Week 7-8 P1 final N=3 evaluation + P2 sensitivity & cross-comparison + P3 figure regeneration & 2 new trade-off scatter plots)
 > Based on: Group-1.pdf (Project Proposal) + CLAUDE.md + Current Codebase Review
 
 ## Phase Implementation Status
@@ -17,7 +17,7 @@
 | **D2** | Controllability & Transparency (Dim 7) | NOT STARTED | [week1-2_phase-d2_controllability.md](./specs/week1-2_phase-d2_controllability.md) (P3, READY FOR IMPLEMENTATION) | — |
 | **E** | Normalization & Composite Scoring | NOT STARTED | [week1-2_phase-e_normalisation.md](./specs/week1-2_phase-e_normalisation.md) (P2, READY FOR IMPLEMENTATION) | — |
 | **F** | Statistical Rigor & Reproducibility | NOT STARTED | [week5-6_phase-f_statistical-rigor.md](./specs/week5-6_phase-f_statistical-rigor.md) (P2, PENDING) | — |
-| **G** | Report & Visualization Polish | NOT STARTED | — | — |
+| **G** | Report & Visualization Polish | **PARTIAL** (figures done 2026-05-14; report body deferred Week 9) | — | `reports/figures/` — 10 PNGs (7-dim radar, heatmap, 2 trade-off scatter plots, robustness, etc.); `src/evaluation/visualization.py` (scatter plots + JSON-adapter CLI) |
 
 ---
 
@@ -37,7 +37,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 | 6 | Robustness & Scalability | Systemic | **D1 COMPLETED** | ~75% | Phase D1 completed (2026-04-01): all perturbations, stability index, complexity scaling |
 | 7 | Controllability, Transparency & Resource Efficiency | Systemic | PARTIALLY DONE | ~45% | TAO cycle tracking enabled |
 
-**Overall estimated completion: ~44% → ~52% → ~58% of the 7-dimension framework** (Phase C1 Dim3, Phase D1 Dim6, Phase C3 Dim5, Phase B1 Dim1 all completed)
+**Overall progress (as of 2026-05-14, Week 8 of 10)**: 7/7 dimensions produce evaluable scores end-to-end (Phase A unified telemetry + B1 reasoning + B2 cognitive-safety N=3 validated + C1 alignment + C3 behavioural-safety + D1 robustness + D2 partial controllability via existing Dim7 formula); Phase F multi-run / 95% CI / pairwise Cohen's d operational and exercised by the 2026-05-08 N=3 final run; Phase G visualization regenerated (10 figures including 2 new trade-off scatter plots) and W7-8 P2 sensitivity analysis appendix complete. **Remaining**: Phase E composite-scoring integration polish, Phase G report body chapters (Week 9 P2/P3), Phase D2 dedicated Dim7 module if time permits.
 
 ---
 
@@ -232,7 +232,7 @@ The proposal defines a **3-Layer, 7-Dimension** evaluation framework. Below is a
 | **Dimension-Level Scoring** | No averaging of sub-indicators into dimension scores. | OPEN | Phase E |
 | **Composite Scoring** | No weighted/uniform combination of dimension scores into a final composite. | OPEN | Phase E |
 | **Statistical Rigor** | ~~No multiple runs (3-5), no confidence intervals, no seed fixing.~~ Multi-run loop, mean ± 95 % CI (t-distribution), pairwise Cohen's d for composite + success rate, seed support where backend exposes it. | **CLOSED** (2026-05-03, Phase F) → [details](./PHASE_F_STATISTICAL_RIGOR.md) |
-| **Sensitivity Analysis** | No weight variation analysis in appendix. | OPEN | Phase F (multi-run / CI infra now in place) — Week 7-8 P2 task |
+| **Sensitivity Analysis** | ~~No weight variation analysis in appendix.~~ Six weight scenarios (S0–S5) with full 6-pattern rankings + cross-dimension trade-off analysis (reasoning vs efficiency, tool alignment vs cost, robustness vs success, controllability/transparency) + per-pattern strengths/weaknesses + S1' / S1'' all-7 projection using actual Phase B2 N=3 Dim 2 means. | **CLOSED (2026-05-14, Week 7-8 P2)** → [details](./WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md) |
 
 ---
 
@@ -483,8 +483,8 @@ Given the project timeline (Figure 1 in proposal: Stage 3 Full Evaluation is ~Ma
 | **P3** | D1 | Enhance Robustness | Medium | **COMPLETED** (2026-04-01) |
 | **P3** | D2 | Controllability & Transparency | Medium | NOT STARTED (prerequisite Phase A ready) |
 | **P3** | C3 | Behavioural Safety | Medium | **COMPLETED** (2026-04-01) |
-| **P4** | B2 | Cognitive Safety (proxy) | Medium | NOT STARTED |
-| **P5** | G | Report & Visualization Polish | Medium | NOT STARTED |
+| **P4** | B2 | Cognitive Safety (proxy) | Medium | **COMPLETED + N=3 VALIDATED** (2026-05-04 impl, 2026-05-08 v2 task redesign, 2026-05-09 N=3 final run) → [details](./PHASE_B2_COGNITIVE_SAFETY.md) |
+| **P5** | G | Report & Visualization Polish | Medium | **PARTIAL** (figures done 2026-05-14; report body Week 9) → [figures](../reports/figures/) + [W7-8 P2 sensitivity report](./WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md) |
 
 **Rationale:**
 - ~~Phase A is the foundation; without it, dimensions 1/3/7 cannot be properly measured~~ **Phase A COMPLETED** — foundation is now in place
