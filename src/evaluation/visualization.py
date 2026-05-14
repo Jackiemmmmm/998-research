@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 
 matplotlib.use('Agg')  # Use non-interactive backend
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
 from .metrics import PatternMetrics
+from .scoring import NormalizedDimensionScores
 from .statistics import StatisticalReport
 
 
@@ -87,6 +88,16 @@ class EvaluationVisualizer:
         if statistical_report is not None and statistical_report.num_runs > 1:
             path = self.plot_composite_ci(statistical_report)
             generated_files.append(path)
+
+        # 9. Trade-off scatter: reasoning quality (Dim 1) vs avg latency.
+        #    Phase G P3 deliverable -- pairs with the radar / heatmap to
+        #    expose cross-dimension trade-offs without re-reading tables.
+        path = self.plot_tradeoff_reasoning_vs_efficiency(pattern_metrics)
+        generated_files.append(path)
+
+        # 10. Trade-off scatter: robustness (Dim 6) vs raw strict success.
+        path = self.plot_tradeoff_robustness_vs_success(pattern_metrics)
+        generated_files.append(path)
 
         return generated_files
 
@@ -634,3 +645,431 @@ class EvaluationVisualizer:
         plt.close()
 
         return str(output_path)
+
+    # ------------------------------------------------------------------
+    # Phase G (Week 7-8 P3) -- regenerate figures from a saved JSON
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def hydrate_pattern_metrics_from_json(
+        evaluation_results: Dict[str, Any],
+    ) -> Dict[str, PatternMetrics]:
+        """Rebuild ``PatternMetrics`` objects from a saved results JSON.
+
+        Used to regenerate the figure set against an existing
+        ``evaluation_results.json`` (e.g. the Phase B2 final N=3 dataset)
+        without re-running the multi-hour evaluation pipeline. Only the
+        fields the visualization layer reads are populated; the JSON
+        schema is the same one ``ReportGenerator.generate_json_report``
+        emits.
+
+        Args:
+            evaluation_results: Parsed JSON with keys
+                ``individual_metrics`` and ``normalised_dimension_scores``.
+
+        Returns:
+            Dict of ``{pattern_name: PatternMetrics}`` ordered to match
+            the JSON's ``individual_metrics`` insertion order.
+        """
+        # Lazy imports keep this module importable even when callers do
+        # not need the hydration path (avoids paying the full metrics
+        # graph cost on simple ``import``s).
+        from .metrics import (
+            ControllabilityMetrics,
+            EfficiencyMetrics,
+            RobustnessMetrics,
+            SuccessMetrics,
+        )
+
+        individual = evaluation_results.get("individual_metrics", {})
+        normalised = evaluation_results.get("normalised_dimension_scores", {})
+
+        rebuilt: Dict[str, PatternMetrics] = {}
+        for name, blob in individual.items():
+            pm = PatternMetrics(pattern_name=name)
+
+            # --- Success ---------------------------------------------
+            s = blob.get("success", {})
+            success = SuccessMetrics()
+            success.total_tasks = int(s.get("total_tasks", 0))
+            success.successful_tasks = int(s.get("successful_tasks_strict", 0))
+            success.lenient_successful_tasks = int(s.get("successful_tasks_lenient", 0))
+            success.failed_tasks = int(s.get("failed_tasks", 0))
+            success.partial_success_tasks = int(s.get("partial_success_tasks", 0))
+            success.success_by_category = dict(s.get("success_by_category", {}))
+            success.success_by_complexity = dict(s.get("success_by_complexity", {}))
+            pm.success = success
+
+            # --- Efficiency ------------------------------------------
+            e = blob.get("efficiency", {})
+            eff = EfficiencyMetrics()
+            # The plotting layer reads avg_latency() / avg_total_tokens()
+            # from the underlying lists; reconstruct minimal-length
+            # sequences whose mean equals the saved aggregate.
+            avg_lat = float(e.get("avg_latency_sec", 0.0))
+            avg_tok = float(e.get("avg_total_tokens", 0.0))
+            eff.latencies = [avg_lat]
+            # Distribute total tokens 50/50 between in/out so the sum
+            # round-trips through ``avg_total_tokens`` correctly.
+            eff.input_tokens = [int(avg_tok / 2)]
+            eff.output_tokens = [int(avg_tok - int(avg_tok / 2))]
+            eff.step_counts = [int(round(float(e.get("avg_steps", 0))))]
+            eff.tool_call_counts = [int(round(float(e.get("avg_tool_calls", 0))))]
+            pm.efficiency = eff
+
+            # --- Robustness ------------------------------------------
+            r = blob.get("robustness", {})
+            rob = RobustnessMetrics()
+            rob.original_success_rate = float(r.get("original_success_rate", 0.0))
+            rob.perturbed_success_rate = float(r.get("perturbed_success_rate", 0.0))
+            rob.degradation_percentage = float(r.get("degradation_percentage", 0.0))
+            rob.absolute_degradation = float(r.get("absolute_degradation", 0.0))
+            rob.perturbation_variant_count = int(r.get("perturbation_variant_count", 0))
+            rob.tool_failure_recovery_rate = float(r.get("tool_failure_recovery_rate", 0.0))
+            rob.tool_failure_graceful_degradation = float(
+                r.get("tool_failure_graceful_degradation", 0.0)
+            )
+            rob.stability_index = float(r.get("stability_index", 0.0))
+            rob.success_by_complexity = dict(r.get("success_by_complexity", {}))
+            rob.complexity_decline = float(r.get("complexity_decline", 0.0))
+            rob.scaling_score = float(r.get("scaling_score", 1.0))
+            rob.task_robustness_scores = dict(r.get("task_robustness_scores", {}))
+            pm.robustness = rob
+
+            # --- Controllability -------------------------------------
+            c = blob.get("controllability", {})
+            ctrl = ControllabilityMetrics()
+            ctrl.total_json_tasks = int(c.get("total_json_tasks", 0))
+            ctrl.schema_compliant_tasks = int(c.get("schema_compliant_tasks", 0))
+            ctrl.total_tool_tasks = int(c.get("total_tool_tasks", 0))
+            ctrl.tool_policy_compliant_tasks = int(c.get("tool_policy_compliant_tasks", 0))
+            ctrl.unauthorized_tool_uses = int(c.get("unauthorized_tool_uses", 0))
+            ctrl.format_compliance_rate = float(c.get("format_compliance_rate", 0.0))
+            ctrl.avg_interpretability_score = float(c.get("avg_interpretability_score", 0.0))
+            pm.controllability = ctrl
+
+            # --- Normalised dimension scores (Phase E) ---------------
+            ns_blob = normalised.get(name, {}).get("dimensions", {})
+            ns = NormalizedDimensionScores(pattern_name=name)
+            ns.dim1_reasoning_quality = ns_blob.get("dim1_reasoning_quality")
+            ns.dim2_cognitive_safety = ns_blob.get("dim2_cognitive_safety")
+            ns.dim3_action_decision_alignment = ns_blob.get("dim3_action_decision_alignment")
+            ns.dim4_success_efficiency = ns_blob.get("dim4_success_efficiency")
+            ns.dim5_behavioural_safety = ns_blob.get("dim5_behavioural_safety")
+            ns.dim6_robustness_scalability = ns_blob.get("dim6_robustness_scalability")
+            ns.dim7_controllability = ns_blob.get("dim7_controllability")
+            # The visualisation layer reads ``_normalised_scores`` via
+            # ``getattr`` -- attach it on the dataclass instance.
+            pm._normalised_scores = ns  # type: ignore[attr-defined]
+
+            rebuilt[name] = pm
+
+        return rebuilt
+
+    # ------------------------------------------------------------------
+    # Phase G (Week 7-8 P3) -- trade-off scatter plots
+    # ------------------------------------------------------------------
+
+    def _annotate_points(
+        self,
+        ax: "plt.Axes",
+        labels: List[str],
+        xs: List[float],
+        ys: List[float],
+        x_offset: float = 0.0,
+        y_offset: float = 0.0,
+    ) -> None:
+        """Annotate each scatter point with its pattern label.
+
+        Uses a small offset so the text sits adjacent to the marker
+        without overlapping it. Offsets are in data coordinates.
+        """
+        for label, x, y in zip(labels, xs, ys):
+            ax.annotate(
+                label,
+                xy=(x, y),
+                xytext=(x + x_offset, y + y_offset),
+                fontsize=9,
+                fontweight='bold',
+                ha='left',
+                va='bottom',
+            )
+
+    def plot_tradeoff_reasoning_vs_efficiency(
+        self,
+        pattern_metrics: Dict[str, PatternMetrics],
+    ) -> str:
+        """Scatter: Dim 1 reasoning quality vs avg latency (efficiency).
+
+        X-axis: avg latency in seconds (log scale -- the sample range
+        spans 2 s to 60 s on the N=3 dataset).
+        Y-axis: Dim 1 reasoning quality (0-1).
+
+        Patterns whose Dim 1 is None (no THINK trace -- Baseline / ReAct /
+        ReAct_Enhanced on the current suite) are still plotted along
+        ``y = 0`` with a hollow marker so the cost-of-no-reasoning
+        trade-off is visible. They are annotated as "Dim 1 = N/A".
+
+        Returns:
+            Absolute path of the saved PNG.
+        """
+        patterns = list(pattern_metrics.keys())
+
+        # Pull the same numbers the heatmap / composite use.
+        latencies: List[float] = []
+        dim1_scores: List[Optional[float]] = []
+        for metrics in pattern_metrics.values():
+            latencies.append(metrics.efficiency.avg_latency())
+            ns = getattr(metrics, '_normalised_scores', None)
+            dim1_scores.append(getattr(ns, 'dim1_reasoning_quality', None) if ns else None)
+
+        # Split into "evaluable" (filled marker) and "N/A" (hollow at y=0).
+        eval_x: List[float] = []
+        eval_y: List[float] = []
+        eval_labels: List[str] = []
+        eval_colors: List[str] = []
+        na_x: List[float] = []
+        na_y: List[float] = []
+        na_labels: List[str] = []
+        na_colors: List[str] = []
+        for i, name in enumerate(patterns):
+            colour = self.colors[i % len(self.colors)]
+            if dim1_scores[i] is None:
+                na_x.append(latencies[i])
+                na_y.append(0.0)
+                na_labels.append(name)
+                na_colors.append(colour)
+            else:
+                eval_x.append(latencies[i])
+                eval_y.append(dim1_scores[i])
+                eval_labels.append(name)
+                eval_colors.append(colour)
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        if eval_x:
+            ax.scatter(
+                eval_x,
+                eval_y,
+                s=140,
+                c=eval_colors,
+                edgecolors='black',
+                linewidths=0.8,
+                zorder=3,
+                label='Dim 1 evaluable',
+            )
+        if na_x:
+            ax.scatter(
+                na_x,
+                na_y,
+                s=140,
+                facecolors='none',
+                edgecolors=na_colors,
+                linewidths=1.6,
+                zorder=3,
+                label='Dim 1 = N/A (no THINK trace)',
+            )
+
+        # Use a log x-axis only when the latency range is wide enough to
+        # warrant it -- avoids squashing the 2 s -- 60 s sample.
+        if latencies and max(latencies) / max(min(latencies), 1e-3) > 5:
+            ax.set_xscale('log')
+
+        # Annotation offsets in data coordinates -- small horizontal nudge
+        # is fine on log scale because the offset is added before log-mapping.
+        if eval_x:
+            self._annotate_points(
+                ax,
+                eval_labels,
+                eval_x,
+                eval_y,
+                x_offset=max(eval_x) * 0.02,
+                y_offset=0.015,
+            )
+        if na_x:
+            self._annotate_points(
+                ax,
+                [f'{lbl} (N/A)' for lbl in na_labels],
+                na_x,
+                na_y,
+                x_offset=max(latencies) * 0.02 if latencies else 0.05,
+                y_offset=0.025,
+            )
+
+        ax.set_xlabel('Average Latency (seconds, log scale)', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Dim 1 Reasoning Quality (0–1)', fontsize=12, fontweight='bold')
+        ax.set_title(
+            'Reasoning Depth vs Efficiency Trade-off',
+            fontsize=14,
+            fontweight='bold',
+        )
+        ax.set_ylim(-0.05, 1.05)
+        ax.grid(True, which='both', alpha=0.3)
+        ax.legend(loc='lower right', fontsize=9, framealpha=0.9)
+
+        plt.tight_layout()
+        output_path = self.output_dir / "tradeoff_reasoning_vs_efficiency.png"
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+
+        return str(output_path)
+
+    def plot_tradeoff_robustness_vs_success(
+        self,
+        pattern_metrics: Dict[str, PatternMetrics],
+    ) -> str:
+        """Scatter: Dim 6 robustness vs raw strict success rate.
+
+        X-axis: strict success rate (0-1).
+        Y-axis: Dim 6 robustness & scalability (0-1).
+        Bubble size is scaled by perturbation degradation (%) so the
+        third dimension of the trade-off is visible without stacking
+        more axes; smaller bubbles = more robust under perturbation.
+
+        Returns:
+            Absolute path of the saved PNG.
+        """
+        patterns = list(pattern_metrics.keys())
+
+        successes: List[float] = []
+        dim6_scores: List[float] = []
+        degradations: List[float] = []
+        colours: List[str] = []
+        for i, metrics in enumerate(pattern_metrics.values()):
+            successes.append(metrics.success.success_rate())
+            ns = getattr(metrics, '_normalised_scores', None)
+            dim6_scores.append(getattr(ns, 'dim6_robustness_scalability', None) or 0.0)
+            degradations.append(metrics.robustness.degradation_percentage)
+            colours.append(self.colors[i % len(self.colors)])
+
+        # Bubble size: linear map of degradation% to a marker area in
+        # points^2.  Floor at 80 so a 0% degradation point is still
+        # visible; ceiling implicit in the data (worst case ~60%).
+        sizes = [80.0 + 8.0 * d for d in degradations]
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        ax.scatter(
+            successes,
+            dim6_scores,
+            s=sizes,
+            c=colours,
+            edgecolors='black',
+            linewidths=0.8,
+            alpha=0.85,
+            zorder=3,
+        )
+
+        # Annotate -- small offset above and to the right of each point.
+        self._annotate_points(
+            ax,
+            patterns,
+            successes,
+            dim6_scores,
+            x_offset=0.012,
+            y_offset=0.018,
+        )
+
+        ax.set_xlabel('Strict Success Rate (0–1)', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Dim 6 Robustness & Scalability (0–1)', fontsize=12, fontweight='bold')
+        ax.set_title(
+            'Robustness vs Raw Success Trade-off (bubble size = degradation %)',
+            fontsize=13,
+            fontweight='bold',
+        )
+        ax.set_xlim(-0.02, 1.05)
+        ax.set_ylim(-0.02, 1.05)
+        ax.grid(True, which='both', alpha=0.3)
+
+        # Build a synthetic legend for the bubble-size encoding.
+        legend_sizes = [10.0, 30.0, 50.0]
+        legend_handles = [
+            plt.scatter(
+                [], [],
+                s=80.0 + 8.0 * d,
+                c='lightgray',
+                edgecolors='black',
+                linewidths=0.6,
+                label=f'{int(d)}% degradation',
+            )
+            for d in legend_sizes
+        ]
+        ax.legend(
+            handles=legend_handles,
+            loc='lower left',
+            fontsize=9,
+            framealpha=0.9,
+            title='Bubble size',
+        )
+
+        plt.tight_layout()
+        output_path = self.output_dir / "tradeoff_robustness_vs_success.png"
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+
+        return str(output_path)
+
+
+def _regenerate_from_json(
+    json_path: Path,
+    output_dir: Path,
+) -> List[str]:
+    """Regenerate the figure set from a saved evaluation JSON (CLI helper).
+
+    Reads ``evaluation_results.json`` (the schema written by
+    ``ReportGenerator.generate_json_report``), hydrates ``PatternMetrics``
+    and writes every figure ``EvaluationVisualizer.generate_all_plots``
+    knows how to emit into ``output_dir``.
+
+    Note: ``StatisticalReport`` is not reconstructed here -- that would
+    require parsing the multi-run flatten format. As a result the
+    multi-run-only ``composite_ci.png`` and CI overlays are skipped on
+    this path. Single-run callers re-running ``run_evaluation.py`` still
+    get the full Phase F treatment via the in-memory pipeline.
+    """
+    import json
+
+    with open(json_path, encoding='utf-8') as fh:
+        data = json.load(fh)
+
+    pattern_metrics = EvaluationVisualizer.hydrate_pattern_metrics_from_json(data)
+    visualizer = EvaluationVisualizer(output_dir=str(output_dir))
+    return visualizer.generate_all_plots(pattern_metrics)
+
+
+def main() -> None:
+    r"""Regenerate figures from a saved evaluation JSON (CLI entrypoint).
+
+    Usage:
+        python -m src.evaluation.visualization \
+            --from-json reports/phase_b2_final_n3_2026-05-08/evaluation_results.json \
+            --output-dir reports/figures
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description='Regenerate evaluation figures from a saved results JSON.',
+    )
+    parser.add_argument(
+        '--from-json',
+        type=Path,
+        required=True,
+        help='Path to evaluation_results.json (Phase F multi-run snapshot).',
+    )
+    parser.add_argument(
+        '--output-dir',
+        type=Path,
+        default=Path('reports/figures'),
+        help='Directory to write the PNGs (default: reports/figures).',
+    )
+    args = parser.parse_args()
+
+    paths = _regenerate_from_json(args.from_json, args.output_dir)
+    # T201: print is intentional CLI output here.
+    print(f"Wrote {len(paths)} figures to {args.output_dir}:")  # noqa: T201
+    for p in paths:
+        print(f"  - {p}")  # noqa: T201
+
+
+if __name__ == '__main__':
+    main()

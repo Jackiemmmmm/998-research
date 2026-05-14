@@ -488,6 +488,30 @@ The fix has three parts: (a) prompts force multi-sentence output, (b) judges req
 
 **Files**: `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md` (full report + reviewer patches).
 
+#### P3 Progress Log (2026-05-14, Week 7-8 P3 completion + reviewer pass) - write by P1 Yucheng Tu
+
+**Status**: ✅ All core P3 deliverables complete; reviewer-pass patches applied 2026-05-14 (added missing scatter plots; regenerated full figure set against the 2026-05-08 N=3 final dataset).
+
+| Sub-task (per row above) | Status | Evidence |
+|--------------------------|--------|----------|
+| 7-dimension radar chart | ✅ Regenerated 2026-05-14 from N=3 dataset | `reports/figures/radar_comparison.png` (7 axes × 6 patterns, mtime 2026-05-14) |
+| Per-pattern success heatmap | ✅ Regenerated 2026-05-14 from N=3 dataset | `reports/figures/normalised_heatmap.png` (6×7 grid, RdYlGn palette) |
+| Trade-off scatter plot | ✅ **NEW** — 2 plots added (Reasoning vs Efficiency, Robustness vs Success) | `reports/figures/tradeoff_reasoning_vs_efficiency.png` (log-scale latency, hollow markers for N/A patterns); `reports/figures/tradeoff_robustness_vs_success.png` (bubble size = degradation %) |
+| Robustness degradation bar chart | ✅ Regenerated 2026-05-14 from N=3 dataset | `reports/figures/robustness_comparison.png` (dual panel: original vs perturbed + stability/scaling) |
+| Statistical significance annotations | ⚠️ Partial — CIs + Cohen's d tables present in `reports/evaluation_report.md` § 7 and `evaluation_results.json`; per-figure p-value asterisks deferred to Week 9 | `reports/figures/success_rate_comparison.png` has 95% CI error bars |
+| Export all figures | ✅ 10 PNGs (8 regenerated + 2 new), 300 DPI, colourblind-safe palette | `reports/figures/` + mirror at `reports/phase_b2_final_n3_2026-05-08/figures/` |
+
+**Reviewer-pass patches (2026-05-14)**:
+- Added `plot_tradeoff_reasoning_vs_efficiency` and `plot_tradeoff_robustness_vs_success` to `src/evaluation/visualization.py`; wired into `generate_all_plots`.
+- Added `hydrate_pattern_metrics_from_json` classmethod + `python -m src.evaluation.visualization --from-json …` CLI entry point — re-emits figures from any saved `evaluation_results.json` **without re-running the ~4 h evaluation**.
+- All ruff checks pass; 255 unit tests pass (pre-existing unrelated `test_configuration.py` collection error untouched).
+
+**Upstream link**: Figures sourced from P1's N=3 final dataset (`reports/phase_b2_final_n3_2026-05-08/`); spot-checks confirm data alignment (radar 7 axes × 6 patterns; heatmap CoT Dim1 = 0.817 matches JSON; scatter values cross-validated against `docs/WEEK7_8_P2_SENSITIVITY_CROSS_COMPARISON.md` §§ 5.1 / 5.3).
+
+**Open follow-ups (non-blocking, deferred to Week 9)**: regenerate `composite_ci.png` via a `StatisticalReport` pathway (current JSON-only adapter cannot reconstruct it — existing 2026-05-09 version retained meanwhile); per-figure p-value asterisk overlays for the success-rate / robustness charts.
+
+**Files**: `src/evaluation/visualization.py` (scatter plots + JSON adapter + CLI), `reports/figures/*.png` (10 PNGs regenerated/new), `reports/phase_b2_final_n3_2026-05-08/figures/` (mirror).
+
 ---
 
 ### Week 9: Demo Preparation + Report Writing
